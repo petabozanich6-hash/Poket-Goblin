@@ -1,47 +1,33 @@
 # Pocket Goblin
 
-ADHD-friendly, goblin-themed life management — migrating from Floot to
-GitHub, Cursor, and Cloudflare.
+Your brain has enough tabs open. Let the goblin handle it.
 
-> Preparing the goblin's new home.
-
-## Status
-
-**Migration foundation.** The existing Floot application has not been imported
-yet. This repository provides a React + TypeScript + Vite shell, tooling,
-folder structure, Cloudflare preparation, and documentation so the real app
-can land cleanly.
-
-Do not expect product features here until the Floot source is migrated.
+ADHD-friendly personal life management — whimsical, calm, and built to do the
+organisational thinking for you.
 
 ## Quick start
 
 ```bash
+cp .dev.vars.example .dev.vars
 npm install
+npm run db:migrate:local
 npm run dev
 ```
 
-See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for full setup.
+Open http://localhost:5173 — create an account and dump your first thought.
 
-## Documentation
+## Stack
 
-| Doc                                                | Contents                                   |
-| -------------------------------------------------- | ------------------------------------------ |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)       | Target stack, Workers / D1 / R2 evaluation |
-| [docs/MIGRATION_PLAN.md](docs/MIGRATION_PLAN.md)   | Phased Floot → Cloudflare plan             |
-| [docs/FLOOT_INVENTORY.md](docs/FLOOT_INVENTORY.md) | Required source, APIs, schemas, assets     |
-| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)         | Local workflows and conventions            |
+React + TypeScript + Vite · Cloudflare Workers · D1 · CSS Modules
 
-## Stack (foundation)
+## Docs
 
-- React + TypeScript (strict) + Vite
-- React Router
-- TanStack React Query
-- Lucide React
-- CSS Modules
-- ESLint + Prettier
-- Cloudflare Workers / D1 / R2 (prepared, not provisioned)
+- [Product](docs/PRODUCT.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Development](docs/DEVELOPMENT.md)
+- [Roadmap](docs/ROADMAP.md)
 
-## License
+## Status
 
-Private — commercial product in preparation. All rights reserved.
+Sprint 1 core application is implemented against a **local** D1 database.
+No production deploy. No paid Cloudflare resources provisioned.

@@ -1,0 +1,75 @@
+.page {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.hero {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.kicker {
+  color: var(--color-ink-muted);
+  font-weight: 700;
+  margin-bottom: var(--space-2);
+}
+
+.sub {
+  margin-top: var(--space-2);
+  color: var(--color-ink-muted);
+  max-width: 36rem;
+}
+
+.capacity {
+  margin-top: var(--space-3);
+  color: var(--color-ink-muted);
+}
+
+.cardHint {
+  color: var(--color-ink-muted);
+  margin: var(--space-2) 0 var(--space-4);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.awaitList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.awaitList li {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-muted);
+}
+
+.captureStack {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+@media (max-width: 800px) {
+  .hero {
+    align-items: flex-start;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

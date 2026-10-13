@@ -5,3 +5,5 @@ coverage
 package-lock.json
 worker/dist
 .wrangler
+.mf
+*.toml
