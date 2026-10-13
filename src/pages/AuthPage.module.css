@@ -1,0 +1,79 @@
+.page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+}
+
+.panel {
+  width: min(28rem, 100%);
+  display: grid;
+  gap: var(--space-5);
+}
+
+.hero {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.tagline {
+  margin-top: var(--space-2);
+  color: var(--color-ink-muted);
+}
+
+.modeTabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  padding: var(--space-1);
+  border-radius: 999px;
+  background: var(--color-bg-muted);
+}
+
+.modeTab,
+.modeActive {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.65rem 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.modeTab {
+  background: transparent;
+  color: var(--color-ink-muted);
+}
+
+.modeActive {
+  background: var(--color-bg-elevated);
+  color: var(--color-accent-strong);
+  box-shadow: var(--shadow-soft);
+}
+
+.form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.error {
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+  border-radius: var(--radius-md);
+  padding: 0.65rem 0.8rem;
+  font-size: 0.9rem;
+}
+
+.switch {
+  color: var(--color-ink-muted);
+  font-size: 0.95rem;
+}
+
+.switch button {
+  border: 0;
+  background: transparent;
+  color: var(--color-accent-strong);
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}

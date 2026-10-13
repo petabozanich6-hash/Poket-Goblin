@@ -1,0 +1,29 @@
+.form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.actions {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.buttonRow {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.hint {
+  color: var(--color-ink-muted);
+  font-size: 0.9rem;
+  max-width: 28rem;
+}
+
+.error {
+  color: var(--color-danger);
+  font-size: 0.9rem;
+}

@@ -1,0 +1,185 @@
+.page {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.header {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.sub {
+  color: var(--color-ink-muted);
+  margin-top: var(--space-2);
+  max-width: 40rem;
+}
+
+.stack {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.stackTight {
+  margin-top: var(--space-4);
+}
+
+.tabs {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.tab,
+.tabActive {
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-ink-muted);
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tabActive {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+  border-color: transparent;
+}
+
+.modeGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.modeCard,
+.modeActive {
+  text-align: left;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-ink);
+  padding: var(--space-4);
+  display: grid;
+  gap: 0.35rem;
+  cursor: pointer;
+}
+
+.modeCard span,
+.modeActive span {
+  color: var(--color-ink-muted);
+  font-size: 0.9rem;
+}
+
+.modeActive {
+  border-color: transparent;
+  background: var(--color-accent-soft);
+  box-shadow: inset 0 0 0 2px var(--color-accent);
+}
+
+.actions {
+  margin-top: var(--space-4);
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.monthGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.35rem;
+  margin-top: var(--space-4);
+}
+
+.monthCell {
+  min-height: 4.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.35rem;
+  background: var(--color-bg-elevated);
+  font-size: 0.8rem;
+}
+
+.monthEvent {
+  margin: 0.15rem 0 0;
+  color: var(--color-accent-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.listRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.row3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-ink-muted);
+}
+
+.field input {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-ink);
+  border-radius: var(--radius-md);
+  padding: 0.65rem 0.75rem;
+  font-weight: 400;
+}
+
+.checkField {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+
+.inlineForm {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-3);
+  align-items: end;
+  margin: var(--space-4) 0;
+}
+
+.rowActions {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.doneText {
+  text-decoration: line-through;
+  color: var(--color-ink-faint);
+}
+
+@media (max-width: 800px) {
+  .modeGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .row3,
+  .monthGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .inlineForm {
+    grid-template-columns: 1fr;
+  }
+}

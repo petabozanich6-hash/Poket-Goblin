@@ -1,0 +1,9 @@
+dist
+node_modules
+coverage
+*.min.js
+package-lock.json
+worker/dist
+.wrangler
+.mf
+*.toml

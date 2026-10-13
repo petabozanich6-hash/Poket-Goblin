@@ -1,0 +1,15 @@
+# Copy to .dev.vars for local Worker secrets (never commit .dev.vars)
+AUTH_SECRET=replace-with-a-long-random-string
+
+# Optional Sprint 3 AI (omit to use labelled rule-based goblin brain)
+# AI_PROVIDER=openai_compatible
+# AI_API_KEY=
+# AI_BASE_URL=https://api.openai.com/v1
+# AI_MODEL=gpt-4o-mini
+# AI_DAILY_USER_LIMIT=40
+
+# Optional Sprint 4 OAuth (omit → honest not_connected states)
+# GOOGLE_OAUTH_CLIENT_ID=
+# GOOGLE_OAUTH_CLIENT_SECRET=
+# MICROSOFT_OAUTH_CLIENT_ID=
+# MICROSOFT_OAUTH_CLIENT_SECRET=

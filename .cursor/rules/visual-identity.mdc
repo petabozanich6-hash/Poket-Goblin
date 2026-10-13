@@ -1,0 +1,35 @@
+---
+description: Pocket Goblin visual identity — one mascot, calm interface
+alwaysApply: true
+---
+
+# Pocket Goblin visual identity
+
+## Character
+
+Official mascot only:
+
+- `public/assets/branding/goblin-original.png` (source)
+- `public/assets/branding/goblin-mascot.webp` (+ PNG fallback) for UI
+
+Use `GoblinMascot` **only** in the Den welcome area. Do not repeat the character across screens. Do not use asset sheets, extra poses, decorative woodland illustrations, emoji, or CSS stand-ins.
+
+## Interface tone
+
+Premium, modern, calm life-management — not a fantasy game or children’s app.
+
+The mascot provides whimsy; the UI provides peace.
+
+## Palette
+
+| Role | Direction |
+|------|-----------|
+| Primary | Deep forest green |
+| Secondary | Soft sage |
+| Background | Warm off-white |
+| Cards | White / pale cream |
+| Text | Dark charcoal |
+| Borders | Subtle warm grey |
+| Accent | Muted amber, sparingly |
+
+Avoid busy gradients, illustrated chrome, leaves/mushrooms/sparkles, and excessive imagery.

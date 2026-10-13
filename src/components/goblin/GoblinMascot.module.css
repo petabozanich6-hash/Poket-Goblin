@@ -1,0 +1,10 @@
+.mascot {
+  display: block;
+  flex-shrink: 0;
+  height: auto;
+  object-fit: contain;
+  object-position: center bottom;
+  background: transparent;
+  user-select: none;
+  -webkit-user-drag: none;
+}

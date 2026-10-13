@@ -1,0 +1,30 @@
+.field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.label {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-ink-muted);
+}
+
+.control {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-ink);
+  border-radius: var(--radius-md);
+  padding: 0.7rem 0.85rem;
+}
+
+.control:focus {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+
+.textarea {
+  min-height: 6.5rem;
+  resize: vertical;
+}

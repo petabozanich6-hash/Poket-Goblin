@@ -1,0 +1,67 @@
+{
+  "name": "pocket-goblin",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n web,api -c green,magenta \"npm:dev:web\" \"npm:dev:api\"",
+    "dev:web": "vite",
+    "dev:api": "wrangler dev --port 8787 --local",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc -b --pretty false && tsc -p worker/tsconfig.json --pretty false",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:migrate:local": "wrangler d1 migrations apply pocket-goblin --local",
+    "db:console:local": "wrangler d1 execute pocket-goblin --local --command",
+    "smoke:local": "node scripts/smoke-local.mjs",
+    "smoke:sprint2": "node scripts/smoke-sprint2.mjs",
+    "smoke:sprint3": "node scripts/smoke-sprint3.mjs",
+    "smoke:sprint4": "node scripts/smoke-sprint4.mjs",
+    "smoke:sprint5": "node scripts/smoke-sprint5.mjs",
+    "smoke:sprint6": "node scripts/smoke-sprint6.mjs",
+    "test:e2e": "playwright test",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.90.2",
+    "hono": "^4.9.8",
+    "lucide-react": "^0.544.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router": "^7.9.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261006.1",
+    "@eslint/js": "^9.36.0",
+    "@playwright/test": "^1.55.0",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^5.0.4",
+    "concurrently": "^9.2.1",
+    "eslint": "^9.36.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.22",
+    "globals": "^16.4.0",
+    "prettier": "^3.6.2",
+    "typescript": "~5.9.2",
+    "typescript-eslint": "^8.44.0",
+    "vite": "^7.1.7",
+    "vitest": "^3.2.4",
+    "wrangler": "^4.40.3"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "workerd@1.20261006.1": true,
+    "fsevents@2.3.3": true
+  }
+}
