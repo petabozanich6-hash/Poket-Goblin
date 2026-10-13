@@ -127,6 +127,10 @@ export async function getDailyPlan(
               t.capacity_cost as capacityCost,
               t.parent_id as parentId,
               t.completed_at as completedAt,
+              t.recurrence_rule_id as recurrenceRuleId,
+              t.series_id as seriesId,
+              t.occurrence_date as occurrenceDate,
+              t.skipped as skipped,
               t.created_at as createdAt,
               t.updated_at as updatedAt
        FROM daily_plan_tasks dpt

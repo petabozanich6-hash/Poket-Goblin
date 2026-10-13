@@ -1,6 +1,6 @@
 # Roadmap
 
-## Sprint 1 — Core application (in progress / shipping now)
+## Sprint 1 — Core application
 
 - [x] Design system + goblin mascot
 - [x] App shell + responsive nav
@@ -14,11 +14,22 @@
 
 ## Sprint 2 — Life management
 
-- [ ] Calendar + appointments
-- [ ] Reminders + snooze
-- [ ] Recurring tasks
-- [ ] Notes + shopping lists
-- [ ] Search + task history
+- [x] Calendar + appointments (month/week/agenda)
+- [x] Reminders (in-app due list, snooze/dismiss/complete)
+- [x] Recurring tasks (rule + occurrence generation)
+- [x] Notes (create/edit/pin/delete/search)
+- [x] Shopping lists (default groceries + checkoff)
+- [x] Universal search
+- [x] Task history
+- [x] Unified brain-dump → multi-type records
+- [x] Den dashboard integration
+
+Known follow-ups inside Sprint 2 scope:
+
+- [ ] Richer series edit UI (edit-all fields) beyond skip / pause / stop
+- [ ] Email/push notification delivery (architecture ready; not configured)
+- [ ] Drag-reorder shopping items in the UI (API supports sortOrder)
+- [ ] Recurring calendar events UI (schema supports series; task recurrence is primary)
 
 ## Sprint 3 — Smart organisation
 

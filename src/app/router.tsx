@@ -3,9 +3,12 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 
 import { useAuth } from '@/features/auth/useAuth'
 import { AuthPage } from '@/pages/AuthPage'
+import { CalendarPage } from '@/pages/CalendarPage'
 import { CapturePage } from '@/pages/CapturePage'
 import { HomePage } from '@/pages/HomePage'
+import { LifePage } from '@/pages/LifePage'
 import { PlanPage } from '@/pages/PlanPage'
+import { SearchPage } from '@/pages/SearchPage'
 import { TasksPage } from '@/pages/TasksPage'
 
 import { AppShell } from './AppShell'
@@ -60,6 +63,11 @@ export function AppRouter() {
           <Route path="/capture" element={<CapturePage />} />
           <Route path="/tasks" element={<TasksPage />} />
           <Route path="/plan" element={<PlanPage />} />
+          <Route path="/calendar" element={<CalendarPage />} />
+          <Route path="/life" element={<LifePage />} />
+          <Route path="/shopping" element={<Navigate to="/life" replace />} />
+          <Route path="/notes" element={<Navigate to="/life" replace />} />
+          <Route path="/find" element={<SearchPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

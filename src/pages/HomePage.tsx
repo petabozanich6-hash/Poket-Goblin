@@ -9,6 +9,7 @@ import { useAuth } from '@/features/auth/useAuth'
 import { CaptureReview } from '@/features/capture/CaptureReview'
 import { QuickCapture } from '@/features/capture/QuickCapture'
 import { fetchCaptures } from '@/features/capture/captureApi'
+import { fetchDenSummary } from '@/features/life/lifeApi'
 import { fetchTodayPlan } from '@/features/plan/planApi'
 import { TaskList } from '@/features/tasks/TaskList'
 import { fetchTasks } from '@/features/tasks/tasksApi'
@@ -37,6 +38,10 @@ export function HomePage() {
     queryKey: ['captures'],
     queryFn: fetchCaptures,
   })
+  const denQuery = useQuery({
+    queryKey: ['den-summary'],
+    queryFn: fetchDenSummary,
+  })
 
   const hour = new Date().getHours()
   const greeting =
@@ -54,6 +59,7 @@ export function HomePage() {
   const dueSoon = (tasksQuery.data?.tasks ?? [])
     .filter((task) => task.dueDate)
     .slice(0, 4)
+  const summary = denQuery.data?.summary
 
   return (
     <div className={styles.page}>
@@ -74,6 +80,9 @@ export function HomePage() {
               {CAPACITY_LABELS[settings?.capacityMode ?? 'steady']}
             </strong>{' '}
             · <Link to="/plan">Adjust plan</Link>
+            {summary && summary.unprocessedCaptures > 0
+              ? ` · ${summary.unprocessedCaptures} dump items waiting`
+              : ''}
           </p>
         </div>
       </header>
@@ -97,6 +106,80 @@ export function HomePage() {
         </Card>
 
         <Card>
+          <h2>Upcoming appointments</h2>
+          {(summary?.upcomingEvents.length ?? 0) === 0 ? (
+            <p className={styles.cardHint}>
+              No appointments in the next week.{' '}
+              <Link to="/calendar">Open calendar</Link>
+            </p>
+          ) : (
+            <ul className={styles.awaitList}>
+              {summary?.upcomingEvents.map((event) => (
+                <li key={event.id}>
+                  <strong>{event.title}</strong>
+                  <div>{new Date(event.startsAt).toLocaleString()}</div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
+
+      <div className={styles.grid}>
+        <Card>
+          <h2>Due reminders</h2>
+          {(summary?.dueReminders.length ?? 0) === 0 ? (
+            <p className={styles.cardHint}>
+              Nothing due right now. <Link to="/life">Life shelves</Link>
+            </p>
+          ) : (
+            <ul className={styles.awaitList}>
+              {summary?.dueReminders.map((reminder) => (
+                <li key={reminder.id}>
+                  <strong>{reminder.title}</strong>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <Card>
+          <h2>Shopping needs attention</h2>
+          {(summary?.shoppingNeedsAttention.length ?? 0) === 0 ? (
+            <p className={styles.cardHint}>Shopping list is clear.</p>
+          ) : (
+            <ul className={styles.awaitList}>
+              {summary?.shoppingNeedsAttention.map((item) => (
+                <li key={item.id}>
+                  <strong>{item.name}</strong>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
+
+      <div className={styles.grid}>
+        <Card>
+          <h2>Pinned notes</h2>
+          {(summary?.pinnedNotes.length ?? 0) === 0 ? (
+            <p className={styles.cardHint}>
+              Pin a note from <Link to="/life">Life</Link> when something must
+              stay visible.
+            </p>
+          ) : (
+            <ul className={styles.awaitList}>
+              {summary?.pinnedNotes.map((note) => (
+                <li key={note.id}>
+                  <strong>{note.title}</strong>
+                  <div>{note.body.slice(0, 80)}</div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <Card>
           <h2>Awaiting attention</h2>
           {awaiting.length === 0 ? (
             <p className={styles.cardHint}>
@@ -107,7 +190,7 @@ export function HomePage() {
               {awaiting.map(({ capture, item }) => (
                 <li key={item.id}>
                   <strong>{item.title}</strong>
-                  <span> from a recent dump</span>
+                  <span> · {item.kind}</span>
                   <div>
                     <Link to="/capture">Review</Link>
                   </div>
@@ -121,7 +204,7 @@ export function HomePage() {
 
       <div className={styles.grid}>
         <Card>
-          <h2>Upcoming</h2>
+          <h2>Upcoming tasks</h2>
           <TaskList tasks={dueSoon} emptyMessage="No dated commitments yet." />
         </Card>
         <Card>

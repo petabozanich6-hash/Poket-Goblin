@@ -6,8 +6,15 @@ import { resolveUser, type AuthUser } from './lib/session'
 import { authRoutes } from './routes/auth'
 import { captureRoutes } from './routes/captures'
 import { categoryRoutes } from './routes/categories'
+import { dashboardRoutes } from './routes/dashboard'
+import { eventRoutes } from './routes/events'
+import { historyRoutes } from './routes/history'
 import { meRoutes } from './routes/me'
+import { noteRoutes } from './routes/notes'
 import { planRoutes } from './routes/plan'
+import { reminderRoutes } from './routes/reminders'
+import { searchRoutes } from './routes/search'
+import { shoppingRoutes } from './routes/shopping'
 import { taskRoutes } from './routes/tasks'
 
 type Vars = { user: AuthUser }
@@ -49,6 +56,13 @@ app.route('/categories', categoryRoutes)
 app.route('/tasks', taskRoutes)
 app.route('/captures', captureRoutes)
 app.route('/plan', planRoutes)
+app.route('/events', eventRoutes)
+app.route('/reminders', reminderRoutes)
+app.route('/notes', noteRoutes)
+app.route('/shopping', shoppingRoutes)
+app.route('/search', searchRoutes)
+app.route('/history', historyRoutes)
+app.route('/dashboard', dashboardRoutes)
 
 app.notFound((c) => c.json({ error: 'Not found' }, 404))
 

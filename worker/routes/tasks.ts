@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 
 import type { TaskPriority, TaskStatus } from '../../shared/types'
 import type { Env } from '../env'
+import { recordTaskHistory } from '../lib/history'
 import { newId } from '../lib/ids'
 import type { AuthUser } from '../lib/session'
 import {
@@ -79,6 +80,7 @@ taskRoutes.post('/', async (c) => {
       capacityCost,
     )
     .run()
+  await recordTaskHistory(c.env.DB, user.id, id, 'created', 'Manual create')
 
   const task = await getTaskForUser(c.env.DB, user.id, id)
   return c.json({ task }, 201)
@@ -167,8 +169,103 @@ taskRoutes.patch('/:id', async (c) => {
     )
     .run()
 
+  if (status !== existing.status) {
+    await recordTaskHistory(
+      c.env.DB,
+      user.id,
+      id,
+      status === 'completed'
+        ? 'completed'
+        : status === 'open'
+          ? 'reopened'
+          : 'cancelled',
+      `Status ${existing.status} → ${status}`,
+    )
+  } else {
+    await recordTaskHistory(c.env.DB, user.id, id, 'updated', 'Task edited')
+  }
+
   const task = await getTaskForUser(c.env.DB, user.id, id)
   return c.json({ task })
+})
+
+taskRoutes.post('/:id/skip', async (c) => {
+  const user = c.get('user')
+  const id = c.req.param('id')
+  const existing = await getTaskForUser(c.env.DB, user.id, id)
+  if (!existing) return c.json({ error: 'Task not found' }, 404)
+
+  await c.env.DB.prepare(
+    `UPDATE tasks SET skipped = 1, status = 'cancelled',
+      updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+     WHERE id = ? AND user_id = ?`,
+  )
+    .bind(id, user.id)
+    .run()
+  await recordTaskHistory(
+    c.env.DB,
+    user.id,
+    id,
+    'skipped',
+    'Occurrence skipped',
+  )
+  return c.json({ ok: true })
+})
+
+taskRoutes.post('/:id/pause-series', async (c) => {
+  const user = c.get('user')
+  const id = c.req.param('id')
+  const existing = await getTaskForUser(c.env.DB, user.id, id)
+  if (!existing?.recurrenceRuleId) {
+    return c.json({ error: 'Not a recurring task' }, 400)
+  }
+  const result = await c.env.DB.prepare(
+    `UPDATE recurrence_rules SET paused = 1
+     WHERE id = ? AND user_id = ?`,
+  )
+    .bind(existing.recurrenceRuleId, user.id)
+    .run()
+  if (!result.meta.changes) return c.json({ error: 'Series not found' }, 404)
+  await recordTaskHistory(
+    c.env.DB,
+    user.id,
+    id,
+    'paused',
+    'Recurring series paused',
+  )
+  return c.json({ ok: true })
+})
+
+taskRoutes.post('/:id/stop-series', async (c) => {
+  const user = c.get('user')
+  const id = c.req.param('id')
+  const existing = await getTaskForUser(c.env.DB, user.id, id)
+  if (!existing?.recurrenceRuleId) {
+    return c.json({ error: 'Not a recurring task' }, 400)
+  }
+  const today = new Date().toISOString().slice(0, 10)
+  await c.env.DB.prepare(
+    `UPDATE recurrence_rules SET paused = 1, ends_on = ?
+     WHERE id = ? AND user_id = ?`,
+  )
+    .bind(today, existing.recurrenceRuleId, user.id)
+    .run()
+  await c.env.DB.prepare(
+    `UPDATE tasks SET status = 'cancelled',
+      updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+     WHERE user_id = ? AND recurrence_rule_id = ? AND status = 'open'
+       AND (occurrence_date IS NULL OR occurrence_date > ?)`,
+  )
+    .bind(user.id, existing.recurrenceRuleId, today)
+    .run()
+  await recordTaskHistory(
+    c.env.DB,
+    user.id,
+    id,
+    'stopped',
+    'Recurring series stopped',
+  )
+  return c.json({ ok: true })
 })
 
 taskRoutes.delete('/:id', async (c) => {
@@ -177,6 +274,7 @@ taskRoutes.delete('/:id', async (c) => {
   const existing = await getTaskForUser(c.env.DB, user.id, id)
   if (!existing) return c.json({ error: 'Task not found' }, 404)
 
+  await recordTaskHistory(c.env.DB, user.id, id, 'deleted', existing.title)
   await c.env.DB.prepare(`DELETE FROM tasks WHERE id = ? AND user_id = ?`)
     .bind(id, user.id)
     .run()

@@ -5,6 +5,11 @@ export type TaskPriority = 'low' | 'normal' | 'high'
 export type CaptureItemKind =
   'task' | 'reminder' | 'appointment' | 'note' | 'shopping' | 'follow_up'
 export type Confidence = 'low' | 'medium' | 'high'
+export type RecurrenceFrequency =
+  'daily' | 'weekly' | 'fortnightly' | 'monthly' | 'yearly' | 'custom'
+export type ReminderStatus = 'pending' | 'snoozed' | 'dismissed' | 'completed'
+export type ReminderEntityType =
+  'task' | 'event' | 'bill' | 'follow_up' | 'general'
 
 export type Category = {
   id: string
@@ -27,8 +32,108 @@ export type Task = {
   capacityCost: number
   parentId: string | null
   completedAt: string | null
+  recurrenceRuleId: string | null
+  seriesId: string | null
+  occurrenceDate: string | null
+  skipped: boolean
   createdAt: string
   updatedAt: string
+}
+
+export type RecurrenceRule = {
+  id: string
+  frequency: RecurrenceFrequency
+  intervalValue: number
+  byWeekday: number[] | null
+  dayOfMonth: number | null
+  startsOn: string
+  endsOn: string | null
+  paused: boolean
+}
+
+export type CalendarEvent = {
+  id: string
+  title: string
+  description: string
+  location: string
+  startsAt: string
+  endsAt: string
+  allDay: boolean
+  timezone: string
+  categoryId: string | null
+  linkedTaskId: string | null
+  recurrenceRuleId: string | null
+  seriesId: string | null
+  status: 'scheduled' | 'cancelled'
+  createdAt: string
+  updatedAt: string
+}
+
+export type Reminder = {
+  id: string
+  title: string
+  remindAt: string
+  status: ReminderStatus
+  entityType: ReminderEntityType
+  entityId: string | null
+  repeatFrequency: 'none' | 'daily' | 'weekly' | 'fortnightly' | 'monthly'
+  snoozedUntil: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type Note = {
+  id: string
+  title: string
+  body: string
+  categoryId: string | null
+  categorySlug: string | null
+  categoryName: string | null
+  pinned: boolean
+  linkedTaskId: string | null
+  linkedEventId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type ShoppingList = {
+  id: string
+  name: string
+  isDefault: boolean
+  createdAt: string
+  items: ShoppingItem[]
+}
+
+export type ShoppingItem = {
+  id: string
+  listId: string
+  name: string
+  quantity: string
+  notes: string
+  checked: boolean
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
+export type TaskHistoryEntry = {
+  id: string
+  taskId: string
+  taskTitle: string | null
+  action: string
+  detail: string
+  createdAt: string
+}
+
+export type SearchResultGroup = {
+  type: 'task' | 'note' | 'event' | 'shopping' | 'capture'
+  label: string
+  items: Array<{
+    id: string
+    title: string
+    subtitle?: string
+    href: string
+  }>
 }
 
 export type CaptureItem = {
@@ -36,11 +141,17 @@ export type CaptureItem = {
   kind: CaptureItemKind
   title: string
   dueDate: string | null
+  startTime: string | null
+  recurrenceFrequency: RecurrenceFrequency | null
   categorySlug: string | null
   confidence: Confidence
   uncertain: boolean
   status: 'suggested' | 'accepted' | 'rejected'
   createdTaskId: string | null
+  createdEventId: string | null
+  createdNoteId: string | null
+  createdShoppingItemId: string | null
+  createdReminderId: string | null
 }
 
 export type Capture = {
@@ -71,6 +182,14 @@ export type DailyPlan = {
   taskIds: string[]
   tasks: Task[]
   suggestedCapacity: number
+}
+
+export type DenSummary = {
+  upcomingEvents: CalendarEvent[]
+  dueReminders: Reminder[]
+  shoppingNeedsAttention: ShoppingItem[]
+  pinnedNotes: Note[]
+  unprocessedCaptures: number
 }
 
 export const CAPACITY_LIMITS: Record<CapacityMode, number> = {

@@ -1,9 +1,18 @@
 import { Hono } from 'hono'
 
 import { interpretBrainDump } from '../../shared/brainDump'
+import { generateOccurrences } from '../../shared/recurrence'
+import type { CaptureItemKind, RecurrenceFrequency } from '../../shared/types'
 import type { Env } from '../env'
+import {
+  addHoursIso,
+  localDateTimeToIso,
+  readOffsetMinutes,
+} from '../lib/datetime'
 import { newId } from '../lib/ids'
+import { recordTaskHistory } from '../lib/history'
 import type { AuthUser } from '../lib/session'
+import { ensureDefaultShoppingList } from '../lib/shopping'
 import { getTaskForUser, resolveCategoryId } from '../lib/tasks'
 import { asString } from '../lib/validate'
 
@@ -28,37 +37,62 @@ async function loadCapture(db: D1Database, userId: string, captureId: string) {
 
   const items = await db
     .prepare(
-      `SELECT id, kind, title, due_date as dueDate, category_slug as categorySlug,
-              confidence, uncertain, status, created_task_id as createdTaskId
+      `SELECT id, kind, title, due_date as dueDate, start_time as startTime,
+              recurrence_frequency as recurrenceFrequency,
+              category_slug as categorySlug, confidence, uncertain, status,
+              created_task_id as createdTaskId,
+              created_event_id as createdEventId,
+              created_note_id as createdNoteId,
+              created_shopping_item_id as createdShoppingItemId,
+              created_reminder_id as createdReminderId
        FROM capture_items WHERE capture_id = ? AND user_id = ?
        ORDER BY created_at ASC`,
     )
     .bind(captureId, userId)
-    .all<{
-      id: string
-      kind: string
-      title: string
-      dueDate: string | null
-      categorySlug: string | null
-      confidence: string
-      uncertain: number
-      status: string
-      createdTaskId: string | null
-    }>()
+    .all()
 
   return {
     ...capture,
     items: (items.results ?? []).map((item) => ({
-      id: item.id,
-      kind: item.kind,
-      title: item.title,
-      dueDate: item.dueDate,
-      categorySlug: item.categorySlug,
-      confidence: item.confidence,
+      id: item.id as string,
+      kind: item.kind as CaptureItemKind,
+      title: item.title as string,
+      dueDate: (item.dueDate as string) ?? null,
+      startTime: (item.startTime as string) ?? null,
+      recurrenceFrequency:
+        (item.recurrenceFrequency as RecurrenceFrequency) ?? null,
+      categorySlug: (item.categorySlug as string) ?? null,
+      confidence: item.confidence as string,
       uncertain: Boolean(item.uncertain),
-      status: item.status,
-      createdTaskId: item.createdTaskId,
+      status: item.status as string,
+      createdTaskId: (item.createdTaskId as string) ?? null,
+      createdEventId: (item.createdEventId as string) ?? null,
+      createdNoteId: (item.createdNoteId as string) ?? null,
+      createdShoppingItemId: (item.createdShoppingItemId as string) ?? null,
+      createdReminderId: (item.createdReminderId as string) ?? null,
     })),
+  }
+}
+
+async function maybeMarkReviewed(
+  db: D1Database,
+  userId: string,
+  captureId: string,
+) {
+  const remaining = await db
+    .prepare(
+      `SELECT COUNT(*) as count FROM capture_items
+       WHERE capture_id = ? AND status = 'suggested'`,
+    )
+    .bind(captureId)
+    .first<{ count: number }>()
+  if ((remaining?.count ?? 0) === 0) {
+    await db
+      .prepare(
+        `UPDATE captures SET status = 'reviewed' WHERE id = ? AND user_id = ?`,
+      )
+      .bind(captureId, userId)
+      .run()
   }
 }
 
@@ -103,8 +137,9 @@ captureRoutes.post('/', async (c) => {
   for (const suggestion of suggestions) {
     await c.env.DB.prepare(
       `INSERT INTO capture_items
-        (id, capture_id, user_id, kind, title, due_date, category_slug, confidence, uncertain)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, capture_id, user_id, kind, title, due_date, start_time,
+         recurrence_frequency, category_slug, confidence, uncertain)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
       .bind(
         newId('citem'),
@@ -113,6 +148,8 @@ captureRoutes.post('/', async (c) => {
         suggestion.kind,
         suggestion.title,
         suggestion.dueDate,
+        suggestion.startTime,
+        suggestion.recurrenceFrequency,
         suggestion.categorySlug,
         suggestion.confidence,
         suggestion.uncertain ? 1 : 0,
@@ -124,22 +161,89 @@ captureRoutes.post('/', async (c) => {
   return c.json({ capture }, 201)
 })
 
+captureRoutes.patch('/:captureId/items/:itemId', async (c) => {
+  const user = c.get('user')
+  const captureId = c.req.param('captureId')
+  const itemId = c.req.param('itemId')
+  const body = (await c.req.json().catch(() => null)) as Record<
+    string,
+    unknown
+  > | null
+
+  const existing = await c.env.DB.prepare(
+    `SELECT id FROM capture_items
+     WHERE id = ? AND capture_id = ? AND user_id = ? AND status = 'suggested'`,
+  )
+    .bind(itemId, captureId, user.id)
+    .first()
+  if (!existing) return c.json({ error: 'Suggestion not found' }, 404)
+
+  const kind = asString(body?.kind, 40)
+  const title = asString(body?.title, 200)
+  if (
+    kind &&
+    ![
+      'task',
+      'reminder',
+      'appointment',
+      'note',
+      'shopping',
+      'follow_up',
+    ].includes(kind)
+  ) {
+    return c.json({ error: 'Invalid kind' }, 400)
+  }
+
+  await c.env.DB.prepare(
+    `UPDATE capture_items SET
+      kind = COALESCE(?, kind),
+      title = COALESCE(?, title),
+      due_date = CASE WHEN ? = 1 THEN ? ELSE due_date END,
+      start_time = CASE WHEN ? = 1 THEN ? ELSE start_time END,
+      category_slug = COALESCE(?, category_slug)
+     WHERE id = ? AND user_id = ?`,
+  )
+    .bind(
+      kind,
+      title,
+      body && 'dueDate' in body ? 1 : 0,
+      typeof body?.dueDate === 'string' ? body.dueDate : null,
+      body && 'startTime' in body ? 1 : 0,
+      typeof body?.startTime === 'string' ? body.startTime : null,
+      typeof body?.categorySlug === 'string' ? body.categorySlug : null,
+      itemId,
+      user.id,
+    )
+    .run()
+
+  const capture = await loadCapture(c.env.DB, user.id, captureId)
+  return c.json({ capture })
+})
+
 captureRoutes.post('/:captureId/items/:itemId/accept', async (c) => {
   const user = c.get('user')
   const captureId = c.req.param('captureId')
   const itemId = c.req.param('itemId')
+  const body = (await c.req.json().catch(() => null)) as Record<
+    string,
+    unknown
+  > | null
 
   const item = await c.env.DB.prepare(
-    `SELECT id, kind, title, due_date as dueDate, category_slug as categorySlug, status
+    `SELECT id, kind, title, due_date as dueDate, start_time as startTime,
+            recurrence_frequency as recurrenceFrequency,
+            category_slug as categorySlug, status
      FROM capture_items
      WHERE id = ? AND capture_id = ? AND user_id = ?`,
   )
     .bind(itemId, captureId, user.id)
     .first<{
       id: string
-      kind: string
+      kind: CaptureItemKind
       title: string
       dueDate: string | null
+      startTime: string | null
+      recurrenceFrequency: RecurrenceFrequency | null
       categorySlug: string | null
       status: string
     }>()
@@ -155,52 +259,227 @@ captureRoutes.post('/:captureId/items/:itemId/accept', async (c) => {
     null,
     item.categorySlug,
   )
-  const taskId = newId('task')
-  const priority = item.kind === 'appointment' ? 'high' : 'normal'
 
-  await c.env.DB.prepare(
-    `INSERT INTO tasks
-      (id, user_id, category_id, title, notes, priority, due_date, capacity_cost)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-  )
-    .bind(
-      taskId,
-      user.id,
-      categoryId,
-      item.title,
-      `From brain dump (${item.kind})`,
-      priority,
-      item.dueDate,
-      1,
-    )
-    .run()
+  let createdTaskId: string | null = null
+  let createdEventId: string | null = null
+  let createdNoteId: string | null = null
+  let createdShoppingItemId: string | null = null
+  let createdReminderId: string | null = null
 
-  await c.env.DB.prepare(
-    `UPDATE capture_items
-     SET status = 'accepted', created_task_id = ?
-     WHERE id = ? AND user_id = ?`,
-  )
-    .bind(taskId, itemId, user.id)
-    .run()
-
-  const remaining = await c.env.DB.prepare(
-    `SELECT COUNT(*) as count FROM capture_items
-     WHERE capture_id = ? AND status = 'suggested'`,
-  )
-    .bind(captureId)
-    .first<{ count: number }>()
-
-  if ((remaining?.count ?? 0) === 0) {
+  if (item.kind === 'shopping') {
+    const listId = await ensureDefaultShoppingList(c.env.DB, user.id)
+    createdShoppingItemId = newId('sitem')
     await c.env.DB.prepare(
-      `UPDATE captures SET status = 'reviewed' WHERE id = ? AND user_id = ?`,
+      `INSERT INTO shopping_items (id, list_id, user_id, name, sort_order)
+       VALUES (?, ?, ?, ?, 0)`,
     )
-      .bind(captureId, user.id)
+      .bind(createdShoppingItemId, listId, user.id, item.title)
       .run()
+  } else if (item.kind === 'note') {
+    createdNoteId = newId('note')
+    await c.env.DB.prepare(
+      `INSERT INTO notes (id, user_id, title, body, category_id)
+       VALUES (?, ?, ?, ?, ?)`,
+    )
+      .bind(createdNoteId, user.id, item.title, item.title, categoryId)
+      .run()
+  } else if (item.kind === 'appointment') {
+    if (!item.dueDate) {
+      return c.json(
+        { error: 'Confirm a date before accepting this appointment' },
+        400,
+      )
+    }
+    const offset = readOffsetMinutes(body)
+    createdEventId = newId('evt')
+    const startsAt = localDateTimeToIso(
+      item.dueDate,
+      item.startTime,
+      !item.startTime,
+      offset,
+    )
+    const endsAt = addHoursIso(startsAt, item.startTime ? 1 : 24)
+    await c.env.DB.prepare(
+      `INSERT INTO events
+        (id, user_id, title, starts_at, ends_at, all_day, category_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        createdEventId,
+        user.id,
+        item.title,
+        startsAt,
+        endsAt,
+        item.startTime ? 0 : 1,
+        categoryId,
+      )
+      .run()
+  } else if (item.kind === 'reminder') {
+    if (!item.dueDate) {
+      return c.json(
+        { error: 'Confirm a date before accepting this reminder' },
+        400,
+      )
+    }
+    createdReminderId = newId('rem')
+    const remindAt = localDateTimeToIso(
+      item.dueDate,
+      item.startTime ?? '09:00',
+      false,
+      readOffsetMinutes(body),
+    )
+    await c.env.DB.prepare(
+      `INSERT INTO reminders (id, user_id, title, remind_at, entity_type)
+       VALUES (?, ?, ?, ?, 'general')`,
+    )
+      .bind(createdReminderId, user.id, item.title, remindAt)
+      .run()
+
+    // Also create a linked open task for follow-through
+    createdTaskId = newId('task')
+    await c.env.DB.prepare(
+      `INSERT INTO tasks
+        (id, user_id, category_id, title, notes, priority, due_date, capacity_cost)
+       VALUES (?, ?, ?, ?, ?, 'normal', ?, 1)`,
+    )
+      .bind(
+        createdTaskId,
+        user.id,
+        categoryId,
+        item.title,
+        'From reminder capture',
+        item.dueDate,
+      )
+      .run()
+    await c.env.DB.prepare(
+      `UPDATE reminders SET entity_type = 'task', entity_id = ? WHERE id = ?`,
+    )
+      .bind(createdTaskId, createdReminderId)
+      .run()
+    await recordTaskHistory(
+      c.env.DB,
+      user.id,
+      createdTaskId,
+      'created',
+      'From capture reminder',
+    )
+  } else {
+    // task / follow_up
+    let recurrenceRuleId: string | null = null
+    let seriesId: string | null = null
+    if (item.recurrenceFrequency) {
+      const startsOn = item.dueDate ?? new Date().toISOString().slice(0, 10)
+      recurrenceRuleId = newId('rrule')
+      seriesId = newId('series')
+      await c.env.DB.prepare(
+        `INSERT INTO recurrence_rules
+          (id, user_id, frequency, interval_value, starts_on)
+         VALUES (?, ?, ?, 1, ?)`,
+      )
+        .bind(recurrenceRuleId, user.id, item.recurrenceFrequency, startsOn)
+        .run()
+
+      const occurrences = generateOccurrences(
+        {
+          frequency: item.recurrenceFrequency,
+          startsOn,
+        },
+        4,
+      )
+      for (const occurrence of occurrences) {
+        const taskId = newId('task')
+        if (!createdTaskId) createdTaskId = taskId
+        await c.env.DB.prepare(
+          `INSERT INTO tasks
+            (id, user_id, category_id, title, notes, priority, due_date,
+             capacity_cost, recurrence_rule_id, series_id, occurrence_date)
+           VALUES (?, ?, ?, ?, ?, 'normal', ?, 1, ?, ?, ?)`,
+        )
+          .bind(
+            taskId,
+            user.id,
+            categoryId,
+            item.title,
+            `Recurring (${item.recurrenceFrequency})`,
+            occurrence,
+            recurrenceRuleId,
+            seriesId,
+            occurrence,
+          )
+          .run()
+        await recordTaskHistory(
+          c.env.DB,
+          user.id,
+          taskId,
+          'created',
+          `Recurring occurrence ${occurrence}`,
+        )
+      }
+    } else {
+      createdTaskId = newId('task')
+      await c.env.DB.prepare(
+        `INSERT INTO tasks
+          (id, user_id, category_id, title, notes, priority, due_date, capacity_cost)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+      )
+        .bind(
+          createdTaskId,
+          user.id,
+          categoryId,
+          item.title,
+          `From brain dump (${item.kind})`,
+          item.kind === 'appointment' ? 'high' : 'normal',
+          item.dueDate,
+        )
+        .run()
+      await recordTaskHistory(
+        c.env.DB,
+        user.id,
+        createdTaskId,
+        'created',
+        'From capture',
+      )
+    }
   }
 
-  const task = await getTaskForUser(c.env.DB, user.id, taskId)
+  await c.env.DB.prepare(
+    `UPDATE capture_items SET
+      status = 'accepted',
+      created_task_id = ?,
+      created_event_id = ?,
+      created_note_id = ?,
+      created_shopping_item_id = ?,
+      created_reminder_id = ?
+     WHERE id = ? AND user_id = ?`,
+  )
+    .bind(
+      createdTaskId,
+      createdEventId,
+      createdNoteId,
+      createdShoppingItemId,
+      createdReminderId,
+      itemId,
+      user.id,
+    )
+    .run()
+
+  await maybeMarkReviewed(c.env.DB, user.id, captureId)
+
+  const task = createdTaskId
+    ? await getTaskForUser(c.env.DB, user.id, createdTaskId)
+    : null
   const capture = await loadCapture(c.env.DB, user.id, captureId)
-  return c.json({ task, capture })
+  return c.json({
+    task,
+    capture,
+    created: {
+      taskId: createdTaskId,
+      eventId: createdEventId,
+      noteId: createdNoteId,
+      shoppingItemId: createdShoppingItemId,
+      reminderId: createdReminderId,
+    },
+  })
 })
 
 captureRoutes.post('/:captureId/items/:itemId/reject', async (c) => {
@@ -219,21 +498,7 @@ captureRoutes.post('/:captureId/items/:itemId/reject', async (c) => {
     return c.json({ error: 'Suggestion not found' }, 404)
   }
 
-  const remaining = await c.env.DB.prepare(
-    `SELECT COUNT(*) as count FROM capture_items
-     WHERE capture_id = ? AND status = 'suggested'`,
-  )
-    .bind(captureId)
-    .first<{ count: number }>()
-
-  if ((remaining?.count ?? 0) === 0) {
-    await c.env.DB.prepare(
-      `UPDATE captures SET status = 'reviewed' WHERE id = ? AND user_id = ?`,
-    )
-      .bind(captureId, user.id)
-      .run()
-  }
-
+  await maybeMarkReviewed(c.env.DB, user.id, captureId)
   const capture = await loadCapture(c.env.DB, user.id, captureId)
   return c.json({ capture })
 })

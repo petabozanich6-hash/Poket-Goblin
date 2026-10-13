@@ -38,6 +38,18 @@ export function deleteTask(id: string) {
   return api.delete<{ ok: boolean }>(`/tasks/${id}`)
 }
 
+export function skipTaskOccurrence(id: string) {
+  return api.post<{ ok: boolean }>(`/tasks/${id}/skip`)
+}
+
+export function pauseTaskSeries(id: string) {
+  return api.post<{ ok: boolean }>(`/tasks/${id}/pause-series`)
+}
+
+export function stopTaskSeries(id: string) {
+  return api.post<{ ok: boolean }>(`/tasks/${id}/stop-series`)
+}
+
 export function fetchCategories() {
   return api.get<{ categories: Category[] }>('/categories')
 }

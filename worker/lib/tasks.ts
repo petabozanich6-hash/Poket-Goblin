@@ -13,6 +13,10 @@ type TaskRow = {
   capacityCost: number
   parentId: string | null
   completedAt: string | null
+  recurrenceRuleId: string | null
+  seriesId: string | null
+  occurrenceDate: string | null
+  skipped: number | null
   createdAt: string
   updatedAt: string
 }
@@ -30,6 +34,10 @@ const TASK_SELECT = `
          t.capacity_cost as capacityCost,
          t.parent_id as parentId,
          t.completed_at as completedAt,
+         t.recurrence_rule_id as recurrenceRuleId,
+         t.series_id as seriesId,
+         t.occurrence_date as occurrenceDate,
+         t.skipped as skipped,
          t.created_at as createdAt,
          t.updated_at as updatedAt
   FROM tasks t
@@ -50,6 +58,10 @@ export function mapTask(row: TaskRow): Task {
     capacityCost: row.capacityCost,
     parentId: row.parentId,
     completedAt: row.completedAt,
+    recurrenceRuleId: row.recurrenceRuleId,
+    seriesId: row.seriesId,
+    occurrenceDate: row.occurrenceDate,
+    skipped: Boolean(row.skipped),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   }
@@ -74,7 +86,7 @@ export async function listTasksForUser(
 ): Promise<Task[]> {
   const status = opts.status ?? 'open'
   const limit = opts.limit ?? 100
-  let sql = `${TASK_SELECT} WHERE t.user_id = ?`
+  let sql = `${TASK_SELECT} WHERE t.user_id = ? AND COALESCE(t.skipped, 0) = 0`
   const binds: (string | number)[] = [userId]
   if (status !== 'all') {
     sql += ' AND t.status = ?'

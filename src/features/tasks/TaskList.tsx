@@ -5,7 +5,12 @@ import type { Task } from '@shared/types'
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/features/auth/useAuth'
 
-import { updateTask } from './tasksApi'
+import {
+  pauseTaskSeries,
+  skipTaskOccurrence,
+  stopTaskSeries,
+  updateTask,
+} from './tasksApi'
 import styles from './TaskList.module.css'
 
 const encouragement = [
@@ -26,17 +31,33 @@ export function TaskList({
   const queryClient = useQueryClient()
   const { settings } = useAuth()
 
+  const refresh = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+      queryClient.invalidateQueries({ queryKey: ['plan'] }),
+      queryClient.invalidateQueries({ queryKey: ['history'] }),
+    ])
+  }
+
   const completeMutation = useMutation({
     mutationFn: (task: Task) =>
       updateTask(task.id, {
         status: task.status === 'completed' ? 'open' : 'completed',
       }),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['tasks'] }),
-        queryClient.invalidateQueries({ queryKey: ['plan'] }),
-      ])
-    },
+    onSuccess: refresh,
+  })
+
+  const skipMutation = useMutation({
+    mutationFn: (id: string) => skipTaskOccurrence(id),
+    onSuccess: refresh,
+  })
+  const pauseMutation = useMutation({
+    mutationFn: (id: string) => pauseTaskSeries(id),
+    onSuccess: refresh,
+  })
+  const stopMutation = useMutation({
+    mutationFn: (id: string) => stopTaskSeries(id),
+    onSuccess: refresh,
   })
 
   if (tasks.length === 0) {
@@ -62,6 +83,7 @@ export function TaskList({
               {task.categoryName ?? 'Uncategorised'}
               {task.dueDate ? ` · due ${task.dueDate}` : ''}
               {` · ${task.priority}`}
+              {task.recurrenceRuleId ? ' · repeating' : ''}
             </p>
             {settings?.gamificationEnabled &&
             completeMutation.isSuccess &&
@@ -76,13 +98,40 @@ export function TaskList({
               </p>
             ) : null}
           </div>
-          <Button
-            size="sm"
-            variant={task.status === 'completed' ? 'secondary' : 'primary'}
-            onClick={() => completeMutation.mutate(task)}
-          >
-            {task.status === 'completed' ? 'Undo' : 'Done'}
-          </Button>
+          <div className={styles.actions}>
+            {task.recurrenceRuleId && task.status === 'open' ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => skipMutation.mutate(task.id)}
+                >
+                  Skip
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => pauseMutation.mutate(task.id)}
+                >
+                  Pause
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => stopMutation.mutate(task.id)}
+                >
+                  Stop
+                </Button>
+              </>
+            ) : null}
+            <Button
+              size="sm"
+              variant={task.status === 'completed' ? 'secondary' : 'primary'}
+              onClick={() => completeMutation.mutate(task)}
+            >
+              {task.status === 'completed' ? 'Undo' : 'Done'}
+            </Button>
+          </div>
         </li>
       ))}
     </ul>

@@ -1,4 +1,14 @@
-import { Brain, Home, ListTodo, LogOut, Sparkles, SunMoon } from 'lucide-react'
+import {
+  Brain,
+  CalendarDays,
+  Home,
+  ListTodo,
+  LogOut,
+  Layers,
+  Search,
+  Sparkles,
+  SunMoon,
+} from 'lucide-react'
 import { NavLink, Outlet } from 'react-router'
 
 import { GoblinMascot } from '@/components/goblin/GoblinMascot'
@@ -12,6 +22,9 @@ const links = [
   { to: '/den', label: 'Den', icon: Home, end: true },
   { to: '/capture', label: 'Dump', icon: Brain },
   { to: '/tasks', label: 'Tasks', icon: ListTodo },
+  { to: '/calendar', label: 'Calendar', icon: CalendarDays },
+  { to: '/life', label: 'Life', icon: Layers },
+  { to: '/find', label: 'Find', icon: Search },
   { to: '/plan', label: 'Plan', icon: Sparkles },
 ]
 
