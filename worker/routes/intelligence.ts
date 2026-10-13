@@ -86,26 +86,48 @@ intelligenceRoutes.post('/breakdown/accept', async (c) => {
     string,
     unknown
   > | null
+  const existingParentId = asString(body?.parentId, 80)
   const parentTitle = asString(body?.parentTitle, 200)
   const steps = Array.isArray(body?.steps) ? body.steps : []
-  if (!parentTitle || steps.length === 0) {
-    return c.json({ error: 'parentTitle and steps are required' }, 400)
+  if (steps.length === 0) {
+    return c.json({ error: 'steps are required' }, 400)
   }
 
-  const parentId = newId('task')
-  await c.env.DB.prepare(
-    `INSERT INTO tasks (id, user_id, title, notes, priority, capacity_cost)
-     VALUES (?, ?, ?, ?, 'normal', 3)`,
-  )
-    .bind(parentId, user.id, parentTitle, 'Parent task for accepted breakdown')
-    .run()
-  await recordTaskHistory(
-    c.env.DB,
-    user.id,
-    parentId,
-    'created',
-    'Breakdown parent',
-  )
+  let parentId = existingParentId
+  let resolvedTitle = parentTitle
+
+  if (parentId) {
+    const existing = await c.env.DB.prepare(
+      `SELECT id, title FROM tasks WHERE id = ? AND user_id = ?`,
+    )
+      .bind(parentId, user.id)
+      .first<{ id: string; title: string }>()
+    if (!existing) return c.json({ error: 'Parent task not found' }, 404)
+    resolvedTitle = existing.title
+  } else {
+    if (!parentTitle) {
+      return c.json({ error: 'parentTitle or parentId is required' }, 400)
+    }
+    parentId = newId('task')
+    await c.env.DB.prepare(
+      `INSERT INTO tasks (id, user_id, title, notes, priority, capacity_cost)
+       VALUES (?, ?, ?, ?, 'normal', 3)`,
+    )
+      .bind(
+        parentId,
+        user.id,
+        parentTitle,
+        'Parent task for accepted breakdown',
+      )
+      .run()
+    await recordTaskHistory(
+      c.env.DB,
+      user.id,
+      parentId,
+      'created',
+      'Breakdown parent',
+    )
+  }
 
   const created = []
   for (const step of steps) {
@@ -118,7 +140,7 @@ intelligenceRoutes.post('/breakdown/accept', async (c) => {
         (id, user_id, title, notes, priority, capacity_cost, parent_id)
        VALUES (?, ?, ?, ?, 'normal', 1, ?)`,
     )
-      .bind(id, user.id, title, `Step of: ${parentTitle}`, parentId)
+      .bind(id, user.id, title, `Step of: ${resolvedTitle}`, parentId)
       .run()
     await recordTaskHistory(c.env.DB, user.id, id, 'created', 'Breakdown step')
     created.push({ id, title })

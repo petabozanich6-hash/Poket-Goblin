@@ -12,6 +12,7 @@ import { documentRoutes } from './routes/documents'
 import { eventRoutes } from './routes/events'
 import { historyRoutes } from './routes/history'
 import { intelligenceRoutes } from './routes/intelligence'
+import { magicalRoutes } from './routes/magical'
 import { meRoutes } from './routes/me'
 import { noteRoutes } from './routes/notes'
 import { planRoutes } from './routes/plan'
@@ -75,6 +76,7 @@ app.route('/intelligence', intelligenceRoutes)
 app.route('/documents', documentRoutes)
 app.route('/review', reviewRoutes)
 app.route('/connections', connectionRoutes)
+app.route('/magical', magicalRoutes)
 
 app.notFound((c) => c.json({ error: 'Not found' }, 404))
 

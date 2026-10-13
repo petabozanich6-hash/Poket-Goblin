@@ -129,9 +129,11 @@ export function deleteShoppingItem(id: string) {
 }
 
 export function searchAll(q: string) {
-  return api.get<{ groups: SearchResultGroup[]; suggestions: string[] }>(
-    `/search?q=${encodeURIComponent(q)}`,
-  )
+  return api.get<{
+    groups: SearchResultGroup[]
+    suggestions: string[]
+    recent?: string[]
+  }>(`/search?q=${encodeURIComponent(q)}`)
 }
 
 export function fetchTaskHistory() {

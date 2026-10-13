@@ -1,9 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
+import { goblinLine } from '@shared/magical/personality'
 import type { Task } from '@shared/types'
 
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/features/auth/useAuth'
+import { ContextualActions } from '@/features/magical/ContextualActions'
+import { TinyFirstStep } from '@/features/magical/TinyFirstStep'
 
 import {
   pauseTaskSeries,
@@ -13,20 +16,18 @@ import {
 } from './tasksApi'
 import styles from './TaskList.module.css'
 
-const encouragement = [
-  'Nice one. The goblin noticed.',
-  'Quest complete — soft applause from the den.',
-  'That was a real thing. Well done.',
-]
-
 type TaskListProps = {
   tasks: Task[]
   emptyMessage?: string
+  showPriorityReason?: boolean
+  reasonsById?: Record<string, string[]>
 }
 
 export function TaskList({
   tasks,
   emptyMessage = 'Nothing here yet. Dump a thought or add a task.',
+  showPriorityReason = false,
+  reasonsById,
 }: TaskListProps) {
   const queryClient = useQueryClient()
   const { settings } = useAuth()
@@ -36,6 +37,9 @@ export function TaskList({
       queryClient.invalidateQueries({ queryKey: ['tasks'] }),
       queryClient.invalidateQueries({ queryKey: ['plan'] }),
       queryClient.invalidateQueries({ queryKey: ['history'] }),
+      queryClient.invalidateQueries({ queryKey: ['briefing'] }),
+      queryClient.invalidateQueries({ queryKey: ['priorities'] }),
+      queryClient.invalidateQueries({ queryKey: ['achievements'] }),
     ])
   }
 
@@ -61,7 +65,13 @@ export function TaskList({
   })
 
   if (tasks.length === 0) {
-    return <p className={styles.empty}>{emptyMessage}</p>
+    return (
+      <p className={styles.empty}>
+        {emptyMessage === 'Nothing here yet. Dump a thought or add a task.'
+          ? goblinLine('emptyTasks')
+          : emptyMessage}
+      </p>
+    )
   }
 
   return (
@@ -85,17 +95,21 @@ export function TaskList({
               {` · ${task.priority}`}
               {task.recurrenceRuleId ? ' · repeating' : ''}
             </p>
+            {showPriorityReason && reasonsById?.[task.id]?.[0] ? (
+              <p className={styles.meta}>{reasonsById[task.id]![0]}</p>
+            ) : null}
             {settings?.gamificationEnabled &&
+            settings.goblinFrequency !== 'quiet' &&
             completeMutation.isSuccess &&
             completeMutation.variables?.id === task.id &&
             task.status !== 'completed' ? (
-              <p className={styles.cheer}>
-                {
-                  encouragement[
-                    Math.floor(Math.random() * encouragement.length)
-                  ]
-                }
-              </p>
+              <p className={styles.cheer}>{goblinLine('taskCompleted')}</p>
+            ) : null}
+            {task.status === 'open' ? (
+              <div className={styles.actions}>
+                <TinyFirstStep task={task} />
+                <ContextualActions task={task} />
+              </div>
             ) : null}
           </div>
           <div className={styles.actions}>

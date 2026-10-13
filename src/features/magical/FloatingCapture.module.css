@@ -1,0 +1,37 @@
+.fabWrap {
+  position: fixed;
+  right: var(--space-5);
+  bottom: var(--space-5);
+  z-index: 30;
+  display: grid;
+  justify-items: end;
+  gap: var(--space-2);
+}
+
+.panel {
+  width: min(22rem, calc(100vw - 2rem));
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-soft);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.fab {
+  min-width: 3rem;
+  min-height: 3rem;
+}
+
+.confirm {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-accent-strong);
+}
+
+.error {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-danger);
+}

@@ -1,3 +1,4 @@
+import { scoreTaskWithReasons } from '../../shared/magical/prioritize'
 import {
   CAPACITY_LIMITS,
   type CapacityMode,
@@ -17,33 +18,7 @@ function scoreTask(
   capacityMode: CapacityMode,
   busyDay: boolean,
 ): number {
-  let score = 0
-  if (task.priority === 'high') score += 30
-  if (task.priority === 'normal') score += 15
-  if (task.dueDate) {
-    if (task.dueDate < today)
-      score += 45 // overdue: visible, not punitive
-    else if (task.dueDate === today) score += 40
-    else {
-      const days =
-        (new Date(`${task.dueDate}T12:00:00`).getTime() -
-          new Date(`${today}T12:00:00`).getTime()) /
-        86_400_000
-      if (days <= 2) score += 20
-      else if (days <= 7) score += 10
-    }
-  }
-  // Prefer lighter tasks when capacity is low or the calendar is busy
-  if (capacityMode === 'goblin' || busyDay) {
-    score += Math.max(0, 8 - task.capacityCost * 2)
-  } else if (capacityMode === 'quest') {
-    score += task.capacityCost
-  } else {
-    score += Math.max(0, 6 - task.capacityCost)
-  }
-  // Child breakdown steps are easier starts
-  if (task.parentId) score += 8
-  return score
+  return scoreTaskWithReasons(task, today, capacityMode, busyDay).score
 }
 
 async function countAppointmentsToday(

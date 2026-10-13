@@ -1,18 +1,18 @@
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router'
+import { useState } from 'react'
+import { Link, useSearchParams } from 'react-router'
 
 import { CAPACITY_LABELS } from '@shared/types'
 
 import { GoblinMascot } from '@/components/goblin/GoblinMascot'
 import { Card } from '@/components/ui/Card'
 import { useAuth } from '@/features/auth/useAuth'
-import { CaptureReview } from '@/features/capture/CaptureReview'
-import { QuickCapture } from '@/features/capture/QuickCapture'
-import { fetchCaptures } from '@/features/capture/captureApi'
+import { DailyBriefingCard } from '@/features/magical/DailyBriefingCard'
+import { RescuePanel } from '@/features/magical/RescuePanel'
+import { fetchPriorities } from '@/features/magical/magicalApi'
 import { fetchDenSummary } from '@/features/life/lifeApi'
 import { fetchTodayPlan } from '@/features/plan/planApi'
 import { TaskList } from '@/features/tasks/TaskList'
-import { fetchTasks } from '@/features/tasks/tasksApi'
 
 import styles from './HomePage.module.css'
 
@@ -26,40 +26,26 @@ function formatToday() {
 
 export function HomePage() {
   const { user, settings } = useAuth()
+  const [params] = useSearchParams()
+  const [rescueOpen, setRescueOpen] = useState(params.get('rescue') === '1')
+
   const planQuery = useQuery({
     queryKey: ['plan', 'today'],
     queryFn: fetchTodayPlan,
-  })
-  const tasksQuery = useQuery({
-    queryKey: ['tasks', 'open'],
-    queryFn: () => fetchTasks('open'),
-  })
-  const capturesQuery = useQuery({
-    queryKey: ['captures'],
-    queryFn: fetchCaptures,
   })
   const denQuery = useQuery({
     queryKey: ['den-summary'],
     queryFn: fetchDenSummary,
   })
+  const priorities = useQuery({
+    queryKey: ['priorities'],
+    queryFn: fetchPriorities,
+  })
 
-  const hour = new Date().getHours()
-  const greeting =
-    hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
-
-  const awaiting = (capturesQuery.data?.captures ?? [])
-    .flatMap((capture) =>
-      capture.items
-        .filter((item) => item.status === 'suggested')
-        .map((item) => ({ capture, item })),
-    )
-    .slice(0, 5)
-
-  const recentCaptures = (capturesQuery.data?.captures ?? []).slice(0, 2)
-  const dueSoon = (tasksQuery.data?.tasks ?? [])
-    .filter((task) => task.dueDate)
-    .slice(0, 4)
   const summary = denQuery.data?.summary
+  const reasonMap = Object.fromEntries(
+    (priorities.data?.items ?? []).map((item) => [item.task.id, item.reasons]),
+  )
 
   return (
     <div className={styles.page}>
@@ -67,11 +53,9 @@ export function HomePage() {
         <GoblinMascot size={84} mood="idle" />
         <div>
           <p className={styles.kicker}>{formatToday()}</p>
-          <h1>
-            {greeting}, {user?.displayName}.
-          </h1>
+          <h1>The Den</h1>
           <p className={styles.sub}>
-            The den is calm. Drop a thought anytime — the goblin will sort the
+            {user?.displayName}, drop thoughts anytime — the goblin sorts the
             shelves.
           </p>
           <p className={styles.capacity}>
@@ -80,39 +64,53 @@ export function HomePage() {
               {CAPACITY_LABELS[settings?.capacityMode ?? 'steady']}
             </strong>{' '}
             · <Link to="/plan">Adjust plan</Link>
-            {summary && summary.unprocessedCaptures > 0
-              ? ` · ${summary.unprocessedCaptures} dump items waiting`
-              : ''}
             {summary && summary.pendingReview > 0 ? (
               <>
                 {' '}
                 · <Link to="/inbox">{summary.pendingReview} in Inbox</Link>
               </>
             ) : null}
+            {' · '}
+            <Link to="/settings">Settings</Link>
           </p>
         </div>
       </header>
 
-      <Card>
-        <h2>Quick capture</h2>
-        <p className={styles.cardHint}>
-          One box. No filing cabinets. The goblin proposes structure; you
-          decide.
-        </p>
-        <QuickCapture />
-      </Card>
+      <DailyBriefingCard onRescue={() => setRescueOpen(true)} />
+
+      <RescuePanel open={rescueOpen} onClose={() => setRescueOpen(false)} />
 
       <div className={styles.grid}>
         <Card>
-          <h2>Today&apos;s priorities</h2>
+          <h2>Today&apos;s focus</h2>
           <TaskList
             tasks={planQuery.data?.plan.tasks ?? []}
-            emptyMessage="No plan yet — visit Plan to shape a gentle day."
+            emptyMessage="No plan yet — visit Plan, or use Rescue my day."
+            showPriorityReason
+            reasonsById={reasonMap}
           />
         </Card>
 
         <Card>
-          <h2>Upcoming appointments</h2>
+          <h2>Suggested order</h2>
+          <p className={styles.cardHint}>
+            You can override anytime — this is a gentle suggestion, not a
+            verdict.
+          </p>
+          <TaskList
+            tasks={(priorities.data?.items ?? [])
+              .slice(0, 5)
+              .map((item) => item.task)}
+            emptyMessage="No open tasks to rank."
+            showPriorityReason
+            reasonsById={reasonMap}
+          />
+        </Card>
+      </div>
+
+      <div className={styles.grid}>
+        <Card>
+          <h2>Coming up</h2>
           {(summary?.upcomingEvents.length ?? 0) === 0 ? (
             <p className={styles.cardHint}>
               No appointments in the next week.{' '}
@@ -129,9 +127,7 @@ export function HomePage() {
             </ul>
           )}
         </Card>
-      </div>
 
-      <div className={styles.grid}>
         <Card>
           <h2>Due reminders</h2>
           {(summary?.dueReminders.length ?? 0) === 0 ? (
@@ -146,85 +142,6 @@ export function HomePage() {
                 </li>
               ))}
             </ul>
-          )}
-        </Card>
-
-        <Card>
-          <h2>Shopping needs attention</h2>
-          {(summary?.shoppingNeedsAttention.length ?? 0) === 0 ? (
-            <p className={styles.cardHint}>Shopping list is clear.</p>
-          ) : (
-            <ul className={styles.awaitList}>
-              {summary?.shoppingNeedsAttention.map((item) => (
-                <li key={item.id}>
-                  <strong>{item.name}</strong>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      </div>
-
-      <div className={styles.grid}>
-        <Card>
-          <h2>Pinned notes</h2>
-          {(summary?.pinnedNotes.length ?? 0) === 0 ? (
-            <p className={styles.cardHint}>
-              Pin a note from <Link to="/life">Life</Link> when something must
-              stay visible.
-            </p>
-          ) : (
-            <ul className={styles.awaitList}>
-              {summary?.pinnedNotes.map((note) => (
-                <li key={note.id}>
-                  <strong>{note.title}</strong>
-                  <div>{note.body.slice(0, 80)}</div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-
-        <Card>
-          <h2>Awaiting attention</h2>
-          {awaiting.length === 0 ? (
-            <p className={styles.cardHint}>
-              Nothing waiting for a decision. Lovely.
-            </p>
-          ) : (
-            <ul className={styles.awaitList}>
-              {awaiting.map(({ capture, item }) => (
-                <li key={item.id}>
-                  <strong>{item.title}</strong>
-                  <span> · {item.kind}</span>
-                  <div>
-                    <Link to="/capture">Review</Link>
-                  </div>
-                  <span className={styles.sr}>{capture.id}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      </div>
-
-      <div className={styles.grid}>
-        <Card>
-          <h2>Upcoming tasks</h2>
-          <TaskList tasks={dueSoon} emptyMessage="No dated commitments yet." />
-        </Card>
-        <Card>
-          <h2>Recently captured</h2>
-          {recentCaptures.length === 0 ? (
-            <p className={styles.cardHint}>
-              Your first dump will show up here.
-            </p>
-          ) : (
-            <div className={styles.captureStack}>
-              {recentCaptures.map((capture) => (
-                <CaptureReview key={capture.id} capture={capture} />
-              ))}
-            </div>
           )}
         </Card>
       </div>

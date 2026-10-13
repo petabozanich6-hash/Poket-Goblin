@@ -126,7 +126,8 @@ export type TaskHistoryEntry = {
 }
 
 export type SearchResultGroup = {
-  type: 'task' | 'note' | 'event' | 'shopping' | 'capture'
+  type:
+    'task' | 'note' | 'event' | 'shopping' | 'capture' | 'document' | 'reminder'
   label: string
   items: Array<{
     id: string
@@ -135,6 +136,10 @@ export type SearchResultGroup = {
     href: string
   }>
 }
+
+export type NudgeFrequency = 'off' | 'quiet' | 'normal' | 'chatty'
+export type PlanningApproach = 'minimal' | 'balanced' | 'ambitious'
+export type GoblinFrequency = 'quiet' | 'normal' | 'chatty'
 
 export type CaptureItem = {
   id: string
@@ -173,6 +178,36 @@ export type UserSettings = {
   capacityMode: CapacityMode
   theme: ThemePreference
   gamificationEnabled: boolean
+  quietHoursEnabled: boolean
+  quietHoursStart: string
+  quietHoursEnd: string
+  nudgeFrequency: NudgeFrequency
+  dailyBriefingEnabled: boolean
+  eveningCheckinEnabled: boolean
+  reducedMotion: boolean
+  planningApproach: PlanningApproach
+  goblinFrequency: GoblinFrequency
+  completedQuestCount: number
+}
+
+export type Achievement = {
+  id: string
+  code: string
+  title: string
+  detail: string
+  earnedAt: string
+}
+
+export type InAppNudge = {
+  id: string
+  kind: string
+  entityType: string | null
+  entityId: string | null
+  title: string
+  body: string
+  status: 'pending' | 'shown' | 'snoozed' | 'dismissed' | 'acted'
+  snoozedUntil: string | null
+  createdAt: string
 }
 
 export type DailyPlan = {

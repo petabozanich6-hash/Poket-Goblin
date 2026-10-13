@@ -12,6 +12,7 @@ import { InboxPage } from '@/pages/InboxPage'
 import { LifePage } from '@/pages/LifePage'
 import { PlanPage } from '@/pages/PlanPage'
 import { SearchPage } from '@/pages/SearchPage'
+import { SettingsPage } from '@/pages/SettingsPage'
 import { TasksPage } from '@/pages/TasksPage'
 
 import { AppShell } from './AppShell'
@@ -74,6 +75,7 @@ export function AppRouter() {
           <Route path="/ask" element={<AssistantPage />} />
           <Route path="/vault" element={<DocumentsPage />} />
           <Route path="/inbox" element={<InboxPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

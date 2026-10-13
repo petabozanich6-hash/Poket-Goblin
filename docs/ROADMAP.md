@@ -65,10 +65,27 @@ Requires credentials / approval before claiming live:
 - [ ] Google / Microsoft OAuth client secrets + completed token exchange
 - [ ] Live email/calendar sync
 
-## Sprint 5 — Polish & release prep
+## Sprint 5 — Make it magical
 
-- [ ] Account management
-- [ ] Accessibility + performance pass
-- [ ] Optional gamification depth
-- [ ] Security review + deployment prep
-- [ ] Swap placeholder imagery for dedicated exports from the official asset library (see `docs/VISUAL_IDENTITY.md`)
+- [x] UX audit (`docs/UX_AUDIT.md`) + critical workflow repairs
+- [x] Daily briefing from real data (rule-based; labelled as such)
+- [x] Overwhelm / calm mode (“I’m overwhelmed”)
+- [x] Tiny First Step on existing tasks
+- [x] Rescue My Day (reviewable plan; appointments untouched)
+- [x] In-app gentle nudges + quiet hours + frequency prefs
+- [x] Explainable task prioritisation
+- [x] Persistent quick-capture control
+- [x] Contextual task actions (reminder / today / vault)
+- [x] Search improvements (documents, reminders, recent, NL hints)
+- [x] Goblin personality system (`docs/GOBLIN_PERSONALITY.md`)
+- [x] Optional gamification (milestones; no streaks/leaderboards)
+- [x] Personalisation Settings page
+- [x] Accessibility pass on new surfaces (focus, labels, reduced motion)
+
+Known follow-ups:
+
+- [ ] Push/email notification channels (opt-in only; not configured)
+- [ ] Deeper contextual actions on events/documents/notes
+- [ ] Full WCAG audit beyond touched surfaces
+- [ ] Swap placeholder imagery for dedicated exports (see `docs/VISUAL_IDENTITY.md`)
+- [ ] Account management polish + security review for release

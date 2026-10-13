@@ -38,6 +38,32 @@ export function todayLocalIso(now = new Date()): string {
   return local.toISOString().slice(0, 10)
 }
 
+/** Client `getTimezoneOffset()` minutes — works on the Worker. */
+export function todayLocalFromOffset(
+  offsetMinutes: number,
+  now = new Date(),
+): string {
+  return new Date(now.getTime() - offsetMinutes * 60_000)
+    .toISOString()
+    .slice(0, 10)
+}
+
+export function localDayBoundsUtc(
+  todayLocal: string,
+  offsetMinutes: number,
+): { startIso: string; endIso: string } {
+  const year = Number(todayLocal.slice(0, 4))
+  const month = Number(todayLocal.slice(5, 7))
+  const day = Number(todayLocal.slice(8, 10))
+  const startMs =
+    Date.UTC(year, month - 1, day, 0, 0, 0) + offsetMinutes * 60_000
+  const endMs = startMs + 86_400_000 - 1
+  return {
+    startIso: new Date(startMs).toISOString(),
+    endIso: new Date(endMs).toISOString(),
+  }
+}
+
 export function readOffsetMinutes(
   body: Record<string, unknown> | null,
 ): number {

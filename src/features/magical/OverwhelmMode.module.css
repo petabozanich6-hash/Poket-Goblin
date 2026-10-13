@@ -1,0 +1,92 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background:
+    radial-gradient(
+      ellipse 80% 50% at 50% 0%,
+      color-mix(in srgb, var(--color-accent) 12%, transparent),
+      transparent 55%
+    ),
+    var(--color-bg);
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+  overflow: auto;
+}
+
+.panel {
+  width: min(32rem, 100%);
+  display: grid;
+  gap: var(--space-4);
+  text-align: left;
+}
+
+.kicker {
+  color: var(--color-ink-muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.75rem;
+}
+
+.lead {
+  margin: 0;
+  color: var(--color-ink-muted);
+}
+
+.focus {
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.focusLabel {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-accent-strong);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+.focusTitle {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.reason {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: 0.95rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.step {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-muted);
+}

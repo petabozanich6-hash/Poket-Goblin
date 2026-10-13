@@ -4,7 +4,9 @@ import type { TaskPriority, TaskStatus } from '../../shared/types'
 import type { Env } from '../env'
 import { recordTaskHistory } from '../lib/history'
 import { newId } from '../lib/ids'
+import { maybeAwardAchievements } from '../lib/magical'
 import type { AuthUser } from '../lib/session'
+import { loadSettings } from '../lib/settings'
 import {
   getTaskForUser,
   listTasksForUser,
@@ -185,8 +187,27 @@ taskRoutes.patch('/:id', async (c) => {
     await recordTaskHistory(c.env.DB, user.id, id, 'updated', 'Task edited')
   }
 
+  let achievements: Awaited<ReturnType<typeof maybeAwardAchievements>> = []
+  if (status === 'completed' && existing.status !== 'completed') {
+    await c.env.DB.prepare(
+      `UPDATE user_settings
+       SET completed_quest_count = completed_quest_count + 1,
+           updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+       WHERE user_id = ?`,
+    )
+      .bind(user.id)
+      .run()
+    const settings = await loadSettings(c.env.DB, user.id)
+    achievements = await maybeAwardAchievements(
+      c.env.DB,
+      user.id,
+      settings.gamificationEnabled,
+      settings.completedQuestCount,
+    )
+  }
+
   const task = await getTaskForUser(c.env.DB, user.id, id)
-  return c.json({ task })
+  return c.json({ task, achievements })
 })
 
 taskRoutes.post('/:id/skip', async (c) => {
