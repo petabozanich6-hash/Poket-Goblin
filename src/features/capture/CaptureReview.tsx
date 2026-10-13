@@ -37,6 +37,10 @@ export function CaptureReview({ capture }: CaptureReviewProps) {
       queryClient.invalidateQueries({ queryKey: ['shopping'] }),
       queryClient.invalidateQueries({ queryKey: ['den-summary'] }),
       queryClient.invalidateQueries({ queryKey: ['history'] }),
+      queryClient.invalidateQueries({ queryKey: ['review'] }),
+      queryClient.invalidateQueries({ queryKey: ['briefing'] }),
+      queryClient.invalidateQueries({ queryKey: ['priorities'] }),
+      queryClient.invalidateQueries({ queryKey: ['nudges'] }),
     ])
   }
 

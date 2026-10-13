@@ -43,6 +43,10 @@ lerna-debug.log*
 # Test / coverage
 coverage
 *.lcov
+playwright-report
+test-results
+blob-report
+.playwright
 
 # TypeScript
 *.tsbuildinfo

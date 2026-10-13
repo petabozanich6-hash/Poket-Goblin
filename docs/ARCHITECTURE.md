@@ -61,8 +61,17 @@ See `docs/INTELLIGENCE.md`.
 
 See `docs/INTEGRATIONS.md`.
 
+## Inspection & QA (Sprint 6)
+
+- Evidence-based audit: `docs/PRODUCT_AUDIT.md`
+- Testing guide: `docs/TESTING.md`
+- Security notes: `docs/SECURITY.md`
+- Journey smoke: `npm run smoke:sprint6` (disposable users; does not wipe D1)
+- Playwright: `npm run test:e2e` (Chromium; assumes local web+API)
+
 ## Local development
 
 - D1 via Wrangler (`--local`). Apply migrations with `npm run db:migrate:local`.
 - Secrets in `.dev.vars` (gitignored).
 - Do not provision paid Cloudflare resources without permission.
+- Do not reset local D1 without explicit permission.

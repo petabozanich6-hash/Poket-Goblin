@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 import type { Env } from '../env'
 import { newId } from '../lib/ids'
 import { hashPassword, verifyPassword } from '../lib/passwords'
+import { checkRateLimit } from '../lib/rateLimit'
 import {
   clearSessionCookie,
   createSession,
@@ -16,7 +17,28 @@ type Vars = { user: AuthUser }
 
 export const authRoutes = new Hono<{ Bindings: Env; Variables: Vars }>()
 
+function clientKey(c: { req: { header: (n: string) => string | undefined } }) {
+  return (
+    c.req.header('CF-Connecting-IP') ||
+    c.req.header('X-Forwarded-For')?.split(',')[0]?.trim() ||
+    'local'
+  )
+}
+
 authRoutes.post('/register', async (c) => {
+  const registerCap = c.env.ENVIRONMENT === 'production' ? 8 : 60
+  const limit = checkRateLimit(
+    `register:${clientKey(c)}`,
+    registerCap,
+    15 * 60_000,
+  )
+  if (!limit.ok) {
+    return c.json(
+      { error: 'Too many registration attempts. Please try again shortly.' },
+      429,
+    )
+  }
+
   const body = (await c.req.json().catch(() => null)) as Record<
     string,
     unknown
@@ -74,6 +96,15 @@ authRoutes.post('/register', async (c) => {
 })
 
 authRoutes.post('/login', async (c) => {
+  const loginCap = c.env.ENVIRONMENT === 'production' ? 20 : 120
+  const limit = checkRateLimit(`login:${clientKey(c)}`, loginCap, 15 * 60_000)
+  if (!limit.ok) {
+    return c.json(
+      { error: 'Too many login attempts. Please try again shortly.' },
+      429,
+    )
+  }
+
   const body = (await c.req.json().catch(() => null)) as Record<
     string,
     unknown
@@ -100,6 +131,8 @@ authRoutes.post('/login', async (c) => {
     }>()
 
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
+    // Count failed attempts against a tighter per-email bucket too
+    checkRateLimit(`login-fail:${emailRaw}`, 10, 15 * 60_000)
     return c.json({ error: 'Email or password is incorrect' }, 401)
   }
 

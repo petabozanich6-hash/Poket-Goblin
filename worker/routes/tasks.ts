@@ -1,6 +1,11 @@
 import { Hono } from 'hono'
 
-import type { TaskPriority, TaskStatus } from '../../shared/types'
+import { generateOccurrences } from '../../shared/recurrence'
+import type {
+  RecurrenceFrequency,
+  TaskPriority,
+  TaskStatus,
+} from '../../shared/types'
 import type { Env } from '../env'
 import { recordTaskHistory } from '../lib/history'
 import { newId } from '../lib/ids'
@@ -13,6 +18,14 @@ import {
   resolveCategoryId,
 } from '../lib/tasks'
 import { asString } from '../lib/validate'
+
+const RECURRENCE: RecurrenceFrequency[] = [
+  'daily',
+  'weekly',
+  'fortnightly',
+  'monthly',
+  'yearly',
+]
 
 type Vars = { user: AuthUser }
 
@@ -64,6 +77,66 @@ taskRoutes.post('/', async (c) => {
     typeof body?.categoryId === 'string' ? body.categoryId : null,
     typeof body?.categorySlug === 'string' ? body.categorySlug : null,
   )
+
+  const recurrenceRaw = asString(body?.recurrenceFrequency, 20)
+  const recurrenceFrequency =
+    recurrenceRaw && RECURRENCE.includes(recurrenceRaw as RecurrenceFrequency)
+      ? (recurrenceRaw as RecurrenceFrequency)
+      : null
+
+  if (recurrenceFrequency) {
+    const startsOn = dueDate ?? new Date().toISOString().slice(0, 10)
+    const recurrenceRuleId = newId('rrule')
+    const seriesId = newId('series')
+    await c.env.DB.prepare(
+      `INSERT INTO recurrence_rules
+        (id, user_id, frequency, interval_value, starts_on)
+       VALUES (?, ?, ?, 1, ?)`,
+    )
+      .bind(recurrenceRuleId, user.id, recurrenceFrequency, startsOn)
+      .run()
+
+    let firstId: string | null = null
+    const occurrences = generateOccurrences(
+      { frequency: recurrenceFrequency, startsOn },
+      4,
+    )
+    for (const occurrence of occurrences) {
+      const id = newId('task')
+      if (!firstId) firstId = id
+      await c.env.DB.prepare(
+        `INSERT INTO tasks
+          (id, user_id, category_id, title, notes, priority, due_date,
+           capacity_cost, recurrence_rule_id, series_id, occurrence_date)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+        .bind(
+          id,
+          user.id,
+          categoryId,
+          title,
+          notes || `Recurring (${recurrenceFrequency})`,
+          priority,
+          occurrence,
+          capacityCost,
+          recurrenceRuleId,
+          seriesId,
+          occurrence,
+        )
+        .run()
+      await recordTaskHistory(
+        c.env.DB,
+        user.id,
+        id,
+        'created',
+        `Recurring occurrence ${occurrence}`,
+      )
+    }
+    const task = firstId
+      ? await getTaskForUser(c.env.DB, user.id, firstId)
+      : null
+    return c.json({ task }, 201)
+  }
 
   const id = newId('task')
   await c.env.DB.prepare(

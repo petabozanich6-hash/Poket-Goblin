@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import type { TaskPriority } from '@shared/types'
+import type { RecurrenceFrequency, TaskPriority } from '@shared/types'
 
 import { Button } from '@/components/ui/Button'
 import { Input, TextArea } from '@/components/ui/Input'
@@ -22,6 +22,7 @@ export function TaskForm({ onCreated }: { onCreated?: () => void }) {
   const [dueDate, setDueDate] = useState('')
   const [priority, setPriority] = useState<TaskPriority>('normal')
   const [categorySlug, setCategorySlug] = useState('other')
+  const [recurrence, setRecurrence] = useState<RecurrenceFrequency | ''>('')
   const [error, setError] = useState<string | null>(null)
 
   const mutation = useMutation({
@@ -31,6 +32,7 @@ export function TaskForm({ onCreated }: { onCreated?: () => void }) {
       setNotes('')
       setDueDate('')
       setPriority('normal')
+      setRecurrence('')
       setError(null)
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['tasks'] }),
@@ -51,6 +53,7 @@ export function TaskForm({ onCreated }: { onCreated?: () => void }) {
       priority,
       dueDate: dueDate || null,
       categorySlug,
+      recurrenceFrequency: recurrence || null,
     })
   }
 
@@ -102,6 +105,21 @@ export function TaskForm({ onCreated }: { onCreated?: () => void }) {
                 {category.name}
               </option>
             ))}
+          </select>
+        </label>
+        <label className={styles.field}>
+          <span>Repeat</span>
+          <select
+            value={recurrence}
+            onChange={(e) =>
+              setRecurrence(e.target.value as RecurrenceFrequency | '')
+            }
+          >
+            <option value="">Doesn’t repeat</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="fortnightly">Fortnightly</option>
+            <option value="monthly">Monthly</option>
           </select>
         </label>
       </div>

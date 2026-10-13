@@ -32,6 +32,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [meQuery.data?.settings.theme])
 
+  useEffect(() => {
+    function onExpired() {
+      queryClient.clear()
+      if (window.location.pathname !== '/') {
+        window.location.assign('/')
+      }
+    }
+    window.addEventListener('pg:session-expired', onExpired)
+    return () => window.removeEventListener('pg:session-expired', onExpired)
+  }, [queryClient])
+
   const loginMutation = useMutation({
     mutationFn: loginAccount,
     onSuccess: async () => {

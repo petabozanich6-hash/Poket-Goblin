@@ -23,6 +23,8 @@
     "smoke:sprint3": "node scripts/smoke-sprint3.mjs",
     "smoke:sprint4": "node scripts/smoke-sprint4.mjs",
     "smoke:sprint5": "node scripts/smoke-sprint5.mjs",
+    "smoke:sprint6": "node scripts/smoke-sprint6.mjs",
+    "test:e2e": "playwright test",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build"
   },
   "dependencies": {
@@ -36,6 +38,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261006.1",
     "@eslint/js": "^9.36.0",
+    "@playwright/test": "^1.55.0",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",

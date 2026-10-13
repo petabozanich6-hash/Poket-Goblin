@@ -22,7 +22,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   } & T
 
   if (!response.ok) {
-    throw new ApiError(response.status, data.error || 'Request failed')
+    if (
+      response.status === 401 &&
+      !path.startsWith('/auth/') &&
+      typeof window !== 'undefined' &&
+      window.location.pathname !== '/'
+    ) {
+      window.dispatchEvent(new CustomEvent('pg:session-expired'))
+    }
+    throw new ApiError(
+      response.status,
+      data.error ||
+        (response.status === 401
+          ? 'Your session ended — please log in again.'
+          : 'Request failed'),
+    )
   }
 
   return data

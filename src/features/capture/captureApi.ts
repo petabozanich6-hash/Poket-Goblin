@@ -7,7 +7,10 @@ export function fetchCaptures() {
 }
 
 export function createCapture(text: string) {
-  return api.post<{ capture: Capture }>('/captures', { text })
+  return api.post<{ capture: Capture }>('/captures', {
+    text,
+    timezoneOffsetMinutes: new Date().getTimezoneOffset(),
+  })
 }
 
 export function acceptCaptureItem(captureId: string, itemId: string) {

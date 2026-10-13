@@ -1,4 +1,9 @@
-import type { Category, Task, TaskPriority } from '@shared/types'
+import type {
+  Category,
+  RecurrenceFrequency,
+  Task,
+  TaskPriority,
+} from '@shared/types'
 
 import { api } from '@/lib/api'
 
@@ -14,6 +19,7 @@ export function createTask(input: {
   categoryId?: string | null
   categorySlug?: string | null
   capacityCost?: number
+  recurrenceFrequency?: RecurrenceFrequency | null
 }) {
   return api.post<{ task: Task }>('/tasks', input)
 }

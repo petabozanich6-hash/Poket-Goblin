@@ -130,11 +130,36 @@ captureRoutes.post('/', async (c) => {
   const intelligence = await interpretIntelligence(c.env, rawText)
   await recordUsage(c.env.DB, user.id, intelligence.provider)
 
-  const suggestions = intelligence.suggestions.filter((s) =>
+  let suggestions = intelligence.suggestions.filter((s) =>
     isCaptureKind(s.type),
   )
+  const warnings = [...(intelligence.warnings ?? [])]
+
+  // Never discard the user's thought — park as an uncertain note for review.
   if (suggestions.length === 0) {
-    return c.json({ error: 'Could not find anything actionable yet' }, 400)
+    suggestions = [
+      {
+        id: 'fallback_note',
+        type: 'note',
+        title: rawText.slice(0, 120),
+        details: rawText,
+        dueDate: null,
+        startTime: null,
+        recurrenceFrequency: null,
+        categorySlug: 'other',
+        priority: 'normal',
+        capacityCost: 1,
+        confidence: 'low',
+        uncertain: true,
+        missingInformation: ['Could not confidently structure this dump'],
+        proposedAction: 'Save as a note for later sorting',
+        sourceReference: rawText.slice(0, 80),
+        parentSuggestionId: null,
+      },
+    ]
+    warnings.push(
+      'Could not confidently structure this dump — saved as a note so nothing is lost.',
+    )
   }
 
   const captureId = newId('cap')
@@ -195,7 +220,7 @@ captureRoutes.post('/', async (c) => {
         mode: intelligence.mode,
         provider: intelligence.provider,
         summary: intelligence.summary,
-        warnings: intelligence.warnings,
+        warnings,
       },
     },
     201,
