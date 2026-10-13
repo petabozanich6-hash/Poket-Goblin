@@ -19,7 +19,20 @@ function Protected({ children }: { children: ReactNode }) {
       </div>
     )
   }
-  if (!isAuthenticated) return <Navigate to="/welcome" replace />
+  if (!isAuthenticated) return <Navigate to="/" replace />
+  return children
+}
+
+function PublicOnly({ children }: { children: ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth()
+  if (isLoading) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
+        Waking the goblin…
+      </div>
+    )
+  }
+  if (isAuthenticated) return <Navigate to="/den" replace />
   return children
 }
 
@@ -27,7 +40,15 @@ export function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/welcome" element={<AuthPage />} />
+        <Route
+          path="/"
+          element={
+            <PublicOnly>
+              <AuthPage />
+            </PublicOnly>
+          }
+        />
+        <Route path="/welcome" element={<Navigate to="/" replace />} />
         <Route
           element={
             <Protected>
@@ -35,7 +56,7 @@ export function AppRouter() {
             </Protected>
           }
         >
-          <Route path="/" element={<HomePage />} />
+          <Route path="/den" element={<HomePage />} />
           <Route path="/capture" element={<CapturePage />} />
           <Route path="/tasks" element={<TasksPage />} />
           <Route path="/plan" element={<PlanPage />} />

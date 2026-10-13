@@ -14,7 +14,10 @@ npm run db:migrate:local
 npm run dev
 ```
 
-Open http://localhost:5173 — create an account and dump your first thought.
+Open http://localhost:5173 — you should see Register / Sign in, then the Den.
+
+If an old “coming soon” page appears, a stale Vite process is probably still
+bound to port 5173. Stop it, run `rm -rf node_modules/.vite`, then `npm run dev` again.
 
 ## Stack
 

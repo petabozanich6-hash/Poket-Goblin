@@ -15,10 +15,20 @@ npm run db:migrate:local
 npm run dev
 ```
 
-- Web: http://localhost:5173
+- Web: http://localhost:5173 → welcome / register (or Den if signed in)
 - API: http://localhost:8787/api/health
 
-Vite proxies `/api` to the Worker.
+`npm run dev` starts **both** Vite and the Worker. Vite proxies `/api` to the Worker.
+
+If the UI looks stuck on an old page, stop every process on ports 5173/8787,
+clear Vite’s cache, and restart:
+
+```bash
+# free the ports, then:
+rm -rf node_modules/.vite
+npm run db:migrate:local
+npm run dev
+```
 
 ## Scripts
 

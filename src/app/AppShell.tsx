@@ -9,7 +9,7 @@ import { applyTheme } from '@/lib/theme'
 import styles from './AppShell.module.css'
 
 const links = [
-  { to: '/', label: 'Den', icon: Home, end: true },
+  { to: '/den', label: 'Den', icon: Home, end: true },
   { to: '/capture', label: 'Dump', icon: Brain },
   { to: '/tasks', label: 'Tasks', icon: ListTodo },
   { to: '/plan', label: 'Plan', icon: Sparkles },

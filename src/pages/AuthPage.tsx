@@ -20,7 +20,7 @@ export function AuthPage() {
   const [busy, setBusy] = useState(false)
 
   if (!isLoading && isAuthenticated) {
-    return <Navigate to="/" replace />
+    return <Navigate to="/den" replace />
   }
 
   async function onSubmit(event: FormEvent) {
@@ -51,6 +51,27 @@ export function AuthPage() {
               Your brain has enough tabs open. Let the goblin handle it.
             </p>
           </div>
+        </div>
+
+        <div className={styles.modeTabs} role="tablist" aria-label="Account">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'register'}
+            className={mode === 'register' ? styles.modeActive : styles.modeTab}
+            onClick={() => setMode('register')}
+          >
+            Register
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'login'}
+            className={mode === 'login' ? styles.modeActive : styles.modeTab}
+            onClick={() => setMode('login')}
+          >
+            Sign in
+          </button>
         </div>
 
         <form className={styles.form} onSubmit={(e) => void onSubmit(e)}>

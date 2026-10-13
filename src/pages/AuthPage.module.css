@@ -22,6 +22,35 @@
   color: var(--color-ink-muted);
 }
 
+.modeTabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  padding: var(--space-1);
+  border-radius: 999px;
+  background: var(--color-bg-muted);
+}
+
+.modeTab,
+.modeActive {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.65rem 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.modeTab {
+  background: transparent;
+  color: var(--color-ink-muted);
+}
+
+.modeActive {
+  background: var(--color-bg-elevated);
+  color: var(--color-accent-strong);
+  box-shadow: var(--shadow-soft);
+}
+
 .form {
   display: grid;
   gap: var(--space-3);
