@@ -13,13 +13,14 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "tsc -b --pretty false",
+    "typecheck": "tsc -b --pretty false && tsc -p worker/tsconfig.json --pretty false",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:migrate:local": "wrangler d1 migrations apply pocket-goblin --local",
     "db:console:local": "wrangler d1 execute pocket-goblin --local --command",
     "smoke:local": "node scripts/smoke-local.mjs",
     "smoke:sprint2": "node scripts/smoke-sprint2.mjs",
+    "smoke:sprint3": "node scripts/smoke-sprint3.mjs",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build"
   },
   "dependencies": {

@@ -1,0 +1,46 @@
+---
+description: Pocket Goblin official visual identity — woodland fantasy, character lock, asset rules
+alwaysApply: true
+---
+
+# Pocket Goblin visual identity
+
+Canonical reference (full sheets only — never crop for production):
+
+`docs/assets/pocket-goblin-fantasy-asset-library.jpg`
+
+## Character lock
+
+The Pocket Goblin is a small, friendly woodland helper:
+
+- Bright green skin, large expressive eyes, very large pointed ears
+- Brown leather aviator goggles with brass rims on the forehead
+- Brown leather vest/tunic, backpack, sturdy boots
+- Warm, painterly storybook look — cozy and helpful, never aggressive
+
+Do **not** recreate the character with emoji, CSS shapes, Lucide/generic icons as a stand-in mascot, or generic AI-generated goblins. Prefer existing in-repo imagery until dedicated cut assets ship.
+
+## Palette (woodland fantasy)
+
+Prefer these directions when adjusting UI tokens or new surfaces:
+
+| Role | Hex | Notes |
+|------|-----|--------|
+| Forest green | `#4A5D23` | Primary brand / foliage |
+| Leather brown | `#8B5A2B` | Character gear, borders |
+| Parchment | `#F5E6BE` | Soft backgrounds, cards |
+| Warm oak | `#D4A373` | Accents, banners |
+
+Avoid purple-on-white, cold neon, or flat SaaS greys that fight the den aesthetic.
+
+## Asset usage
+
+- Do **not** crop individual characters/icons from the reference sheets for production UI.
+- Dedicated export assets will replace current placeholder imagery later.
+- Until then: preserve current layout/functionality; when touching visuals, align colours/tone toward the palette above without inventing a new goblin.
+
+## UI tone
+
+- Rounded containers, parchment-like calm surfaces, readable text (low cognitive load).
+- Capacity modes: Goblin (leaf / low energy), Steady (sun / balanced), Quest (mountains / high energy) — woodland metaphors, not corporate badges.
+- Empty states and feedback should feel storybook and non-punitive when real assets arrive.

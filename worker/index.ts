@@ -9,6 +9,7 @@ import { categoryRoutes } from './routes/categories'
 import { dashboardRoutes } from './routes/dashboard'
 import { eventRoutes } from './routes/events'
 import { historyRoutes } from './routes/history'
+import { intelligenceRoutes } from './routes/intelligence'
 import { meRoutes } from './routes/me'
 import { noteRoutes } from './routes/notes'
 import { planRoutes } from './routes/plan'
@@ -63,6 +64,7 @@ app.route('/shopping', shoppingRoutes)
 app.route('/search', searchRoutes)
 app.route('/history', historyRoutes)
 app.route('/dashboard', dashboardRoutes)
+app.route('/intelligence', intelligenceRoutes)
 
 app.notFound((c) => c.json({ error: 'Not found' }, 404))
 

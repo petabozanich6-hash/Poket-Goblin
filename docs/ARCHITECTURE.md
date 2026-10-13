@@ -20,6 +20,8 @@ Browser (Vite SPA)
    ▼
 Worker (Hono)
    ├── auth, me, categories, tasks, captures, plan
+   ├── events, reminders, notes, shopping, search, history, dashboard
+   ├── intelligence (interpret, breakdown, assist, memory)
    └── D1 (per-user row isolation)
 ```
 
@@ -27,9 +29,10 @@ Worker (Hono)
 
 ```
 src/           UI, features, design system
-shared/        Types + deterministic brain-dump interpreter
-worker/        API routes and server libs
+shared/        Types, brain-dump heuristics, intelligence schemas/rules
+worker/        API routes and server libs (incl. AI provider adapter)
 migrations/    D1 SQL migrations
+docs/          Product, architecture, intelligence, visual identity
 ```
 
 ## Multi-user isolation
@@ -38,25 +41,23 @@ migrations/    D1 SQL migrations
 - Session middleware resolves the user before protected routes.
 - Queries always filter by `user_id`.
 
-## Brain dump (Sprint 1)
+## Intelligence (Sprint 3)
 
-Deterministic heuristics in `shared/brainDump.ts` — not AI.
+See `docs/INTELLIGENCE.md`.
 
-- Suggests kind / category / date only from cues in the text.
-- Never invents dates without recognizable language.
-- User must accept suggestions before tasks are created.
-
-AI provider abstraction arrives in Sprint 3.
+- One engine for dump / breakdown / assist.
+- Structured JSON validated server-side before any write path.
+- Rule-based fallback when AI credentials are absent or fail.
+- Daily per-user usage limits.
+- User must confirm before mutations.
 
 ## Local development
 
 - D1 runs locally via Wrangler (`--local`). No remote DB required.
-- `AUTH_SECRET` lives in `.dev.vars` (gitignored).
+- Secrets live in `.dev.vars` (gitignored). See `.dev.vars.example`.
 - Do not provision paid Cloudflare resources without permission.
 
 ## Future
 
-- Sprint 2: calendar, reminders, notes, shopping, search
-- Sprint 3: AI organisation + natural language
 - Sprint 4: R2 documents + integrations
 - Sprint 5: polish, security review, release prep

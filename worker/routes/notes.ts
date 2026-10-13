@@ -110,7 +110,8 @@ noteRoutes.patch('/:id', async (c) => {
       : (existing.title as string)
   if (!title) return c.json({ error: 'Title is required' }, 400)
 
-  let categoryId = (existing.categoryId as string) ?? null
+  let categoryId: string | null =
+    typeof existing.categoryId === 'string' ? existing.categoryId : null
   if (body && ('categoryId' in body || 'categorySlug' in body)) {
     categoryId = await resolveCategoryId(
       c.env.DB,

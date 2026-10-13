@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 
-import { interpretBrainDump } from '../../shared/brainDump'
 import { generateOccurrences } from '../../shared/recurrence'
+import { isCaptureKind } from '../../shared/intelligence'
 import type { CaptureItemKind, RecurrenceFrequency } from '../../shared/types'
 import type { Env } from '../env'
 import {
@@ -9,6 +9,8 @@ import {
   localDateTimeToIso,
   readOffsetMinutes,
 } from '../lib/datetime'
+import { interpretIntelligence } from '../lib/intelligence/provider'
+import { assertUnderLimit, recordUsage } from '../lib/intelligence/usage'
 import { newId } from '../lib/ids'
 import { recordTaskHistory } from '../lib/history'
 import type { AuthUser } from '../lib/session'
@@ -122,7 +124,15 @@ captureRoutes.post('/', async (c) => {
   const rawText = asString(body?.text, 4000)
   if (!rawText) return c.json({ error: 'Capture text is required' }, 400)
 
-  const suggestions = interpretBrainDump(rawText)
+  const gate = await assertUnderLimit(c.env.DB, c.env, user.id)
+  if (!gate.ok) return c.json({ error: gate.error }, 429)
+
+  const intelligence = await interpretIntelligence(c.env, rawText)
+  await recordUsage(c.env.DB, user.id, intelligence.provider)
+
+  const suggestions = intelligence.suggestions.filter((s) =>
+    isCaptureKind(s.type),
+  )
   if (suggestions.length === 0) {
     return c.json({ error: 'Could not find anything actionable yet' }, 400)
   }
@@ -145,7 +155,7 @@ captureRoutes.post('/', async (c) => {
         newId('citem'),
         captureId,
         user.id,
-        suggestion.kind,
+        suggestion.type,
         suggestion.title,
         suggestion.dueDate,
         suggestion.startTime,
@@ -158,7 +168,18 @@ captureRoutes.post('/', async (c) => {
   }
 
   const capture = await loadCapture(c.env.DB, user.id, captureId)
-  return c.json({ capture }, 201)
+  return c.json(
+    {
+      capture,
+      intelligence: {
+        mode: intelligence.mode,
+        provider: intelligence.provider,
+        summary: intelligence.summary,
+        warnings: intelligence.warnings,
+      },
+    },
+    201,
+  )
 })
 
 captureRoutes.patch('/:captureId/items/:itemId', async (c) => {
@@ -428,7 +449,7 @@ captureRoutes.post('/:captureId/items/:itemId/accept', async (c) => {
           categoryId,
           item.title,
           `From brain dump (${item.kind})`,
-          item.kind === 'appointment' ? 'high' : 'normal',
+          'normal',
           item.dueDate,
         )
         .run()

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 
 import { useAuth } from '@/features/auth/useAuth'
+import { AssistantPage } from '@/pages/AssistantPage'
 import { AuthPage } from '@/pages/AuthPage'
 import { CalendarPage } from '@/pages/CalendarPage'
 import { CapturePage } from '@/pages/CapturePage'
@@ -68,6 +69,7 @@ export function AppRouter() {
           <Route path="/shopping" element={<Navigate to="/life" replace />} />
           <Route path="/notes" element={<Navigate to="/life" replace />} />
           <Route path="/find" element={<SearchPage />} />
+          <Route path="/ask" element={<AssistantPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

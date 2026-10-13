@@ -5,6 +5,7 @@ import {
   ListTodo,
   LogOut,
   Layers,
+  MessageCircle,
   Search,
   Sparkles,
   SunMoon,
@@ -25,6 +26,7 @@ const links = [
   { to: '/calendar', label: 'Calendar', icon: CalendarDays },
   { to: '/life', label: 'Life', icon: Layers },
   { to: '/find', label: 'Find', icon: Search },
+  { to: '/ask', label: 'Ask', icon: MessageCircle },
   { to: '/plan', label: 'Plan', icon: Sparkles },
 ]
 

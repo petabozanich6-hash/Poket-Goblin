@@ -31,11 +31,21 @@ Known follow-ups inside Sprint 2 scope:
 - [ ] Drag-reorder shopping items in the UI (API supports sortOrder)
 - [ ] Recurring calendar events UI (schema supports series; task recurrence is primary)
 
-## Sprint 3 — Smart organisation
+## Sprint 3 — The goblin gets a brain
 
-- [ ] AI provider abstraction (keys on Worker only)
-- [ ] Richer multi-item extraction
-- [ ] Task breakdown + assisted planning
+- [x] Central intelligence service + structured suggestion schema
+- [x] AI provider abstraction (OpenAI-compatible) with rule-based fallback
+- [x] Richer multi-action brain-dump extraction + review
+- [x] Task breakdown (tiny / normal / detailed) with accept-selected
+- [x] Capacity-aware planning (appointments + effort + mode)
+- [x] Ask the goblin assistant (grounded in user data)
+- [x] Follow-up suggestions (confirm date before create)
+- [x] User-controlled memory (list / save / delete)
+- [x] Per-user daily usage limits + failure handling
+
+Requires credentials to claim live AI interpret:
+
+- [ ] Configure `AI_PROVIDER` + `AI_API_KEY` (and optional base URL / model) in Worker secrets
 
 ## Sprint 4 — Documents & integrations
 
@@ -49,3 +59,4 @@ Known follow-ups inside Sprint 2 scope:
 - [ ] Accessibility + performance pass
 - [ ] Optional gamification depth
 - [ ] Security review + deployment prep
+- [ ] Swap placeholder imagery for dedicated exports from the official asset library (see `docs/VISUAL_IDENTITY.md`)

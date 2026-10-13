@@ -12,6 +12,15 @@ export function localDateTimeToIso(
   const clock = allDay || !time ? '12:00' : time
   const [year, month, day] = date.split('-').map(Number)
   const [hour, minute] = clock.split(':').map(Number)
+  if (
+    year === undefined ||
+    month === undefined ||
+    day === undefined ||
+    hour === undefined ||
+    minute === undefined
+  ) {
+    throw new Error('Invalid date or time')
+  }
   const utcMs =
     Date.UTC(year, month - 1, day, hour, minute, 0) + offsetMinutes * 60_000
   return new Date(utcMs).toISOString()

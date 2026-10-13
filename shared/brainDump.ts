@@ -41,6 +41,15 @@ export function parseRelativeDate(
 ): string | null {
   const lower = text.toLowerCase()
 
+  // Vague horizons — never invent an exact calendar day
+  if (
+    /\b(next month|soon|sometime|eventually|later this year|end of (the )?month)\b/.test(
+      lower,
+    )
+  ) {
+    return null
+  }
+
   if (/\btoday\b/.test(lower)) return toIsoDate(now)
 
   if (/\btomorrow\b/.test(lower)) {
@@ -54,6 +63,13 @@ export function parseRelativeDate(
   )
   if (nextDay?.[1]) {
     return toIsoDate(nextWeekday(now, WEEKDAYS[nextDay[1]]!, true))
+  }
+
+  const byDay = lower.match(
+    /\bby\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/,
+  )
+  if (byDay?.[1]) {
+    return toIsoDate(nextWeekday(now, WEEKDAYS[byDay[1]]!, false))
   }
 
   const day = lower.match(
@@ -195,6 +211,19 @@ function cleanTitle(text: string): string {
     .replace(/^./, (c) => c.toUpperCase())
 }
 
+function expandShoppingBundle(fragment: string): string[] {
+  const match = fragment.match(
+    /^(?:i\s+)?(?:need\s+to\s+)?(?:get|buy|pick\s+up)\s+(.+)$/i,
+  )
+  if (!match?.[1]) return [fragment]
+  const items = match[1]
+    .split(/\s*,\s*|\s+and\s+/i)
+    .map((p) => p.trim())
+    .filter(Boolean)
+  if (items.length <= 1) return [fragment]
+  return items.map((item) => `buy ${item}`)
+}
+
 function splitThoughts(raw: string): string[] {
   const lower = raw.toLowerCase()
 
@@ -213,7 +242,7 @@ function splitThoughts(raw: string): string[] {
   if (
     /\b(need|buy|get)\b/.test(lower) &&
     (lower.includes(',') || /\sand\s/.test(lower)) &&
-    !/\b(book|meeting|appointment|remind)\b/.test(lower)
+    !/\b(book|meeting|appointment|remind|pay|bill|expire)\b/.test(lower)
   ) {
     const stripped = raw
       .replace(/^(i\s+)?(need|buy|get)\s+/i, '')
@@ -224,11 +253,32 @@ function splitThoughts(raw: string): string[] {
     }
   }
 
+  // Multi-action dump with commas / and:
+  // "pay the bill by Thursday, book the dentist, get milk and bread, and remember…"
+  if (
+    (raw.includes(',') || /\sand\s/i.test(raw)) &&
+    !/\bevery\b/i.test(raw) &&
+    /\b(pay|book|get|buy|remind|remember|need to)\b/i.test(raw)
+  ) {
+    const normalized = raw
+      .replace(/\.$/, '')
+      .replace(/^i\s+need\s+to\s+/i, '')
+      .replace(/,\s+and\s+/gi, ', ')
+      .replace(/\s+and\s+(?=(remember|remind|book|pay|get|buy)\b)/gi, ', ')
+    const clauses = normalized
+      .split(/\s*,\s*/)
+      .map((part) => part.trim())
+      .filter((part) => part.length > 2)
+    if (clauses.length > 1) {
+      return clauses.flatMap((clause) => expandShoppingBundle(clause))
+    }
+  }
+
   // "Book the dentist and buy toothpaste."
   if (/\band\b/i.test(raw) && !/\bevery\b/i.test(raw)) {
     const andParts = raw.split(/\s+and\s+/i).map((p) => p.trim())
     if (andParts.length === 2 && andParts[0] && andParts[1]) {
-      return andParts
+      return andParts.flatMap((part) => expandShoppingBundle(part))
     }
   }
 

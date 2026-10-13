@@ -11,22 +11,57 @@ function todayIso(now = new Date()): string {
   return now.toISOString().slice(0, 10)
 }
 
-function scoreTask(task: Task, today: string): number {
+function scoreTask(
+  task: Task,
+  today: string,
+  capacityMode: CapacityMode,
+  busyDay: boolean,
+): number {
   let score = 0
   if (task.priority === 'high') score += 30
   if (task.priority === 'normal') score += 15
   if (task.dueDate) {
-    if (task.dueDate <= today) score += 40
+    if (task.dueDate < today)
+      score += 45 // overdue: visible, not punitive
+    else if (task.dueDate === today) score += 40
     else {
       const days =
-        (new Date(task.dueDate).getTime() - new Date(today).getTime()) /
+        (new Date(`${task.dueDate}T12:00:00`).getTime() -
+          new Date(`${today}T12:00:00`).getTime()) /
         86_400_000
       if (days <= 2) score += 20
       else if (days <= 7) score += 10
     }
   }
-  score += Math.max(0, 6 - task.capacityCost)
+  // Prefer lighter tasks when capacity is low or the calendar is busy
+  if (capacityMode === 'goblin' || busyDay) {
+    score += Math.max(0, 8 - task.capacityCost * 2)
+  } else if (capacityMode === 'quest') {
+    score += task.capacityCost
+  } else {
+    score += Math.max(0, 6 - task.capacityCost)
+  }
+  // Child breakdown steps are easier starts
+  if (task.parentId) score += 8
   return score
+}
+
+async function countAppointmentsToday(
+  db: D1Database,
+  userId: string,
+  planDate: string,
+): Promise<number> {
+  const start = `${planDate}T00:00:00.000Z`
+  const end = `${planDate}T23:59:59.999Z`
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) as count FROM events
+       WHERE user_id = ? AND status = 'scheduled'
+         AND starts_at >= ? AND starts_at <= ?`,
+    )
+    .bind(userId, start, end)
+    .first<{ count: number }>()
+  return row?.count ?? 0
 }
 
 export async function buildDailyPlan(
@@ -35,20 +70,47 @@ export async function buildDailyPlan(
   capacityMode: CapacityMode,
   planDate = todayIso(),
 ): Promise<DailyPlan> {
-  const limit = CAPACITY_LIMITS[capacityMode]
+  let limit = CAPACITY_LIMITS[capacityMode]
+  const appointmentCount = await countAppointmentsToday(db, userId, planDate)
+  const busyDay = appointmentCount >= 2
+  if (busyDay) {
+    limit = Math.max(1, limit - 1)
+  }
+  if (capacityMode === 'goblin') {
+    // Keep goblin mode especially gentle
+    limit = Math.min(limit, CAPACITY_LIMITS.goblin)
+  }
+
   const openTasks = await listTasksForUser(db, userId, {
     status: 'open',
     limit: 200,
   })
   const ranked = [...openTasks].sort(
-    (a, b) => scoreTask(b, planDate) - scoreTask(a, planDate),
+    (a, b) =>
+      scoreTask(b, planDate, capacityMode, busyDay) -
+      scoreTask(a, planDate, capacityMode, busyDay),
   )
 
   const selected: Task[] = []
   let cost = 0
+  const maxCost =
+    capacityMode === 'goblin'
+      ? limit
+      : capacityMode === 'steady'
+        ? limit + 1
+        : limit + 2
+
   for (const task of ranked) {
     if (selected.length >= limit) break
-    if (cost + task.capacityCost > limit + 1 && selected.length > 0) continue
+    // Skip heavy tasks on goblin / busy days unless overdue today
+    if (
+      (capacityMode === 'goblin' || busyDay) &&
+      task.capacityCost >= 4 &&
+      !(task.dueDate && task.dueDate <= planDate)
+    ) {
+      continue
+    }
+    if (cost + task.capacityCost > maxCost && selected.length > 0) continue
     selected.push(task)
     cost += task.capacityCost
   }
