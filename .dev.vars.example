@@ -1,0 +1,13 @@
+# Cloudflare Worker local secrets (wrangler / miniflare)
+# Copy to .dev.vars — never commit real values.
+
+# Auth / session
+# AUTH_SECRET=
+
+# AI providers (to be wired during migration)
+# OPENAI_API_KEY=
+# ANTHROPIC_API_KEY=
+
+# Email integration credentials (to be wired during migration)
+# EMAIL_CLIENT_ID=
+# EMAIL_CLIENT_SECRET=

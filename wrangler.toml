@@ -1,0 +1,31 @@
+# Cloudflare configuration — prepared, not provisioned.
+# Do not create D1/R2 resources until migration inventory is complete.
+# See docs/ARCHITECTURE.md for Workers / D1 / R2 evaluation.
+
+name = "pocket-goblin"
+main = "worker/index.ts"
+compatibility_date = "2025-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Static assets from the Vite production build (Cloudflare Pages / Assets).
+# Uncomment and configure when ready to deploy:
+# [assets]
+# directory = "./dist"
+# binding = "ASSETS"
+# not_found_handling = "single-page-application"
+
+# D1 — evaluate during migration; do not create the database yet.
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "pocket-goblin"
+# database_id = "REPLACE_AFTER_PROVISIONING"
+# migrations_dir = "migrations"
+
+# R2 — evaluate during migration; do not create the bucket yet.
+# [[r2_buckets]]
+# binding = "UPLOADS"
+# bucket_name = "pocket-goblin-uploads"
+
+# Local / preview vars (non-secret). Secrets go in .dev.vars or Cloudflare dashboard.
+[vars]
+ENVIRONMENT = "development"
