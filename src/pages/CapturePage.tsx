@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
 
-import { GoblinMascot } from '@/components/goblin/GoblinMascot'
 import { Card } from '@/components/ui/Card'
 import { CaptureReview } from '@/features/capture/CaptureReview'
 import { QuickCapture } from '@/features/capture/QuickCapture'
@@ -17,7 +16,6 @@ export function CapturePage() {
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <GoblinMascot size={64} mood="think" />
         <div>
           <h1>Brain dump</h1>
           <p className={styles.sub}>

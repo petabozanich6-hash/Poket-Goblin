@@ -49,30 +49,35 @@ export function HomePage() {
 
   return (
     <div className={styles.page}>
-      <header className={styles.hero}>
-        <GoblinMascot size={84} mood="idle" />
-        <div>
+      <header className={styles.welcome}>
+        <div className={styles.welcomeCopy}>
           <p className={styles.kicker}>{formatToday()}</p>
           <h1>The Den</h1>
           <p className={styles.sub}>
-            {user?.displayName}, drop thoughts anytime — the goblin sorts the
-            shelves.
+            {user?.displayName
+              ? `Welcome back, ${user.displayName}.`
+              : 'Welcome back.'}{' '}
+            Here&apos;s what needs a gentle look today.
           </p>
           <p className={styles.capacity}>
-            Today&apos;s capacity:{' '}
+            Capacity:{' '}
             <strong>
               {CAPACITY_LABELS[settings?.capacityMode ?? 'steady']}
-            </strong>{' '}
-            · <Link to="/plan">Adjust plan</Link>
+            </strong>
+            {' · '}
+            <Link to="/plan">Adjust</Link>
             {summary && summary.pendingReview > 0 ? (
               <>
-                {' '}
-                · <Link to="/inbox">{summary.pendingReview} in Inbox</Link>
+                {' · '}
+                <Link to="/inbox">{summary.pendingReview} in Inbox</Link>
               </>
             ) : null}
             {' · '}
-            <Link to="/settings">Settings</Link>
+            <Link to="/capture">Quick capture</Link>
           </p>
+        </div>
+        <div className={styles.welcomeMascot} aria-hidden={false}>
+          <GoblinMascot size={148} loading="eager" />
         </div>
       </header>
 

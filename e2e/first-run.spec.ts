@@ -22,7 +22,7 @@ test.describe('Pocket Goblin first-run journey', () => {
     await page.getByLabel('Brain dump').fill('Buy milk tomorrow')
     await page.getByRole('button', { name: /give it to the goblin/i }).click()
 
-    await page.getByRole('link', { name: 'Dump' }).click()
+    await page.getByRole('link', { name: 'Dump', exact: true }).click()
     const keep = page.getByRole('button', { name: /^keep$/i }).first()
     await expect(keep).toBeVisible({ timeout: 15_000 })
     await keep.click()

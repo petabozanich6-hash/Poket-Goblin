@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router'
 
-import { GoblinMascot } from '@/components/goblin/GoblinMascot'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -44,7 +43,6 @@ export function AuthPage() {
     <div className={styles.page}>
       <Card className={styles.panel}>
         <div className={styles.hero}>
-          <GoblinMascot size={88} mood="happy" />
           <div>
             <h1>Pocket Goblin</h1>
             <p className={styles.tagline}>

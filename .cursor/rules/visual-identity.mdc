@@ -1,46 +1,35 @@
 ---
-description: Pocket Goblin official visual identity — woodland fantasy, character lock, asset rules
+description: Pocket Goblin visual identity — one mascot, calm interface
 alwaysApply: true
 ---
 
 # Pocket Goblin visual identity
 
-Canonical reference (full sheets only — never crop for production):
+## Character
 
-`docs/assets/pocket-goblin-fantasy-asset-library.jpg`
+Official mascot only:
 
-## Character lock
+- `public/assets/branding/goblin-original.png` (source)
+- `public/assets/branding/goblin-mascot.webp` (+ PNG fallback) for UI
 
-The Pocket Goblin is a small, friendly woodland helper:
+Use `GoblinMascot` **only** in the Den welcome area. Do not repeat the character across screens. Do not use asset sheets, extra poses, decorative woodland illustrations, emoji, or CSS stand-ins.
 
-- Bright green skin, large expressive eyes, very large pointed ears
-- Brown leather aviator goggles with brass rims on the forehead
-- Brown leather vest/tunic, backpack, sturdy boots
-- Warm, painterly storybook look — cozy and helpful, never aggressive
+## Interface tone
 
-Do **not** recreate the character with emoji, CSS shapes, Lucide/generic icons as a stand-in mascot, or generic AI-generated goblins. Prefer existing in-repo imagery until dedicated cut assets ship.
+Premium, modern, calm life-management — not a fantasy game or children’s app.
 
-## Palette (woodland fantasy)
+The mascot provides whimsy; the UI provides peace.
 
-Prefer these directions when adjusting UI tokens or new surfaces:
+## Palette
 
-| Role | Hex | Notes |
-|------|-----|--------|
-| Forest green | `#4A5D23` | Primary brand / foliage |
-| Leather brown | `#8B5A2B` | Character gear, borders |
-| Parchment | `#F5E6BE` | Soft backgrounds, cards |
-| Warm oak | `#D4A373` | Accents, banners |
+| Role | Direction |
+|------|-----------|
+| Primary | Deep forest green |
+| Secondary | Soft sage |
+| Background | Warm off-white |
+| Cards | White / pale cream |
+| Text | Dark charcoal |
+| Borders | Subtle warm grey |
+| Accent | Muted amber, sparingly |
 
-Avoid purple-on-white, cold neon, or flat SaaS greys that fight the den aesthetic.
-
-## Asset usage
-
-- Do **not** crop individual characters/icons from the reference sheets for production UI.
-- Dedicated export assets will replace current placeholder imagery later.
-- Until then: preserve current layout/functionality; when touching visuals, align colours/tone toward the palette above without inventing a new goblin.
-
-## UI tone
-
-- Rounded containers, parchment-like calm surfaces, readable text (low cognitive load).
-- Capacity modes: Goblin (leaf / low energy), Steady (sun / balanced), Quest (mountains / high energy) — woodland metaphors, not corporate badges.
-- Empty states and feedback should feel storybook and non-punitive when real assets arrive.
+Avoid busy gradients, illustrated chrome, leaves/mushrooms/sparkles, and excessive imagery.

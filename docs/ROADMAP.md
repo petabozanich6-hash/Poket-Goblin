@@ -82,9 +82,16 @@ Requires credentials / approval:
 - [x] Playwright first-run e2e + testing/security docs
 - [x] Roadmap + architecture updated to match reality
 
+## Sprint 7 — One goblin, one calm interface
+
+- [x] Official single mascot prepared (transparent WebP/PNG)
+- [x] Mascot only in Den welcome area
+- [x] Removed repeated character art elsewhere
+- [x] Restrained surface tokens; Lucide nav retained
+- [x] Docs: `docs/ARTWORK_INTEGRATION.md`
+
 Remaining limitations (honest):
 
 - [ ] Live AI / OAuth / remote R2 / OCR / push-email
 - [ ] Full WCAG audit beyond critical surfaces
 - [ ] Production AUTH_SECRET + deployment hardening
-- [ ] Dedicated production artwork exports

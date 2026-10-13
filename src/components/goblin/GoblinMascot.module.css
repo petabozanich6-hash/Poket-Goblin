@@ -1,48 +1,10 @@
 .mascot {
   display: block;
   flex-shrink: 0;
-}
-
-.shadow {
-  fill: var(--color-shadow);
-}
-
-.body {
-  fill: #4f7d57;
-  stroke: #2f5138;
-  stroke-width: 1.5;
-}
-
-.ear {
-  fill: #6a9a71;
-  stroke: #2f5138;
-  stroke-width: 1.2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.eye {
-  fill: #f7f1e6;
-}
-
-.pupil {
-  fill: #1f1a14;
-}
-
-.mouth {
-  fill: none;
-  stroke: #1f1a14;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-}
-
-.blush {
-  fill: #d88b7a;
-  opacity: 0.55;
-}
-
-.thought {
-  fill: var(--color-warm-soft);
-  stroke: var(--color-warm);
-  stroke-width: 1;
+  height: auto;
+  object-fit: contain;
+  object-position: center bottom;
+  background: transparent;
+  user-select: none;
+  -webkit-user-drag: none;
 }

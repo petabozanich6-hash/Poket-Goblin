@@ -3,7 +3,6 @@ import { useState } from 'react'
 
 import { goblinLine } from '@shared/magical/personality'
 
-import { GoblinMascot } from '@/components/goblin/GoblinMascot'
 import { Button } from '@/components/ui/Button'
 import { updateTask } from '@/features/tasks/tasksApi'
 
@@ -61,7 +60,6 @@ export function OverwhelmMode() {
       aria-labelledby="overwhelm-title"
     >
       <div className={styles.panel}>
-        <GoblinMascot size={72} mood="idle" />
         <p className={styles.kicker}>{goblinLine('overwhelmEnter')}</p>
         <h1 id="overwhelm-title" className={styles.title}>
           One thing at a time

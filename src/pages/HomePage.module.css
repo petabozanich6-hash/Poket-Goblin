@@ -3,10 +3,25 @@
   gap: var(--space-5);
 }
 
-.hero {
-  display: flex;
-  gap: var(--space-4);
+.welcome {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-5);
   align-items: center;
+  padding: var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+}
+
+.welcomeCopy {
+  min-width: 0;
+}
+
+.welcomeMascot {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
 }
 
 .kicker {
@@ -19,11 +34,13 @@
   margin-top: var(--space-2);
   color: var(--color-ink-muted);
   max-width: 36rem;
+  line-height: 1.45;
 }
 
 .capacity {
   margin-top: var(--space-3);
   color: var(--color-ink-muted);
+  font-size: 0.95rem;
 }
 
 .cardHint {
@@ -51,25 +68,29 @@
   background: var(--color-bg-muted);
 }
 
-.captureStack {
-  display: grid;
-  gap: var(--space-3);
-}
-
-.sr {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-}
-
 @media (max-width: 800px) {
-  .hero {
-    align-items: flex-start;
+  .welcome {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+    padding: var(--space-4);
+  }
+
+  .welcomeMascot {
+    justify-content: flex-start;
+  }
+
+  .welcomeMascot :global(img) {
+    height: 96px !important;
+    width: auto !important;
   }
 
   .grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .welcomeMascot {
+    display: none;
   }
 }

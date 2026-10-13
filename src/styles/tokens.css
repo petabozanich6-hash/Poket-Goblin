@@ -4,18 +4,19 @@
   --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
   --font-body: 'Nunito', 'Segoe UI', system-ui, sans-serif;
 
-  --color-bg: #f4efe4;
-  --color-bg-elevated: #fffaf0;
-  --color-bg-muted: #e8dfd0;
-  --color-ink: #2a241c;
-  --color-ink-muted: #5c5348;
-  --color-ink-faint: #7a7165;
-  --color-border: #d5c8b4;
-  --color-accent: #3f6b4a;
-  --color-accent-strong: #2f5138;
-  --color-accent-soft: #dce8de;
-  --color-warm: #c4783a;
-  --color-warm-soft: #f3e0cc;
+  /* Calm life-management surface: warm off-white, white cards, forest accent */
+  --color-bg: #f7f4ef;
+  --color-bg-elevated: #ffffff;
+  --color-bg-muted: #efebe3;
+  --color-ink: #2c2a26;
+  --color-ink-muted: #5c574e;
+  --color-ink-faint: #7a7468;
+  --color-border: #e2ddd3;
+  --color-accent: #3d5c45;
+  --color-accent-strong: #2f4a36;
+  --color-accent-soft: #e4eee6;
+  --color-warm: #b8864a;
+  --color-warm-soft: #f3e8d8;
   --color-danger: #9b3b3b;
   --color-danger-soft: #f3d6d6;
   --color-focus: #3f6b4a;

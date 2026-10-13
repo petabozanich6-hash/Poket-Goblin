@@ -15,7 +15,6 @@ import {
 import { NavLink, Outlet } from 'react-router'
 import { useEffect } from 'react'
 
-import { GoblinMascot } from '@/components/goblin/GoblinMascot'
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/features/auth/useAuth'
 import { FloatingCapture } from '@/features/magical/FloatingCapture'
@@ -100,7 +99,6 @@ export function AppShell() {
         <header className={styles.topbar}>
           <NavLink to="/den" className={styles.brandLink}>
             <div className={styles.brand}>
-              <GoblinMascot size={40} mood="happy" />
               <div>
                 <p className={styles.brandName}>Pocket Goblin</p>
                 <p className={styles.brandTag}>

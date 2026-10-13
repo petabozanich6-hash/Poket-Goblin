@@ -1,46 +1,37 @@
 import styles from './GoblinMascot.module.css'
 
+/** Official Pocket Goblin mascot — use only in the Den welcome area. */
+const MASCOT_SRC = '/assets/branding/goblin-mascot.webp'
+const MASCOT_FALLBACK = '/assets/branding/goblin-mascot.png'
+
 type GoblinMascotProps = {
+  /** Rendered height in CSS pixels; width follows aspect ratio. */
   size?: number
-  mood?: 'idle' | 'happy' | 'think'
-  title?: string
+  alt?: string
+  className?: string
+  loading?: 'eager' | 'lazy'
 }
 
 export function GoblinMascot({
-  size = 72,
-  mood = 'idle',
-  title = 'Pocket Goblin',
+  size = 140,
+  alt = 'Pocket Goblin waving hello',
+  className,
+  loading = 'eager',
 }: GoblinMascotProps) {
-  const mouth =
-    mood === 'happy' ? 'M12 18c1.5 2 3.5 3 6 3s4.5-1 6-3' : 'M13 19h6'
-
   return (
-    <svg
-      className={styles.mascot}
-      width={size}
-      height={size}
-      viewBox="0 0 64 64"
-      role="img"
-      aria-label={title}
-    >
-      <title>{title}</title>
-      <ellipse cx="32" cy="56" rx="18" ry="4" className={styles.shadow} />
-      <path
-        d="M18 20c0-10 6-16 14-16s14 6 14 16v18c0 8-6 14-14 14s-14-6-14-14V20z"
-        className={styles.body}
+    <picture>
+      <source srcSet={MASCOT_SRC} type="image/webp" />
+      <img
+        className={[styles.mascot, className].filter(Boolean).join(' ')}
+        src={MASCOT_FALLBACK}
+        alt={alt}
+        height={size}
+        width={Math.round(size * (424 / 512))}
+        loading={loading}
+        decoding="async"
+        draggable={false}
+        style={{ height: size, width: 'auto', maxWidth: '100%' }}
       />
-      <path d="M16 14l-8-10 12 6" className={styles.ear} />
-      <path d="M48 14l8-10-12 6" className={styles.ear} />
-      <circle cx="24" cy="28" r="3" className={styles.eye} />
-      <circle cx="40" cy="28" r="3" className={styles.eye} />
-      <circle cx="25" cy="27.5" r="1" className={styles.pupil} />
-      <circle cx="41" cy="27.5" r="1" className={styles.pupil} />
-      <path d={mouth} className={styles.mouth} transform="translate(8 8)" />
-      <circle cx="20" cy="34" r="2.5" className={styles.blush} />
-      <circle cx="44" cy="34" r="2.5" className={styles.blush} />
-      {mood === 'think' ? (
-        <circle cx="50" cy="12" r="3" className={styles.thought} />
-      ) : null}
-    </svg>
+    </picture>
   )
 }
