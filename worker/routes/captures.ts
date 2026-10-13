@@ -145,6 +145,7 @@ captureRoutes.post('/', async (c) => {
     .run()
 
   for (const suggestion of suggestions) {
+    const itemId = newId('citem')
     await c.env.DB.prepare(
       `INSERT INTO capture_items
         (id, capture_id, user_id, kind, title, due_date, start_time,
@@ -152,7 +153,7 @@ captureRoutes.post('/', async (c) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
       .bind(
-        newId('citem'),
+        itemId,
         captureId,
         user.id,
         suggestion.type,
@@ -162,6 +163,25 @@ captureRoutes.post('/', async (c) => {
         suggestion.recurrenceFrequency,
         suggestion.categorySlug,
         suggestion.confidence,
+        suggestion.uncertain ? 1 : 0,
+      )
+      .run()
+
+    // Unified inbox — avoid forcing users to hunt across shelves
+    await c.env.DB.prepare(
+      `INSERT INTO review_items
+        (id, user_id, source_type, source_id, title, summary, suggestion_type,
+         payload_json, uncertain)
+       VALUES (?, ?, 'capture', ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        newId('rev'),
+        user.id,
+        itemId,
+        suggestion.title,
+        rawText.slice(0, 200),
+        suggestion.type,
+        JSON.stringify(suggestion),
         suggestion.uncertain ? 1 : 0,
       )
       .run()
@@ -484,6 +504,16 @@ captureRoutes.post('/:captureId/items/:itemId/accept', async (c) => {
     )
     .run()
 
+  await c.env.DB.prepare(
+    `UPDATE review_items SET status = 'accepted',
+      reviewed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+      updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+     WHERE user_id = ? AND source_type = 'capture' AND source_id = ?
+       AND status IN ('pending', 'snoozed')`,
+  )
+    .bind(user.id, itemId)
+    .run()
+
   await maybeMarkReviewed(c.env.DB, user.id, captureId)
 
   const task = createdTaskId
@@ -518,6 +548,16 @@ captureRoutes.post('/:captureId/items/:itemId/reject', async (c) => {
   if (!result.meta.changes) {
     return c.json({ error: 'Suggestion not found' }, 404)
   }
+
+  await c.env.DB.prepare(
+    `UPDATE review_items SET status = 'dismissed',
+      reviewed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+      updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+     WHERE user_id = ? AND source_type = 'capture' AND source_id = ?
+       AND status IN ('pending', 'snoozed')`,
+  )
+    .bind(user.id, itemId)
+    .run()
 
   await maybeMarkReviewed(c.env.DB, user.id, captureId)
   const capture = await loadCapture(c.env.DB, user.id, captureId)

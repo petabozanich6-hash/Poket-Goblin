@@ -47,11 +47,23 @@ Requires credentials to claim live AI interpret:
 
 - [ ] Configure `AI_PROVIDER` + `AI_API_KEY` (and optional base URL / model) in Worker secrets
 
-## Sprint 4 — Documents & integrations
+## Sprint 4 — The goblin goes exploring
 
-- [ ] R2 uploads
-- [ ] Document organisation / extraction hooks
-- [ ] Email + external calendar architecture
+- [x] Private document vault (local R2 / storage abstraction)
+- [x] Upload / list / rename / download / delete + search
+- [x] Document processing pipeline → reviewable suggestions
+- [x] Source links (document ↔ task/event/reminder)
+- [x] Voice brain-dump (browser speech recognition + fallback)
+- [x] Unified review inbox
+- [x] Email + calendar OAuth foundations (honest not-connected states)
+- [x] Processing jobs table + inline local processing
+
+Requires credentials / approval before claiming live:
+
+- [ ] Remote R2 bucket (paid/remote) — local R2 only for now
+- [ ] OCR provider for scanned images
+- [ ] Google / Microsoft OAuth client secrets + completed token exchange
+- [ ] Live email/calendar sync
 
 ## Sprint 5 — Polish & release prep
 

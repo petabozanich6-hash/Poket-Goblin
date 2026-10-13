@@ -41,4 +41,19 @@ export const api = {
       body: body !== undefined ? JSON.stringify(body) : undefined,
     }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  /** Multipart upload — do not set JSON Content-Type. */
+  upload: async <T>(path: string, form: FormData): Promise<T> => {
+    const response = await fetch(`/api${path}`, {
+      method: 'POST',
+      credentials: 'include',
+      body: form,
+    })
+    const data = (await response.json().catch(() => ({}))) as {
+      error?: string
+    } & T
+    if (!response.ok) {
+      throw new ApiError(response.status, data.error || 'Upload failed')
+    }
+    return data
+  },
 }

@@ -190,6 +190,8 @@ export type DenSummary = {
   shoppingNeedsAttention: ShoppingItem[]
   pinnedNotes: Note[]
   unprocessedCaptures: number
+  pendingReview: number
+  recentDocuments: { id: string; displayName: string; status: string }[]
 }
 
 export const CAPACITY_LIMITS: Record<CapacityMode, number> = {

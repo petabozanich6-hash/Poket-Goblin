@@ -83,6 +83,12 @@ export function HomePage() {
             {summary && summary.unprocessedCaptures > 0
               ? ` · ${summary.unprocessedCaptures} dump items waiting`
               : ''}
+            {summary && summary.pendingReview > 0 ? (
+              <>
+                {' '}
+                · <Link to="/inbox">{summary.pendingReview} in Inbox</Link>
+              </>
+            ) : null}
           </p>
         </div>
       </header>

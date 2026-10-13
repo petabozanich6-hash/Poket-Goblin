@@ -71,6 +71,21 @@ dashboardRoutes.get('/den', async (c) => {
     .bind(user.id)
     .first<{ count: number }>()
 
+  const pendingReview = await c.env.DB.prepare(
+    `SELECT COUNT(*) as count FROM review_items
+     WHERE user_id = ? AND status = 'pending'`,
+  )
+    .bind(user.id)
+    .first<{ count: number }>()
+
+  const recentDocs = await c.env.DB.prepare(
+    `SELECT id, display_name as displayName, status
+     FROM documents WHERE user_id = ?
+     ORDER BY updated_at DESC LIMIT 3`,
+  )
+    .bind(user.id)
+    .all()
+
   return c.json({
     summary: {
       upcomingEvents: (events.results ?? []).map((e) => ({
@@ -90,6 +105,8 @@ dashboardRoutes.get('/den', async (c) => {
         pinned: Boolean(n.pinned),
       })),
       unprocessedCaptures: pendingCaptures?.count ?? 0,
+      pendingReview: pendingReview?.count ?? 0,
+      recentDocuments: recentDocs.results ?? [],
     },
   })
 })

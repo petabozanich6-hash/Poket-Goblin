@@ -10,10 +10,11 @@ database_name = "pocket-goblin"
 database_id = "00000000-0000-0000-0000-000000000001"
 migrations_dir = "migrations"
 
-# R2 reserved for Sprint 4 document uploads — not provisioned yet.
-# [[r2_buckets]]
-# binding = "UPLOADS"
-# bucket_name = "pocket-goblin-uploads"
+# Local R2 simulation via Miniflare — do not provision a remote paid bucket without approval.
+[[r2_buckets]]
+binding = "UPLOADS"
+bucket_name = "pocket-goblin-uploads"
+preview_bucket_name = "pocket-goblin-uploads-preview"
 
 [vars]
 ENVIRONMENT = "development"

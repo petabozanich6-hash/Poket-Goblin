@@ -1,7 +1,9 @@
 import {
   Brain,
   CalendarDays,
+  FileText,
   Home,
+  Inbox,
   ListTodo,
   LogOut,
   Layers,
@@ -27,6 +29,8 @@ const links = [
   { to: '/life', label: 'Life', icon: Layers },
   { to: '/find', label: 'Find', icon: Search },
   { to: '/ask', label: 'Ask', icon: MessageCircle },
+  { to: '/vault', label: 'Vault', icon: FileText },
+  { to: '/inbox', label: 'Inbox', icon: Inbox },
   { to: '/plan', label: 'Plan', icon: Sparkles },
 ]
 

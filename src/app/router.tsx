@@ -6,7 +6,9 @@ import { AssistantPage } from '@/pages/AssistantPage'
 import { AuthPage } from '@/pages/AuthPage'
 import { CalendarPage } from '@/pages/CalendarPage'
 import { CapturePage } from '@/pages/CapturePage'
+import { DocumentsPage } from '@/pages/DocumentsPage'
 import { HomePage } from '@/pages/HomePage'
+import { InboxPage } from '@/pages/InboxPage'
 import { LifePage } from '@/pages/LifePage'
 import { PlanPage } from '@/pages/PlanPage'
 import { SearchPage } from '@/pages/SearchPage'
@@ -70,6 +72,8 @@ export function AppRouter() {
           <Route path="/notes" element={<Navigate to="/life" replace />} />
           <Route path="/find" element={<SearchPage />} />
           <Route path="/ask" element={<AssistantPage />} />
+          <Route path="/vault" element={<DocumentsPage />} />
+          <Route path="/inbox" element={<InboxPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

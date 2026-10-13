@@ -22,17 +22,19 @@ Worker (Hono)
    ├── auth, me, categories, tasks, captures, plan
    ├── events, reminders, notes, shopping, search, history, dashboard
    ├── intelligence (interpret, breakdown, assist, memory)
-   └── D1 (per-user row isolation)
+   ├── documents (vault) + review (unified inbox) + connections (OAuth)
+   ├── D1 (per-user row isolation)
+   └── R2 UPLOADS (local Miniflare; remote needs approval)
 ```
 
 ## Source layout
 
 ```
 src/           UI, features, design system
-shared/        Types, brain-dump heuristics, intelligence schemas/rules
-worker/        API routes and server libs (incl. AI provider adapter)
+shared/        Types, brain-dump, intelligence, document extract rules
+worker/        API routes and server libs (AI, storage, jobs)
 migrations/    D1 SQL migrations
-docs/          Product, architecture, intelligence, visual identity
+docs/          Product, architecture, intelligence, integrations, visual identity
 ```
 
 ## Multi-user isolation
@@ -57,7 +59,15 @@ See `docs/INTELLIGENCE.md`.
 - Secrets live in `.dev.vars` (gitignored). See `.dev.vars.example`.
 - Do not provision paid Cloudflare resources without permission.
 
+## Documents & integrations (Sprint 4)
+
+See `docs/INTEGRATIONS.md`.
+
+- Private object storage abstraction (`worker/lib/storage`)
+- Document interpret rules in `shared/documents/extract.ts`
+- Unified `review_items` inbox
+- OAuth foundations without fake synced data
+
 ## Future
 
-- Sprint 4: R2 documents + integrations
 - Sprint 5: polish, security review, release prep
