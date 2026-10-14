@@ -22,7 +22,7 @@ run_worker_first = ["/api/*"]
 [[d1_databases]]
 binding = "DB"
 database_name = "pocket-goblin"
-database_id = "00000000-0000-0000-0000-000000000001"
+database_id = "91a90710-dbd7-4a0c-8c90-b97cd3c86d90"
 migrations_dir = "migrations"
 
 # Local R2 simulation via Miniflare — do not provision a remote paid bucket without approval.
