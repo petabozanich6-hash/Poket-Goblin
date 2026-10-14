@@ -79,6 +79,15 @@ jobs:
             fi
           fi
 
+      # Read-only GETs. Reports presence/shape and what Cloudflare says about
+      # the token; never prints secret values.
+      - name: Check Cloudflare credentials (values never shown)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_D1_READ_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CREDENTIAL_LABEL: CLOUDFLARE_D1_READ_TOKEN
+        run: node scripts/cf-credentials-check.mjs
+
       - name: Read database state and plan
         id: check
         env:
@@ -109,6 +118,11 @@ jobs:
           node-version: '22'
           cache: npm
 
+      - name: Check Cloudflare credentials (values never shown)
+        env:
+          CREDENTIAL_LABEL: CLOUDFLARE_D1_MIGRATE_TOKEN
+        run: node scripts/cf-credentials-check.mjs
+
       - name: Install pinned Wrangler
         run: npm ci --no-audit --no-fund
 
@@ -121,6 +135,7 @@ jobs:
         id: bookmark
         run: |
           set -o pipefail
+          export CLOUDFLARE_API_TOKEN="${CLOUDFLARE_API_TOKEN//[[:space:]]/}" CLOUDFLARE_ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID//[[:space:]]/}"
           npx wrangler d1 time-travel info "$D1_DATABASE_NAME" --json | tee bookmark.json
           BOOKMARK=$(node -e "const j=JSON.parse(require('fs').readFileSync('bookmark.json','utf8'));const b=j.bookmark??j.result?.bookmark??'';process.stdout.write(/^[\\w-]+$/.test(b)?b:'')")
           if [ -z "$BOOKMARK" ]; then
@@ -143,6 +158,7 @@ jobs:
         run: |
           set -o pipefail
           echo "Applying to $D1_DATABASE_NAME ($D1_DATABASE_ID): $PENDING"
+          export CLOUDFLARE_API_TOKEN="${CLOUDFLARE_API_TOKEN//[[:space:]]/}" CLOUDFLARE_ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID//[[:space:]]/}"
           npx wrangler d1 migrations apply "$D1_DATABASE_NAME" --remote 2>&1 | tee apply.log
 
       - name: Verify nothing is left pending
