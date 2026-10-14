@@ -15,6 +15,7 @@ import {
   getUsageToday,
   recordUsage,
 } from '../lib/intelligence/usage'
+import { readOffsetMinutes } from '../lib/datetime'
 import { newId } from '../lib/ids'
 import type { AuthUser } from '../lib/session'
 import { asString } from '../lib/validate'
@@ -51,11 +52,13 @@ intelligenceRoutes.post('/interpret', async (c) => {
   const text = asString(body?.text, 4000)
   if (!text) return c.json({ error: 'Text is required' }, 400)
 
+  // Over the AI limit → rule-based result instead of an error.
   const gate = await assertUnderLimit(c.env.DB, c.env, user.id)
-  if (!gate.ok) return c.json({ error: gate.error }, 429)
-
-  const result = await interpretIntelligence(c.env, text)
-  await recordUsage(c.env.DB, user.id, result.provider)
+  const result = await interpretIntelligence(c.env, text, {
+    timezoneOffsetMinutes: readOffsetMinutes(body),
+    allowAi: gate.ok,
+  })
+  if (result.aiCalled) await recordUsage(c.env.DB, user.id, result.provider)
   return c.json({ result })
 })
 

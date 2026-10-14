@@ -157,6 +157,14 @@ export type CaptureItem = {
   createdNoteId: string | null
   createdShoppingItemId: string | null
   createdReminderId: string | null
+  /** An open task / shopping item with the same title the user already has. */
+  possibleDuplicateOf?: CaptureDuplicateRef | null
+}
+
+export type CaptureDuplicateRef = {
+  kind: 'task' | 'shopping'
+  id: string
+  title: string
 }
 
 export type Capture = {

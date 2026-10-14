@@ -1,7 +1,11 @@
 import { Hono } from 'hono'
 
 import { generateOccurrences } from '../../shared/recurrence'
-import { isCaptureKind } from '../../shared/intelligence'
+import {
+  isCaptureKind,
+  type GoblinSuggestion,
+  type IntelligenceResult,
+} from '../../shared/intelligence'
 import type { CaptureItemKind, RecurrenceFrequency } from '../../shared/types'
 import type { Env } from '../env'
 import {
@@ -12,6 +16,15 @@ import {
 import { interpretIntelligence } from '../lib/intelligence/provider'
 import { assertUnderLimit, recordUsage } from '../lib/intelligence/usage'
 import { newId } from '../lib/ids'
+import {
+  claimCaptureItem,
+  duplicateMessage,
+  findExistingForUser,
+  findExistingItem,
+  loadOpenItemIndex,
+  releaseCaptureItem,
+  type OpenItemIndex,
+} from '../lib/dedupe'
 import { recordTaskHistory } from '../lib/history'
 import type { AuthUser } from '../lib/session'
 import { ensureDefaultShoppingList } from '../lib/shopping'
@@ -22,7 +35,12 @@ type Vars = { user: AuthUser }
 
 export const captureRoutes = new Hono<{ Bindings: Env; Variables: Vars }>()
 
-async function loadCapture(db: D1Database, userId: string, captureId: string) {
+async function loadCapture(
+  db: D1Database,
+  userId: string,
+  captureId: string,
+  preloadedIndex?: OpenItemIndex,
+) {
   const capture = await db
     .prepare(
       `SELECT id, raw_text as rawText, status, created_at as createdAt
@@ -53,9 +71,15 @@ async function loadCapture(db: D1Database, userId: string, captureId: string) {
     .bind(captureId, userId)
     .all()
 
+  const rows = items.results ?? []
+  // Only suggestions still awaiting review need a duplicate check.
+  const index = rows.some((item) => item.status === 'suggested')
+    ? (preloadedIndex ?? (await loadOpenItemIndex(db, userId)))
+    : null
+
   return {
     ...capture,
-    items: (items.results ?? []).map((item) => ({
+    items: rows.map((item) => ({
       id: item.id as string,
       kind: item.kind as CaptureItemKind,
       title: item.title as string,
@@ -72,6 +96,10 @@ async function loadCapture(db: D1Database, userId: string, captureId: string) {
       createdNoteId: (item.createdNoteId as string) ?? null,
       createdShoppingItemId: (item.createdShoppingItemId as string) ?? null,
       createdReminderId: (item.createdReminderId as string) ?? null,
+      possibleDuplicateOf:
+        index && item.status === 'suggested'
+          ? findExistingItem(index, item.kind as string, item.title as string)
+          : null,
     })),
   }
 }
@@ -98,6 +126,48 @@ async function maybeMarkReviewed(
   }
 }
 
+/** Keep Capture and Inbox in step for capture-sourced suggestions. */
+async function syncReviewItem(
+  db: D1Database,
+  userId: string,
+  captureItemId: string,
+  status: 'accepted' | 'dismissed' | 'pending',
+) {
+  const from =
+    status === 'pending' ? `('accepted')` : `('pending', 'snoozed', 'edited')`
+  await db
+    .prepare(
+      `UPDATE review_items SET status = ?,
+        reviewed_at = CASE WHEN ? = 'pending' THEN NULL
+                      ELSE strftime('%Y-%m-%dT%H:%M:%fZ', 'now') END,
+        updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+       WHERE user_id = ? AND source_type = 'capture' AND source_id = ?
+         AND status IN ${from}`,
+    )
+    .bind(status, status, userId, captureItemId)
+    .run()
+}
+
+/**
+ * A note's body is the user's full words when its title was cut short —
+ * e.g. the fallback note for a dump that could not be structured.
+ */
+async function noteBodyFor(
+  db: D1Database,
+  userId: string,
+  captureId: string,
+  title: string,
+): Promise<string> {
+  const capture = await db
+    .prepare(
+      `SELECT raw_text as rawText FROM captures WHERE id = ? AND user_id = ?`,
+    )
+    .bind(captureId, userId)
+    .first<{ rawText: string }>()
+  const raw = capture?.rawText ?? ''
+  return raw.length > title.length && raw.startsWith(title) ? raw : title
+}
+
 captureRoutes.get('/', async (c) => {
   const user = c.get('user')
   const rows = await c.env.DB.prepare(
@@ -108,12 +178,37 @@ captureRoutes.get('/', async (c) => {
     .all<{ id: string }>()
 
   const captures = []
+  const index = await loadOpenItemIndex(c.env.DB, user.id)
   for (const row of rows.results ?? []) {
-    const capture = await loadCapture(c.env.DB, user.id, row.id)
+    const capture = await loadCapture(c.env.DB, user.id, row.id, index)
     if (capture) captures.push(capture)
   }
   return c.json({ captures })
 })
+
+function fallbackNote(rawText: string): GoblinSuggestion {
+  return {
+    id: 'fallback_note',
+    type: 'note',
+    title: rawText.slice(0, 120),
+    details: rawText,
+    dueDate: null,
+    startTime: null,
+    recurrenceFrequency: null,
+    categorySlug: 'other',
+    priority: 'normal',
+    capacityCost: 1,
+    confidence: 'low',
+    uncertain: true,
+    missingInformation: ['Could not confidently structure this dump'],
+    proposedAction: 'Save as a note for later sorting',
+    sourceReference: rawText.slice(0, 80),
+    parentSuggestionId: null,
+  }
+}
+
+/** Same text submitted again within this window returns the first capture. */
+const RESUBMIT_WINDOW_MS = 2 * 60_000
 
 captureRoutes.post('/', async (c) => {
   const user = c.get('user')
@@ -124,11 +219,59 @@ captureRoutes.post('/', async (c) => {
   const rawText = asString(body?.text, 4000)
   if (!rawText) return c.json({ error: 'Capture text is required' }, 400)
 
-  const gate = await assertUnderLimit(c.env.DB, c.env, user.id)
-  if (!gate.ok) return c.json({ error: gate.error }, 429)
+  // A double-tap or retry must not organise the same dump twice.
+  const since = new Date(Date.now() - RESUBMIT_WINDOW_MS).toISOString()
+  const recent = await c.env.DB.prepare(
+    `SELECT id FROM captures
+     WHERE user_id = ? AND raw_text = ? AND created_at >= ?
+     ORDER BY created_at DESC LIMIT 1`,
+  )
+    .bind(user.id, rawText, since)
+    .first<{ id: string }>()
+  if (recent) {
+    const capture = await loadCapture(c.env.DB, user.id, recent.id)
+    if (capture && capture.items.length > 0) {
+      return c.json({
+        capture,
+        intelligence: {
+          mode: 'rules',
+          provider: 'duplicate_submission',
+          summary: 'You already sent this — here is the same review.',
+          warnings: ['Duplicate submission ignored, nothing new was created.'],
+        },
+      })
+    }
+  }
 
-  const intelligence = await interpretIntelligence(c.env, rawText)
-  await recordUsage(c.env.DB, user.id, intelligence.provider)
+  // Save the thought FIRST. Whatever happens next, the user's words are kept.
+  const captureId = recent?.id ?? newId('cap')
+  if (!recent) {
+    await c.env.DB.prepare(
+      `INSERT INTO captures (id, user_id, raw_text) VALUES (?, ?, ?)`,
+    )
+      .bind(captureId, user.id, rawText)
+      .run()
+  }
+
+  const gate = await assertUnderLimit(c.env.DB, c.env, user.id)
+  let intelligence: IntelligenceResult
+  try {
+    intelligence = await interpretIntelligence(c.env, rawText, {
+      timezoneOffsetMinutes: readOffsetMinutes(body),
+      allowAi: gate.ok,
+    })
+  } catch {
+    intelligence = {
+      mode: 'ai_unavailable',
+      provider: 'none',
+      suggestions: [],
+      summary: 'The goblin could not sort this one.',
+      warnings: ['Sorting failed — your words are saved as a note to review.'],
+    }
+  }
+  if (intelligence.aiCalled) {
+    await recordUsage(c.env.DB, user.id, intelligence.provider)
+  }
 
   let suggestions = intelligence.suggestions.filter((s) =>
     isCaptureKind(s.type),
@@ -137,37 +280,24 @@ captureRoutes.post('/', async (c) => {
 
   // Never discard the user's thought — park as an uncertain note for review.
   if (suggestions.length === 0) {
-    suggestions = [
-      {
-        id: 'fallback_note',
-        type: 'note',
-        title: rawText.slice(0, 120),
-        details: rawText,
-        dueDate: null,
-        startTime: null,
-        recurrenceFrequency: null,
-        categorySlug: 'other',
-        priority: 'normal',
-        capacityCost: 1,
-        confidence: 'low',
-        uncertain: true,
-        missingInformation: ['Could not confidently structure this dump'],
-        proposedAction: 'Save as a note for later sorting',
-        sourceReference: rawText.slice(0, 80),
-        parentSuggestionId: null,
-      },
-    ]
+    suggestions = [fallbackNote(rawText)]
     warnings.push(
       'Could not confidently structure this dump — saved as a note so nothing is lost.',
     )
   }
 
-  const captureId = newId('cap')
-  await c.env.DB.prepare(
-    `INSERT INTO captures (id, user_id, raw_text) VALUES (?, ?, ?)`,
-  )
-    .bind(captureId, user.id, rawText)
-    .run()
+  // Flag items the user already has, so accepting doesn't double them up.
+  const existing = await loadOpenItemIndex(c.env.DB, user.id)
+  suggestions = suggestions.map((s) => ({
+    ...s,
+    possibleDuplicateOf: findExistingItem(existing, s.type, s.title),
+  }))
+  const dupes = suggestions.filter((s) => s.possibleDuplicateOf).length
+  if (dupes > 0) {
+    warnings.push(
+      `${dupes} suggestion${dupes === 1 ? ' looks' : 's look'} like something you already have.`,
+    )
+  }
 
   for (const suggestion of suggestions) {
     const itemId = newId('citem')
@@ -315,9 +445,37 @@ captureRoutes.post('/:captureId/items/:itemId/accept', async (c) => {
     }>()
 
   if (!item) return c.json({ error: 'Suggestion not found' }, 404)
-  if (item.status === 'accepted') {
-    return c.json({ error: 'Already accepted' }, 409)
+  if (item.status !== 'suggested') {
+    return c.json({ error: `Already ${item.status}` }, 409)
   }
+  if (
+    (item.kind === 'appointment' || item.kind === 'reminder') &&
+    !item.dueDate
+  ) {
+    return c.json(
+      { error: `Confirm a date before accepting this ${item.kind}` },
+      400,
+    )
+  }
+  if (body?.allowDuplicate !== true) {
+    const existing = await findExistingForUser(
+      c.env.DB,
+      user.id,
+      item.kind,
+      item.title,
+    )
+    if (existing) {
+      return c.json(
+        { error: duplicateMessage(existing), duplicateOf: existing },
+        409,
+      )
+    }
+  }
+  // Atomic: only one request (double-tap, Capture + Inbox) can create records.
+  if (!(await claimCaptureItem(c.env.DB, user.id, itemId))) {
+    return c.json({ error: 'Already handled' }, 409)
+  }
+  await syncReviewItem(c.env.DB, user.id, itemId, 'accepted')
 
   const categoryId = await resolveCategoryId(
     c.env.DB,
@@ -332,180 +490,192 @@ captureRoutes.post('/:captureId/items/:itemId/accept', async (c) => {
   let createdShoppingItemId: string | null = null
   let createdReminderId: string | null = null
 
-  if (item.kind === 'shopping') {
-    const listId = await ensureDefaultShoppingList(c.env.DB, user.id)
-    createdShoppingItemId = newId('sitem')
-    await c.env.DB.prepare(
-      `INSERT INTO shopping_items (id, list_id, user_id, name, sort_order)
-       VALUES (?, ?, ?, ?, 0)`,
-    )
-      .bind(createdShoppingItemId, listId, user.id, item.title)
-      .run()
-  } else if (item.kind === 'note') {
-    createdNoteId = newId('note')
-    await c.env.DB.prepare(
-      `INSERT INTO notes (id, user_id, title, body, category_id)
-       VALUES (?, ?, ?, ?, ?)`,
-    )
-      .bind(createdNoteId, user.id, item.title, item.title, categoryId)
-      .run()
-  } else if (item.kind === 'appointment') {
-    if (!item.dueDate) {
-      return c.json(
-        { error: 'Confirm a date before accepting this appointment' },
-        400,
-      )
-    }
-    const offset = readOffsetMinutes(body)
-    createdEventId = newId('evt')
-    const startsAt = localDateTimeToIso(
-      item.dueDate,
-      item.startTime,
-      !item.startTime,
-      offset,
-    )
-    const endsAt = addHoursIso(startsAt, item.startTime ? 1 : 24)
-    await c.env.DB.prepare(
-      `INSERT INTO events
-        (id, user_id, title, starts_at, ends_at, all_day, category_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    )
-      .bind(
-        createdEventId,
-        user.id,
-        item.title,
-        startsAt,
-        endsAt,
-        item.startTime ? 0 : 1,
-        categoryId,
-      )
-      .run()
-  } else if (item.kind === 'reminder') {
-    if (!item.dueDate) {
-      return c.json(
-        { error: 'Confirm a date before accepting this reminder' },
-        400,
-      )
-    }
-    createdReminderId = newId('rem')
-    const remindAt = localDateTimeToIso(
-      item.dueDate,
-      item.startTime ?? '09:00',
-      false,
-      readOffsetMinutes(body),
-    )
-    await c.env.DB.prepare(
-      `INSERT INTO reminders (id, user_id, title, remind_at, entity_type)
-       VALUES (?, ?, ?, ?, 'general')`,
-    )
-      .bind(createdReminderId, user.id, item.title, remindAt)
-      .run()
-
-    // Also create a linked open task for follow-through
-    createdTaskId = newId('task')
-    await c.env.DB.prepare(
-      `INSERT INTO tasks
-        (id, user_id, category_id, title, notes, priority, due_date, capacity_cost)
-       VALUES (?, ?, ?, ?, ?, 'normal', ?, 1)`,
-    )
-      .bind(
-        createdTaskId,
-        user.id,
-        categoryId,
-        item.title,
-        'From reminder capture',
-        item.dueDate,
-      )
-      .run()
-    await c.env.DB.prepare(
-      `UPDATE reminders SET entity_type = 'task', entity_id = ? WHERE id = ?`,
-    )
-      .bind(createdTaskId, createdReminderId)
-      .run()
-    await recordTaskHistory(
-      c.env.DB,
-      user.id,
-      createdTaskId,
-      'created',
-      'From capture reminder',
-    )
-  } else {
-    // task / follow_up
-    let recurrenceRuleId: string | null = null
-    let seriesId: string | null = null
-    if (item.recurrenceFrequency) {
-      const startsOn = item.dueDate ?? new Date().toISOString().slice(0, 10)
-      recurrenceRuleId = newId('rrule')
-      seriesId = newId('series')
+  try {
+    if (item.kind === 'shopping') {
+      const listId = await ensureDefaultShoppingList(c.env.DB, user.id)
+      createdShoppingItemId = newId('sitem')
       await c.env.DB.prepare(
-        `INSERT INTO recurrence_rules
-          (id, user_id, frequency, interval_value, starts_on)
-         VALUES (?, ?, ?, 1, ?)`,
+        `INSERT INTO shopping_items (id, list_id, user_id, name, sort_order)
+         VALUES (?, ?, ?, ?, 0)`,
       )
-        .bind(recurrenceRuleId, user.id, item.recurrenceFrequency, startsOn)
+        .bind(createdShoppingItemId, listId, user.id, item.title)
         .run()
-
-      const occurrences = generateOccurrences(
-        {
-          frequency: item.recurrenceFrequency,
-          startsOn,
-        },
-        4,
+    } else if (item.kind === 'note') {
+      createdNoteId = newId('note')
+      await c.env.DB.prepare(
+        `INSERT INTO notes (id, user_id, title, body, category_id)
+         VALUES (?, ?, ?, ?, ?)`,
       )
-      for (const occurrence of occurrences) {
-        const taskId = newId('task')
-        if (!createdTaskId) createdTaskId = taskId
-        await c.env.DB.prepare(
-          `INSERT INTO tasks
-            (id, user_id, category_id, title, notes, priority, due_date,
-             capacity_cost, recurrence_rule_id, series_id, occurrence_date)
-           VALUES (?, ?, ?, ?, ?, 'normal', ?, 1, ?, ?, ?)`,
-        )
-          .bind(
-            taskId,
-            user.id,
-            categoryId,
-            item.title,
-            `Recurring (${item.recurrenceFrequency})`,
-            occurrence,
-            recurrenceRuleId,
-            seriesId,
-            occurrence,
-          )
-          .run()
-        await recordTaskHistory(
-          c.env.DB,
+        .bind(
+          createdNoteId,
           user.id,
-          taskId,
-          'created',
-          `Recurring occurrence ${occurrence}`,
+          item.title,
+          await noteBodyFor(c.env.DB, user.id, captureId, item.title),
+          categoryId,
+        )
+        .run()
+    } else if (item.kind === 'appointment') {
+      if (!item.dueDate) {
+        return c.json(
+          { error: 'Confirm a date before accepting this appointment' },
+          400,
         )
       }
-    } else {
+      const offset = readOffsetMinutes(body)
+      createdEventId = newId('evt')
+      const startsAt = localDateTimeToIso(
+        item.dueDate,
+        item.startTime,
+        !item.startTime,
+        offset,
+      )
+      const endsAt = addHoursIso(startsAt, item.startTime ? 1 : 24)
+      await c.env.DB.prepare(
+        `INSERT INTO events
+          (id, user_id, title, starts_at, ends_at, all_day, category_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+        .bind(
+          createdEventId,
+          user.id,
+          item.title,
+          startsAt,
+          endsAt,
+          item.startTime ? 0 : 1,
+          categoryId,
+        )
+        .run()
+    } else if (item.kind === 'reminder') {
+      if (!item.dueDate) {
+        return c.json(
+          { error: 'Confirm a date before accepting this reminder' },
+          400,
+        )
+      }
+      createdReminderId = newId('rem')
+      const remindAt = localDateTimeToIso(
+        item.dueDate,
+        item.startTime ?? '09:00',
+        false,
+        readOffsetMinutes(body),
+      )
+      await c.env.DB.prepare(
+        `INSERT INTO reminders (id, user_id, title, remind_at, entity_type)
+         VALUES (?, ?, ?, ?, 'general')`,
+      )
+        .bind(createdReminderId, user.id, item.title, remindAt)
+        .run()
+
+      // Also create a linked open task for follow-through
       createdTaskId = newId('task')
       await c.env.DB.prepare(
         `INSERT INTO tasks
           (id, user_id, category_id, title, notes, priority, due_date, capacity_cost)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+         VALUES (?, ?, ?, ?, ?, 'normal', ?, 1)`,
       )
         .bind(
           createdTaskId,
           user.id,
           categoryId,
           item.title,
-          `From brain dump (${item.kind})`,
-          'normal',
+          'From reminder capture',
           item.dueDate,
         )
+        .run()
+      await c.env.DB.prepare(
+        `UPDATE reminders SET entity_type = 'task', entity_id = ? WHERE id = ?`,
+      )
+        .bind(createdTaskId, createdReminderId)
         .run()
       await recordTaskHistory(
         c.env.DB,
         user.id,
         createdTaskId,
         'created',
-        'From capture',
+        'From capture reminder',
       )
+    } else {
+      // task / follow_up
+      let recurrenceRuleId: string | null = null
+      let seriesId: string | null = null
+      if (item.recurrenceFrequency) {
+        const startsOn = item.dueDate ?? new Date().toISOString().slice(0, 10)
+        recurrenceRuleId = newId('rrule')
+        seriesId = newId('series')
+        await c.env.DB.prepare(
+          `INSERT INTO recurrence_rules
+            (id, user_id, frequency, interval_value, starts_on)
+           VALUES (?, ?, ?, 1, ?)`,
+        )
+          .bind(recurrenceRuleId, user.id, item.recurrenceFrequency, startsOn)
+          .run()
+
+        const occurrences = generateOccurrences(
+          {
+            frequency: item.recurrenceFrequency,
+            startsOn,
+          },
+          4,
+        )
+        for (const occurrence of occurrences) {
+          const taskId = newId('task')
+          if (!createdTaskId) createdTaskId = taskId
+          await c.env.DB.prepare(
+            `INSERT INTO tasks
+              (id, user_id, category_id, title, notes, priority, due_date,
+               capacity_cost, recurrence_rule_id, series_id, occurrence_date)
+             VALUES (?, ?, ?, ?, ?, 'normal', ?, 1, ?, ?, ?)`,
+          )
+            .bind(
+              taskId,
+              user.id,
+              categoryId,
+              item.title,
+              `Recurring (${item.recurrenceFrequency})`,
+              occurrence,
+              recurrenceRuleId,
+              seriesId,
+              occurrence,
+            )
+            .run()
+          await recordTaskHistory(
+            c.env.DB,
+            user.id,
+            taskId,
+            'created',
+            `Recurring occurrence ${occurrence}`,
+          )
+        }
+      } else {
+        createdTaskId = newId('task')
+        await c.env.DB.prepare(
+          `INSERT INTO tasks
+            (id, user_id, category_id, title, notes, priority, due_date, capacity_cost)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+        )
+          .bind(
+            createdTaskId,
+            user.id,
+            categoryId,
+            item.title,
+            `From brain dump (${item.kind})`,
+            'normal',
+            item.dueDate,
+          )
+          .run()
+        await recordTaskHistory(
+          c.env.DB,
+          user.id,
+          createdTaskId,
+          'created',
+          'From capture',
+        )
+      }
     }
+  } catch (error) {
+    await releaseCaptureItem(c.env.DB, user.id, itemId)
+    await syncReviewItem(c.env.DB, user.id, itemId, 'pending')
+    throw error
   }
 
   await c.env.DB.prepare(

@@ -48,10 +48,12 @@ export function CaptureReview({ capture }: CaptureReviewProps) {
     mutationFn: ({
       captureId,
       itemId,
+      allowDuplicate,
     }: {
       captureId: string
       itemId: string
-    }) => acceptCaptureItem(captureId, itemId),
+      allowDuplicate?: boolean
+    }) => acceptCaptureItem(captureId, itemId, allowDuplicate),
     onSuccess: invalidateAll,
   })
 
@@ -82,6 +84,8 @@ export function CaptureReview({ capture }: CaptureReviewProps) {
     },
   })
 
+  const busy = acceptMutation.isPending || rejectMutation.isPending
+
   return (
     <article className={styles.card}>
       <p className={styles.raw}>“{capture.rawText}”</p>
@@ -101,6 +105,12 @@ export function CaptureReview({ capture }: CaptureReviewProps) {
                 {item.uncertain ? ' · needs your eyes' : ''}
                 {` · ${item.confidence} confidence`}
               </p>
+              {item.possibleDuplicateOf && item.status === 'suggested' ? (
+                <p className={styles.meta}>
+                  You already have “{item.possibleDuplicateOf.title}” — skip
+                  this, or add it again if it really is separate.
+                </p>
+              ) : null}
               {editingId === item.id ? (
                 <div className={styles.kindRow}>
                   {kinds.map((kind) => (
@@ -135,18 +145,22 @@ export function CaptureReview({ capture }: CaptureReviewProps) {
                 </Button>
                 <Button
                   size="sm"
+                  variant={item.possibleDuplicateOf ? 'ghost' : 'primary'}
+                  disabled={busy}
                   onClick={() =>
                     acceptMutation.mutate({
                       captureId: capture.id,
                       itemId: item.id,
+                      allowDuplicate: Boolean(item.possibleDuplicateOf),
                     })
                   }
                 >
-                  Keep
+                  {item.possibleDuplicateOf ? 'Add again' : 'Keep'}
                 </Button>
                 <Button
                   size="sm"
-                  variant="ghost"
+                  variant={item.possibleDuplicateOf ? 'primary' : 'ghost'}
+                  disabled={busy}
                   onClick={() =>
                     rejectMutation.mutate({
                       captureId: capture.id,

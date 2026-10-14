@@ -1,4 +1,5 @@
 import type {
+  CaptureDuplicateRef,
   CaptureItemKind,
   CapacityMode,
   Confidence,
@@ -24,7 +25,11 @@ export type GoblinSuggestion = {
   proposedAction: string
   sourceReference: string
   parentSuggestionId: string | null
+  /** An open task/shopping item the user already has with the same title. */
+  possibleDuplicateOf?: ExistingItemRef | null
 }
+
+export type ExistingItemRef = CaptureDuplicateRef
 
 export type IntelligenceMode = 'rules' | 'ai' | 'ai_unavailable'
 
@@ -34,6 +39,8 @@ export type IntelligenceResult = {
   suggestions: GoblinSuggestion[]
   summary: string
   warnings: string[]
+  /** True only when a paid AI provider was actually called. */
+  aiCalled?: boolean
 }
 
 export type BreakdownLevel = 'tiny' | 'normal' | 'detailed'
