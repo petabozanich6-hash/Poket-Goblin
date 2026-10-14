@@ -55,6 +55,7 @@ redirect to `/`). Unknown `/api/*` paths still return JSON `404`.
 ## Deploying
 
 Production deploys are manual and need approval. Nothing deploys from CI.
+Wrangler 4 needs Node.js 22 or newer.
 
 ```bash
 npm ci
