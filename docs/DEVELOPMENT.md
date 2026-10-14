@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 22+ (required by Wrangler 4)
 - npm 10+
 
 ## Setup

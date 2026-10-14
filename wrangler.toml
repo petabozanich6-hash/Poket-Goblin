@@ -3,11 +3,26 @@ main = "worker/index.ts"
 compatibility_date = "2025-10-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Production: https://pocketgoblin.org is already attached to this Worker as a
+# Custom Domain in the Cloudflare dashboard (DNS + SSL managed there).
+# Deliberately NO `routes` / `custom_domain` entries here — `wrangler deploy`
+# leaves dashboard-managed domains alone when the config declares none.
+# See docs/DEPLOYMENT.md.
+
+# React SPA (Vite build output) served by the same Worker as the API.
+# - /api/* always runs the Hono Worker first.
+# - Everything else is a static asset; unknown paths (e.g. /den, /login on
+#   refresh) fall back to index.html so React Router can handle them.
+[assets]
+directory = "./dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
 # Local D1 only for now — do not provision remote paid resources without permission.
 [[d1_databases]]
 binding = "DB"
 database_name = "pocket-goblin"
-database_id = "00000000-0000-0000-0000-000000000001"
+database_id = "91a90710-dbd7-4a0c-8c90-b97cd3c86d90"
 migrations_dir = "migrations"
 
 # Local R2 simulation via Miniflare — do not provision a remote paid bucket without approval.

@@ -23,6 +23,7 @@ export function fetchIntelligenceStatus() {
 export function interpretText(text: string) {
   return api.post<{ result: IntelligenceResult }>('/intelligence/interpret', {
     text,
+    timezoneOffsetMinutes: new Date().getTimezoneOffset(),
   })
 }
 

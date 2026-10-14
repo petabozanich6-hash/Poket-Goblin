@@ -28,9 +28,13 @@ React + TypeScript + Vite · Cloudflare Workers · D1 · CSS Modules
 - [Product](docs/PRODUCT.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Development](docs/DEVELOPMENT.md)
+- [Deployment](docs/DEPLOYMENT.md)
+- [Production D1 migrations](docs/D1_MIGRATIONS.md)
 - [Roadmap](docs/ROADMAP.md)
 
 ## Status
 
-Sprint 1 core application is implemented against a **local** D1 database.
-No production deploy. No paid Cloudflare resources provisioned.
+Production domain: **https://pocketgoblin.org** — one Worker (`pocket-goblin`)
+serves the React app and the `/api/*` routes. See [Deployment](docs/DEPLOYMENT.md).
+Deploys are manual and approval-gated. No paid Cloudflare resources are
+provisioned by this repository.

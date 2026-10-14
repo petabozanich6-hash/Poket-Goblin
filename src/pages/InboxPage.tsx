@@ -25,6 +25,12 @@ const providerLabels: Record<string, string> = {
   outlook_calendar: 'Outlook Calendar',
 }
 
+function duplicateTitle(payload: unknown): string | null {
+  const ref = (payload as { possibleDuplicateOf?: { title?: unknown } } | null)
+    ?.possibleDuplicateOf
+  return typeof ref?.title === 'string' ? ref.title : null
+}
+
 export function InboxPage() {
   const queryClient = useQueryClient()
   const [tab, setTab] = useState<'pending' | 'all'>('pending')
@@ -139,6 +145,9 @@ export function InboxPage() {
                   <p className={styles.sub}>
                     {item.suggestionType} · from {item.sourceType}
                     {item.uncertain ? ' · needs confirmation' : ''}
+                    {duplicateTitle(item.payload)
+                      ? ` · you already have “${duplicateTitle(item.payload)}”`
+                      : ''}
                     {item.status !== 'pending' ? ` · ${item.status}` : ''}
                   </p>
                   {item.summary ? (
@@ -162,6 +171,7 @@ export function InboxPage() {
                   <div className={styles.tabs}>
                     <Button
                       size="sm"
+                      disabled={acceptMutation.isPending}
                       onClick={() =>
                         acceptMutation.mutate({
                           id: item.id,

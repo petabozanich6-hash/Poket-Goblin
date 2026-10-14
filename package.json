@@ -6,9 +6,11 @@
   "scripts": {
     "dev": "concurrently -k -n web,api -c green,magenta \"npm:dev:web\" \"npm:dev:api\"",
     "dev:web": "vite",
-    "dev:api": "wrangler dev --port 8787 --local",
+    "dev:api": "node -e \"require('fs').mkdirSync('dist',{recursive:true})\" && wrangler dev --port 8787 --local",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
+    "deploy:dry-run": "npm run build && wrangler deploy --dry-run --var ENVIRONMENT:production",
+    "deploy": "npm run build && wrangler deploy --var ENVIRONMENT:production",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
@@ -57,7 +59,7 @@
     "wrangler": "^4.40.3"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "allowScripts": {
     "esbuild@0.28.2": true,

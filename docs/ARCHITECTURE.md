@@ -15,10 +15,11 @@ Independent ADHD-friendly life management app on Cloudflare.
 ## Topology
 
 ```
-Browser (Vite SPA)
-   │  /api/*  (dev proxy → :8787)
+Browser (React SPA)
+   │  dev:  Vite :5173, /api/* proxied → :8787
+   │  prod: https://pocketgoblin.org — same Worker serves dist/ + /api/*
    ▼
-Worker (Hono)
+Worker (Hono, /api/* runs first; other paths → static assets, SPA fallback)
    ├── auth, me, categories, tasks, captures, plan
    ├── events, reminders, notes, shopping, search, history, dashboard
    ├── intelligence (interpret, breakdown, assist, memory)
@@ -68,6 +69,10 @@ See `docs/INTEGRATIONS.md`.
 - Security notes: `docs/SECURITY.md`
 - Journey smoke: `npm run smoke:sprint6` (disposable users; does not wipe D1)
 - Playwright: `npm run test:e2e` (Chromium; assumes local web+API)
+
+## Production
+
+See `docs/DEPLOYMENT.md`.
 
 ## Local development
 
