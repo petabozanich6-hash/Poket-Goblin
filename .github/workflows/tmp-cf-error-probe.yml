@@ -1,0 +1,28 @@
+# TEMPORARY: maps Cloudflare API error responses using FAKE credentials only.
+# References no secrets. Deleted after one run.
+name: tmp cf error probe
+on:
+  push:
+    branches: [tmp/cf-error-probe]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe with fake credentials
+        run: |
+          U=https://api.cloudflare.com/client/v4
+          DB=91a90710-dbd7-4a0c-8c90-b97cd3c86d90
+          FAKE40=$(head -c 60 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 40)
+          HEX32=$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')
+          t(){ label=$1; shift; code=$(curl -sS -m 20 -o r.json -w '%{http_code}' "$@"); printf '%-55s HTTP %s  %s\n' "$label" "$code" "$(jq -c '[.errors[]?|{code,message}]' r.json 2>/dev/null || head -c 150 r.json)"; }
+          t "random 40-char token + random account"      -H "Authorization: Bearer $FAKE40" $U/accounts/$HEX32/d1/database/$DB
+          t "32-hex value as token (token ID/zone ID)"   -H "Authorization: Bearer $HEX32"  $U/accounts/$HEX32/d1/database/$DB
+          t "no Authorization header"                    $U/accounts/$HEX32/d1/database/$DB
+          t "Bearer prefix pasted into secret"           -H "Authorization: Bearer Bearer $FAKE40" $U/accounts/$HEX32/d1/database/$DB
+          t "Global-API-Key-shaped (37 hex) as Bearer"   -H "Authorization: Bearer ${HEX32}abcde" $U/accounts/$HEX32/d1/database/$DB
+          t "random token -> /user/tokens/verify"        -H "Authorization: Bearer $FAKE40" $U/user/tokens/verify
+          t "random token -> /accounts/x/tokens/verify"  -H "Authorization: Bearer $FAKE40" $U/accounts/$HEX32/tokens/verify
+          t "random token -> /accounts"                  -H "Authorization: Bearer $FAKE40" "$U/accounts?per_page=5"
+          t "random token -> d1 list"                    -H "Authorization: Bearer $FAKE40" "$U/accounts/$HEX32/d1/database"
