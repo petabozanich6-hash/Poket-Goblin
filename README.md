@@ -29,6 +29,7 @@ React + TypeScript + Vite · Cloudflare Workers · D1 · CSS Modules
 - [Architecture](docs/ARCHITECTURE.md)
 - [Development](docs/DEVELOPMENT.md)
 - [Deployment](docs/DEPLOYMENT.md)
+- [Production D1 migrations](docs/D1_MIGRATIONS.md)
 - [Roadmap](docs/ROADMAP.md)
 
 ## Status

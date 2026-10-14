@@ -70,15 +70,13 @@ so `wrangler dev` behaves as before.
 
 ### Before the first production deploy
 
-1. **D1 database id.** `wrangler.toml` still has the placeholder id
-   `00000000-0000-0000-0000-000000000001`. Replace it with the id of the
-   existing production `pocket-goblin` D1 database
-   (`npx wrangler d1 list`). Changing this id also changes which local
-   Miniflare database `wrangler dev` uses, so local test data will appear
-   empty afterwards (the old data is still on disk under `.wrangler/state`).
-2. **Migrations.** Apply pending migrations to the remote database only after
-   reviewing them: `npx wrangler d1 migrations apply pocket-goblin --remote`.
-   The migrations are additive; they never drop user data.
+1. **D1 database id.** Done. `wrangler.toml` points at the production
+   `pocket-goblin` database (`91a90710-dbd7-4a0c-8c90-b97cd3c86d90`).
+2. **Migrations.** Use the manual, approval-gated GitHub Actions workflow
+   "D1 migrations (production)". Run `preflight` first, then `apply`. Setup,
+   token permissions and the safety checks are in
+   [D1_MIGRATIONS.md](D1_MIGRATIONS.md). The migrations are additive and never
+   drop user data.
 3. **Secrets.** Set via `npx wrangler secret put <NAME>`, never in git:
    - `AUTH_SECRET` (required — a long random string)
    - Optional AI: `AI_PROVIDER`, `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`,

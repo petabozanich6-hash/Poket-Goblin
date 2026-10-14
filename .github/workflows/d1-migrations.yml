@@ -1,0 +1,183 @@
+# Apply D1 migrations to the PRODUCTION Pocket Goblin database.
+#
+# - Manual only (workflow_dispatch). It never runs on push, PR or a schedule.
+# - Targets one database: pocket-goblin / 91a90710-dbd7-4a0c-8c90-b97cd3c86d90.
+# - "preflight" (default) is read-only, using a D1 Read token.
+# - "apply" also needs: the run started from main, the database name typed to
+#   confirm, and approval on the `production-database` environment. Only that
+#   environment holds the D1 Edit token.
+# - It does not deploy the Worker or the website, and does not create
+#   resources.
+#
+# Setup and token permissions: docs/D1_MIGRATIONS.md
+
+name: D1 migrations (production)
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'preflight = read-only check. apply = run pending migrations (needs approval).'
+        type: choice
+        options:
+          - preflight
+          - apply
+        default: preflight
+      confirm_database:
+        description: 'For apply only: type the database name, pocket-goblin'
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+# Never two migration runs at once; never cancel one mid-apply.
+concurrency:
+  group: d1-migrations-production
+  cancel-in-progress: false
+
+env:
+  D1_DATABASE_NAME: pocket-goblin
+  D1_DATABASE_ID: 91a90710-dbd7-4a0c-8c90-b97cd3c86d90
+  WRANGLER_SEND_METRICS: 'false'
+
+jobs:
+  preflight:
+    name: Preflight (read-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production-database-readonly
+    outputs:
+      pending: ${{ steps.check.outputs.pending }}
+      pending_count: ${{ steps.check.outputs.pending_count }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check inputs
+        env:
+          ACTION: ${{ inputs.action }}
+          CONFIRM: ${{ inputs.confirm_database }}
+          REF: ${{ github.ref }}
+        run: |
+          if [ "$ACTION" = "apply" ]; then
+            if [ "$REF" != "refs/heads/main" ]; then
+              echo "::error title=Wrong branch::apply must be started from main (got $REF). Nothing was changed."
+              exit 1
+            fi
+            if [ "$CONFIRM" != "$D1_DATABASE_NAME" ]; then
+              echo "::error title=Not confirmed::Type '$D1_DATABASE_NAME' in confirm_database to apply. Nothing was changed."
+              exit 1
+            fi
+          fi
+
+      - name: Read database state and plan
+        id: check
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_D1_READ_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/d1-migrations.mjs preflight
+
+  apply:
+    name: Apply migrations (approval required)
+    needs: preflight
+    if: inputs.action == 'apply' && needs.preflight.outputs.pending_count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Pauses here until a required reviewer approves the run.
+    environment: production-database
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_D1_MIGRATE_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Checkout (same commit as preflight)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install pinned Wrangler
+        run: npm ci --no-audit --no-fund
+
+      - name: Re-check database is unchanged since preflight
+        env:
+          EXPECTED_PENDING: ${{ needs.preflight.outputs.pending }}
+        run: node scripts/d1-migrations.mjs recheck
+
+      - name: Record restore point (Time Travel bookmark)
+        id: bookmark
+        run: |
+          set -o pipefail
+          npx wrangler d1 time-travel info "$D1_DATABASE_NAME" --json | tee bookmark.json
+          BOOKMARK=$(node -e "const j=JSON.parse(require('fs').readFileSync('bookmark.json','utf8'));const b=j.bookmark??j.result?.bookmark??'';process.stdout.write(/^[\\w-]+$/.test(b)?b:'')")
+          if [ -z "$BOOKMARK" ]; then
+            echo "::error title=No restore point::Could not read a Time Travel bookmark. Not applying without one."
+            exit 1
+          fi
+          echo "bookmark=$BOOKMARK" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Restore point before applying"
+            echo "Bookmark: \`$BOOKMARK\`"
+            echo ""
+            echo "Only if needed, restore with (this workflow never runs it):"
+            echo "\`npx wrangler d1 time-travel restore $D1_DATABASE_NAME --bookmark=$BOOKMARK\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apply pending migrations in order
+        id: apply
+        env:
+          PENDING: ${{ needs.preflight.outputs.pending }}
+        run: |
+          set -o pipefail
+          echo "Applying to $D1_DATABASE_NAME ($D1_DATABASE_ID): $PENDING"
+          npx wrangler d1 migrations apply "$D1_DATABASE_NAME" --remote 2>&1 | tee apply.log
+
+      - name: Verify nothing is left pending
+        run: node scripts/d1-migrations.mjs verify
+
+      - name: Report failure
+        if: failure()
+        env:
+          BOOKMARK: ${{ steps.bookmark.outputs.bookmark }}
+        run: |
+          {
+            echo "## ❌ Migration run failed"
+            echo ""
+            echo "Wrangler applies migrations one file at a time, in order, and stops at the first error."
+            echo "The failing migration is rolled back. Files applied before it stay applied and recorded in \`d1_migrations\`."
+            echo "Run **preflight** again to see exactly what is still pending."
+            if [ -f apply.log ]; then
+              echo ""
+              echo "<details><summary>Wrangler output (last 60 lines)</summary>"
+              echo ""
+              echo '```'
+              tail -n 60 apply.log
+              echo '```'
+              echo "</details>"
+            fi
+            if [ -n "$BOOKMARK" ]; then
+              echo ""
+              echo "Restore point taken before applying: \`$BOOKMARK\` (see above). Nothing was restored automatically."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  nothing-to-apply:
+    name: Nothing to apply
+    needs: preflight
+    if: inputs.action == 'apply' && needs.preflight.outputs.pending_count == '0'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "## ✅ Database already up to date — nothing applied." >> "$GITHUB_STEP_SUMMARY"
