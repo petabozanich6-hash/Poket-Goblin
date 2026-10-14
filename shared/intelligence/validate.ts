@@ -12,6 +12,14 @@ const KINDS = new Set([
   'link',
 ])
 
+const RECURRENCE = new Set([
+  'daily',
+  'weekly',
+  'fortnightly',
+  'monthly',
+  'yearly',
+])
+
 const CONFIDENCE = new Set<Confidence>(['low', 'medium', 'high'])
 const PRIORITIES = new Set<TaskPriority>(['low', 'normal', 'high'])
 
@@ -63,7 +71,8 @@ export function validateSuggestions(raw: unknown): GoblinSuggestion[] {
       dueDate,
       startTime,
       recurrenceFrequency:
-        typeof row.recurrenceFrequency === 'string'
+        typeof row.recurrenceFrequency === 'string' &&
+        RECURRENCE.has(row.recurrenceFrequency)
           ? (row.recurrenceFrequency as GoblinSuggestion['recurrenceFrequency'])
           : null,
       categorySlug: asString(row.categorySlug, 40),

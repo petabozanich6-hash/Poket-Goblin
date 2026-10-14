@@ -4,6 +4,7 @@ export type {
   AssistantReply,
   BreakdownLevel,
   BreakdownResult,
+  ExistingItemRef,
   GoblinSuggestion,
   IntelligenceMode,
   IntelligenceResult,
@@ -12,3 +13,13 @@ export type {
 export { breakdownTaskWithRules } from './breakdown'
 export { interpretWithRules, relativeDateOrNull } from './ruleEngine'
 export { isCaptureKind, validateSuggestions } from './validate'
+export {
+  addMissedThoughts,
+  findSourceFragment,
+  groundDueDate,
+  groundRecurrence,
+  groundStartTime,
+  groundSuggestions,
+  normalizeTitle,
+  userLocalNow,
+} from './grounding'

@@ -13,10 +13,17 @@ export function createCapture(text: string) {
   })
 }
 
-export function acceptCaptureItem(captureId: string, itemId: string) {
+export function acceptCaptureItem(
+  captureId: string,
+  itemId: string,
+  allowDuplicate = false,
+) {
   return api.post<{ capture: Capture; task: Task }>(
     `/captures/${captureId}/items/${itemId}/accept`,
-    { timezoneOffsetMinutes: new Date().getTimezoneOffset() },
+    {
+      timezoneOffsetMinutes: new Date().getTimezoneOffset(),
+      allowDuplicate,
+    },
   )
 }
 
