@@ -1,0 +1,129 @@
+# Production D1 migrations
+
+Migrations in `migrations/` are applied to the production database by a
+**manually started, approval-gated** GitHub Actions workflow:
+`.github/workflows/d1-migrations.yml` ("D1 migrations (production)").
+
+| Item       | Value                                     |
+| ---------- | ----------------------------------------- |
+| Database   | `pocket-goblin`                           |
+| D1 ID      | `91a90710-dbd7-4a0c-8c90-b97cd3c86d90`    |
+| Migrations | `migrations/0001_…` to `0005_…`, in order |
+
+The workflow only ever targets that database. The ID is pinned in the
+workflow and in `scripts/d1-migrations.mjs`. Every run checks that
+`wrangler.toml` has exactly one D1 binding, with that name and ID, before
+contacting Cloudflare.
+
+It does **not** deploy the Worker or the website, change R2, routes, the
+domain, DNS or SSL, or create any Cloudflare resource.
+
+## Safety model
+
+| Guard                    | What it does                                                                                                                                                             |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Manual trigger only      | `workflow_dispatch`. Never runs on push, PR or a schedule.                                                                                                               |
+| Preflight is the default | Read-only. It sends only `SELECT`s, using a **D1 Read** token.                                                                                                           |
+| Typed confirmation       | `apply` needs `confirm_database` = `pocket-goblin`.                                                                                                                      |
+| Branch lock              | `apply` must be started from `main`. This is enforced in the workflow and in the environment.                                                                            |
+| Approval                 | The apply job waits on the `production-database` environment. Its write token exists only there.                                                                         |
+| Re-check after approval  | Just before applying, the database is read again. If anything changed since preflight, the run stops.                                                                    |
+| Additive only            | Pending migrations with `DROP`, `DELETE FROM`, `UPDATE … SET`, `TRUNCATE`, `ALTER … DROP/RENAME` or `REPLACE` are refused. Those must be applied by hand.                |
+| Order                    | Files must be numbered `0001`… with no gaps. Wrangler applies them in file-name order. The run refuses if the database has a gap or migrations this branch doesn't know. |
+| Untracked schema         | If app tables exist but there is no `d1_migrations` table, the run stops. Re-running `0001` would collide with them.                                                     |
+| Restore point            | A D1 Time Travel bookmark is recorded before applying. Restoring is never automatic.                                                                                     |
+| One at a time            | A concurrency group prevents parallel runs and never cancels one mid-apply.                                                                                              |
+| Verify                   | After applying, the database is read again and must show zero pending migrations.                                                                                        |
+
+The results of every run appear in the run's **Summary**: tables, applied and
+pending migrations, the restore point, and any problems.
+
+## One-time setup (GitHub and Cloudflare web UIs only)
+
+### 1. Cloudflare API tokens (two, least privilege)
+
+Go to Cloudflare dashboard → **My Profile → API Tokens → Create Token →
+Create Custom Token**.
+
+**Token A — preflight (read-only)**
+
+- Name: `pocket-goblin-d1-read-github`
+- Permissions: **Account → D1 → Read**
+- Account Resources: **Include → _the account that owns pocket-goblin_** (only that account)
+- TTL: set an end date if you like. Read-only, so a longer lifetime is acceptable.
+
+**Token B — apply (write)**
+
+- Name: `pocket-goblin-d1-migrate-github`
+- Permissions: **Account → D1 → Edit** (the API reference calls this "D1 Write")
+- Account Resources: **Include → _the account that owns pocket-goblin_** (only that account)
+- TTL: short, for example a few days around a planned migration. Roll or delete it afterwards.
+
+No other permissions are needed: no Workers, R2, Zone, DNS, SSL or User
+permissions. `CLOUDFLARE_ACCOUNT_ID` is supplied, so Wrangler doesn't need to
+look up account memberships.
+
+> **Limitation:** Cloudflare D1 permissions apply to the whole account. They
+> can't be restricted to one database. If another project (for example
+> Side-Quest) has D1 databases in the **same** Cloudflare account, these tokens
+> could technically reach them too. The workflow itself only addresses the
+> pinned Pocket Goblin ID, and the short-lived Edit token limits the exposure.
+
+### 2. Cloudflare account ID
+
+Find it in the Cloudflare dashboard: **Workers & Pages → Overview**, right
+sidebar, "Account ID". It is also in the dashboard URL after `dash.cloudflare.com/`.
+
+### 3. GitHub settings
+
+In the repository: **Settings → Secrets and variables → Actions**
+
+- **Repository secret** `CLOUDFLARE_ACCOUNT_ID` = the account ID.
+
+**Settings → Environments → New environment**
+
+1. `production-database-readonly`
+   - Environment secret `CLOUDFLARE_D1_READ_TOKEN` = Token A.
+   - No reviewers needed.
+2. `production-database`
+   - Environment secret `CLOUDFLARE_D1_MIGRATE_TOKEN` = Token B.
+   - **Required reviewers:** add yourself (`petabozanich6-hash`).
+   - Leave **"Prevent self-review"** unticked. You are the only maintainer, so
+     ticking it would mean nobody could approve.
+   - **Deployment branches and tags:** choose **Selected branches and tags** and
+     add `main`.
+
+Don't put either token in a repository-level secret. Keeping Token B in the
+gated environment means no workflow can use it without approval.
+
+### 4. Make the workflow runnable
+
+GitHub only shows **Run workflow** for workflows that exist on the default
+branch (`main`). After this file is merged into `development`, open a PR from
+`development` to `main` and merge it. Merging into `main` deploys nothing,
+because no workflow deploys automatically.
+
+## Running it
+
+**Actions → D1 migrations (production) → Run workflow**
+
+1. **Preflight first.** Branch `main`, action `preflight`. Read the Summary: the
+   database identity, its tables, what is already applied, and what is pending.
+2. **Apply** (only when you're ready). Branch `main`, action `apply`,
+   confirm_database `pocket-goblin`. Preflight runs again. The run then pauses
+   with **"Waiting for review"**. Open it, choose **Review deployments → tick
+   production-database → Approve and deploy**. (GitHub calls every environment
+   approval a "deployment". Nothing is deployed.)
+3. The Summary reports ✅ applied and verified, or ❌ with Wrangler's output and
+   the restore point.
+
+If a migration fails, Wrangler rolls back that file and stops. Files applied
+before it stay applied. Run preflight again to see what is still pending. To
+undo everything, restore the recorded Time Travel bookmark yourself:
+
+```bash
+npx wrangler d1 time-travel restore pocket-goblin --bookmark=<bookmark from the run summary>
+```
+
+Restoring rewinds **all** data in the database to that moment, so any writes
+made after it are lost.
