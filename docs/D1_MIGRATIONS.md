@@ -127,3 +127,27 @@ npx wrangler d1 time-travel restore pocket-goblin --bookmark=<bookmark from the 
 
 Restoring rewinds **all** data in the database to that moment, so any writes
 made after it are lost.
+
+## Troubleshooting authentication
+
+Every run starts with **Check Cloudflare credentials (values never shown)**. It
+reports whether each secret is present, its length, and any shape problems
+(quotes, a `Bearer ` prefix, an ID pasted instead of the token). It then asks
+Cloudflare, using read-only GETs:
+
+1. Is the token recognised, and is it active? (`/user/tokens/verify`, or the
+   account-token equivalent)
+2. Is `CLOUDFLARE_ACCOUNT_ID` one of the accounts this token can access?
+3. Can the token read D1 in that account, and is `pocket-goblin` there?
+
+The step's Summary names the failing check and the fix. The database is not
+contacted until this check passes.
+
+Why this matters: the D1 endpoint returns the same
+`401 — 10000: Authentication error` for an unrecognised token, a token ID
+pasted instead of the token secret, a Global API Key, a doubled `Bearer`
+prefix, and a missing header. This was confirmed against the live API with fake
+credentials. The verify endpoint tells them apart (`1000: Invalid API Token`).
+
+Spaces or line breaks around either secret are trimmed automatically and
+reported as a warning.

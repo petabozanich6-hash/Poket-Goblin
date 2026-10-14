@@ -170,31 +170,42 @@ export function planMigrations({ files, applied, tables }) {
 // ------------------------------------------------------------ remote (read)
 
 async function cloudflare(pathname, init = {}) {
-  const token = process.env.CLOUDFLARE_API_TOKEN
-  const account = process.env.CLOUDFLARE_ACCOUNT_ID
+  // Trim: a space or line break pasted into a GitHub secret must not break auth.
+  const token = process.env.CLOUDFLARE_API_TOKEN?.trim()
+  const account = process.env.CLOUDFLARE_ACCOUNT_ID?.trim()
   if (!token || !account) {
     throw new Error(
       'CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID must be set (GitHub environment secrets).',
     )
   }
-  const res = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${account}${pathname}`,
-    {
-      ...init,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        ...(init.headers ?? {}),
+  let res
+  try {
+    res = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${account}${pathname}`,
+      {
+        ...init,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          ...(init.headers ?? {}),
+        },
       },
-    },
-  )
+    )
+  } catch {
+    // Don't echo the underlying error: it can contain header values.
+    throw new Error(`Could not reach the Cloudflare API for ${pathname}.`)
+  }
   const body = await res.json().catch(() => ({}))
   if (!res.ok || body.success === false) {
     const detail = (body.errors ?? [])
       .map((e) => `${e.code}: ${e.message}`)
       .join('; ')
+    const hint =
+      res.status === 401 || res.status === 403
+        ? ' See the "Check Cloudflare credentials" step above for the cause.'
+        : ''
     throw new Error(
-      `Cloudflare API ${res.status} on ${pathname}${detail ? ` — ${detail}` : ''}`,
+      `Cloudflare API ${res.status} on ${pathname}${detail ? ` — ${detail}` : ''}.${hint}`,
     )
   }
   return body.result
