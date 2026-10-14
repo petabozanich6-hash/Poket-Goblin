@@ -190,7 +190,7 @@ connectionRoutes.get('/oauth/callback', async (c) => {
   return c.html(
     `<p>Thanks — Pocket Goblin received the OAuth response for ${row.provider}. ` +
       `Live sync is not enabled until token exchange is fully configured and tested. ` +
-      `<a href="http://localhost:5173/inbox">Return to Inbox</a></p>`,
+      `<a href="/inbox">Return to Inbox</a></p>`,
   )
 })
 
