@@ -9,6 +9,7 @@ import type {
 } from '../../shared/types'
 import { parseHm } from '../../shared/magical/quietHours'
 import type { Env } from '../env'
+import { loadAccess, PLAN_LABELS } from '../lib/access'
 import type { AuthUser } from '../lib/session'
 import { asString } from '../lib/validate'
 import { loadSettings } from '../lib/settings'
@@ -19,8 +20,20 @@ export const meRoutes = new Hono<{ Bindings: Env; Variables: Vars }>()
 
 meRoutes.get('/', async (c) => {
   const user = c.get('user')
-  const settings = await loadSettings(c.env.DB, user.id)
-  return c.json({ user, settings })
+  const [settings, access] = await Promise.all([
+    loadSettings(c.env.DB, user.id),
+    loadAccess(c.env.DB, user.id),
+  ])
+  return c.json({
+    user,
+    settings,
+    // Display only: every privileged API re-checks roles on the server.
+    access: {
+      plan: access.plan,
+      planLabel: PLAN_LABELS[access.plan],
+      isOwner: access.isOwner,
+    },
+  })
 })
 
 meRoutes.patch('/settings', async (c) => {

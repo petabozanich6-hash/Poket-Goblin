@@ -25,6 +25,10 @@ function fakeDb(executed: Statement[]): D1Database {
         executed.push({ sql, args })
         if (sql.includes('FROM sessions s')) {
           return {
+            status: 'active',
+            sessionId: 'sess_me',
+            lastSeenAt: new Date().toISOString(),
+            elevatedUntil: null,
             id: ME,
             email: 'me@example.com',
             displayName: 'Me',

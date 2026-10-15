@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 
 import type { Env } from '../env'
+import { loadAccess } from '../lib/access'
 import { processDocumentForUser } from '../lib/documents/processDocument'
 import {
   MAX_UPLOAD_BYTES,
@@ -9,6 +10,10 @@ import {
 } from '../lib/documents/validateUpload'
 import { newId } from '../lib/ids'
 import { firstUnownedLink, linkNotFound } from '../lib/ownership'
+import {
+  loadPlatformSettings,
+  storageQuotaBytesFor,
+} from '../lib/platformSettings'
 import type { AuthUser } from '../lib/session'
 import { getObjectStore } from '../lib/storage'
 import { asString } from '../lib/validate'
@@ -99,6 +104,13 @@ documentRoutes.get('/:id', async (c) => {
 
 documentRoutes.post('/', async (c) => {
   const user = c.get('user')
+  const settings = await loadPlatformSettings(c.env.DB, c.env)
+  if (!settings.features.documentUploads) {
+    return c.json(
+      { error: 'Document uploads are paused for now. Please try again later.' },
+      503,
+    )
+  }
   const form = await c.req.formData()
   const file = form.get('file')
   if (!(file instanceof File)) {
@@ -112,6 +124,23 @@ documentRoutes.post('/', async (c) => {
     bytes,
   })
   if (!validated.ok) return c.json({ error: validated.error }, 400)
+
+  // Per-plan storage quota (applies to the Owner too: an infrastructure guard).
+  const access = await loadAccess(c.env.DB, user.id)
+  const quota = storageQuotaBytesFor(access.plan, settings)
+  const used = await c.env.DB.prepare(
+    `SELECT COALESCE(SUM(byte_size), 0) as bytes FROM documents WHERE user_id = ?`,
+  )
+    .bind(user.id)
+    .first<{ bytes: number }>()
+  if ((used?.bytes ?? 0) + bytes.byteLength > quota) {
+    return c.json(
+      {
+        error: `This upload would exceed your document storage allowance (${Math.round(quota / (1024 * 1024))} MB).`,
+      },
+      413,
+    )
+  }
 
   const id = newId('doc')
   const storageKey = `${user.id}/${id}/${validated.safeName}`

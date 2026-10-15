@@ -11,8 +11,10 @@ import {
 } from '../lib/intelligence/provider'
 import {
   assertUnderLimit,
-  dailyLimit,
   getUsageToday,
+  loadAiPolicy,
+  outcomeOf,
+  recordAiEvent,
   recordUsage,
 } from '../lib/intelligence/usage'
 import { readOffsetMinutes } from '../lib/datetime'
@@ -29,13 +31,14 @@ export const intelligenceRoutes = new Hono<{ Bindings: Env; Variables: Vars }>()
 
 intelligenceRoutes.get('/status', async (c) => {
   const user = c.get('user')
-  const provider = resolveProvider(c.env)
+  const policy = await loadAiPolicy(c.env.DB, c.env, user.id)
+  const provider = resolveProvider(policy.env)
   const usage = await getUsageToday(c.env.DB, user.id)
   return c.json({
     provider: provider.kind,
     aiConfigured: provider.configured,
     model: provider.model,
-    dailyLimit: dailyLimit(c.env),
+    dailyLimit: policy.limit,
     usedToday: usage.requestCount,
     modeLabel: provider.configured
       ? 'AI credentials present — structured interpret may use AI; assistant stays grounded'
@@ -53,12 +56,20 @@ intelligenceRoutes.post('/interpret', async (c) => {
   if (!text) return c.json({ error: 'Text is required' }, 400)
 
   // Over the AI limit → rule-based result instead of an error.
-  const gate = await assertUnderLimit(c.env.DB, c.env, user.id)
-  const result = await interpretIntelligence(c.env, text, {
+  const policy = await loadAiPolicy(c.env.DB, c.env, user.id)
+  const gate = await assertUnderLimit(c.env.DB, policy, user.id)
+  const result = await interpretIntelligence(policy.env, text, {
     timezoneOffsetMinutes: readOffsetMinutes(body),
     allowAi: gate.ok,
   })
   if (result.aiCalled) await recordUsage(c.env.DB, user.id, result.provider)
+  await recordAiEvent(
+    c.env.DB,
+    user.id,
+    'interpret',
+    result.provider,
+    outcomeOf(result, gate.ok, policy.providerEnabled),
+  )
   return c.json({ result })
 })
 
@@ -75,11 +86,22 @@ intelligenceRoutes.post('/breakdown', async (c) => {
     return c.json({ error: 'Invalid breakdown level' }, 400)
   }
 
-  const gate = await assertUnderLimit(c.env.DB, c.env, user.id)
-  if (!gate.ok) return c.json({ error: gate.error }, 429)
+  const policy = await loadAiPolicy(c.env.DB, c.env, user.id)
+  const gate = await assertUnderLimit(c.env.DB, policy, user.id)
+  if (!gate.ok) {
+    await recordAiEvent(c.env.DB, user.id, 'breakdown', '', 'limit_reached')
+    return c.json({ error: gate.error }, 429)
+  }
 
-  const result = await breakdownIntelligence(c.env, title, level)
+  const result = await breakdownIntelligence(policy.env, title, level)
   await recordUsage(c.env.DB, user.id, result.provider)
+  await recordAiEvent(
+    c.env.DB,
+    user.id,
+    'breakdown',
+    result.provider,
+    outcomeOf(result, true, policy.providerEnabled),
+  )
   return c.json({ result })
 })
 
@@ -181,11 +203,22 @@ intelligenceRoutes.post('/assist', async (c) => {
     })
   }
 
-  const gate = await assertUnderLimit(c.env.DB, c.env, user.id)
-  if (!gate.ok) return c.json({ error: gate.error }, 429)
+  const policy = await loadAiPolicy(c.env.DB, c.env, user.id)
+  const gate = await assertUnderLimit(c.env.DB, policy, user.id)
+  if (!gate.ok) {
+    await recordAiEvent(c.env.DB, user.id, 'assist', '', 'limit_reached')
+    return c.json({ error: gate.error }, 429)
+  }
 
-  const reply = await answerAssistant(c.env, c.env.DB, user.id, question)
+  const reply = await answerAssistant(policy.env, c.env.DB, user.id, question)
   await recordUsage(c.env.DB, user.id, reply.provider)
+  await recordAiEvent(
+    c.env.DB,
+    user.id,
+    'assist',
+    reply.provider,
+    outcomeOf(reply, true, policy.providerEnabled),
+  )
 
   await c.env.DB.prepare(
     `INSERT INTO assistant_messages (id, user_id, role, content, actions_json)

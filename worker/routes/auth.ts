@@ -1,8 +1,10 @@
 import { Hono } from 'hono'
 
 import type { Env } from '../env'
+import { recordSecurityEvent } from '../lib/audit'
 import { newId } from '../lib/ids'
 import { hashPassword, verifyPassword } from '../lib/passwords'
+import { loadPlatformSettings } from '../lib/platformSettings'
 import { checkRateLimit } from '../lib/rateLimit'
 import {
   clearSessionCookie,
@@ -36,6 +38,16 @@ authRoutes.post('/register', async (c) => {
     return c.json(
       { error: 'Too many registration attempts. Please try again shortly.' },
       429,
+    )
+  }
+
+  const platform = await loadPlatformSettings(c.env.DB, c.env)
+  if (!platform.features.registrationsOpen) {
+    return c.json(
+      {
+        error: 'New registrations are paused for now. Please try again later.',
+      },
+      403,
     )
   }
 
@@ -118,7 +130,7 @@ authRoutes.post('/login', async (c) => {
 
   const user = await c.env.DB.prepare(
     `SELECT id, email, password_hash as passwordHash, display_name as displayName,
-            created_at as createdAt
+            created_at as createdAt, status
      FROM users WHERE email = ?`,
   )
     .bind(emailRaw)
@@ -128,16 +140,28 @@ authRoutes.post('/login', async (c) => {
       passwordHash: string
       displayName: string
       createdAt: string
+      status: string
     }>()
 
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
     // Count failed attempts against a tighter per-email bucket too
     checkRateLimit(`login-fail:${emailRaw}`, 10, 15 * 60_000)
+    if (user) await recordSecurityEvent(c.env.DB, user.id, 'login_failed')
     return c.json({ error: 'Email or password is incorrect' }, 401)
+  }
+
+  // Only after the password checks out, so suspension is not an oracle.
+  if (user.status !== 'active') {
+    await recordSecurityEvent(c.env.DB, user.id, 'login_blocked_suspended')
+    return c.json(
+      { error: 'This account is suspended.', code: 'account_suspended' },
+      403,
+    )
   }
 
   const session = await createSession(c.env.DB, c.env, user.id)
   setSessionCookie(c, session.token, session.expiresAt)
+  await recordSecurityEvent(c.env.DB, user.id, 'login_success')
 
   return c.json({
     user: {

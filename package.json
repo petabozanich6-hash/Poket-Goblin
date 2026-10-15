@@ -30,6 +30,8 @@
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build"
   },
   "dependencies": {
+    "@simplewebauthn/browser": "13.3.0",
+    "@simplewebauthn/server": "13.3.3",
     "@tanstack/react-query": "^5.90.2",
     "hono": "^4.9.8",
     "lucide-react": "^0.544.0",
