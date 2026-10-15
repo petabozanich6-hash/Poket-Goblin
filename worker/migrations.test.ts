@@ -80,3 +80,31 @@ describe('migration 0006 (owner administration schema)', () => {
     ).toThrow()
   })
 })
+
+describe('migration 0007 (Document Devourer)', () => {
+  it('keeps every existing document as a kept document', () => {
+    const t = createTestD1({ upTo: 6 })
+    t.run(
+      `INSERT INTO users (id, email, password_hash, display_name)
+       VALUES ('user_a', 'a@example.com', 'x', 'A')`,
+    )
+    t.run(
+      `INSERT INTO documents (id, user_id, display_name, storage_key, mime_type, byte_size, status)
+       VALUES ('doc_a', 'user_a', 'bill.pdf', 'user_a/doc_a/bill.pdf', 'application/pdf', 10, 'ready')`,
+    )
+    applyMigrations(t.sqlite, migrationFiles().slice(6))
+    expect(
+      t.query('SELECT id, storage_key, retention, expires_at FROM documents'),
+    ).toEqual([
+      {
+        id: 'doc_a',
+        storage_key: 'user_a/doc_a/bill.pdf',
+        retention: 'keep',
+        expires_at: null,
+      },
+    ])
+    expect(() =>
+      t.run(`UPDATE documents SET retention = 'forever' WHERE id = 'doc_a'`),
+    ).toThrow()
+  })
+})
