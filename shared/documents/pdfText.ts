@@ -380,7 +380,9 @@ function textOfContent(content: string, fonts: Map<string, Font>): string {
         if (nums.length >= 2) moveTo((y ?? 0) + nums[nums.length - 1]!, true)
         break
       case 'Tm':
-        if (nums.length >= 6) moveTo(nums[nums.length - 1]!, false)
+        // A new run on the same line is usually a new table cell or column:
+        // keep a gap so "Essay" and "30%" don't fuse into "Essay30%".
+        if (nums.length >= 6) moveTo(nums[nums.length - 1]!, true)
         break
       case 'T*':
         newline()

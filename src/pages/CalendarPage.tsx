@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input, TextArea } from '@/components/ui/Input'
+import { PhoneCalendarCard } from '@/features/calendar/PhoneCalendarCard'
 import { createEvent, deleteEvent, fetchEvents } from '@/features/life/lifeApi'
 
 import styles from './Page.module.css'
@@ -98,8 +99,8 @@ export function CalendarPage() {
         <div>
           <h1>Calendar</h1>
           <p className={styles.sub}>
-            Appointments live here — create them directly or accept them from a
-            brain dump.
+            Appointments and due dates live here — add them yourself, tell the
+            Goblin, or let it read a document.
           </p>
         </div>
       </header>
@@ -193,6 +194,8 @@ export function CalendarPage() {
           </ul>
         )}
       </Card>
+
+      <PhoneCalendarCard />
 
       <Card>
         <h2>New appointment</h2>

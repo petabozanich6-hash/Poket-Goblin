@@ -1,0 +1,76 @@
+.card {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.title {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  margin: 0;
+}
+
+.muted {
+  color: var(--color-ink-muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.error {
+  color: var(--color-danger);
+  font-size: 0.9rem;
+}
+
+.links {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-warm-soft);
+}
+
+.links p {
+  margin: 0;
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.linkButton {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.5rem 0.85rem;
+  background: var(--color-bg-elevated);
+  color: var(--color-ink);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.linkButton:hover {
+  border-color: var(--color-accent);
+}
+
+.copyRow {
+  display: flex;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.urlInput {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.45rem 0.65rem;
+  background: var(--color-bg-elevated);
+  color: var(--color-ink-muted);
+  font-size: 0.8rem;
+}

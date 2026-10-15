@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Bell, CalendarDays, Inbox } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 
 import type { CalendarEvent, Task } from '@shared/types'
@@ -67,6 +67,11 @@ export function HomePage() {
   const overwhelm = useOverwhelm()
   const [params] = useSearchParams()
   const [rescueOpen, setRescueOpen] = useState(params.get('rescue') === '1')
+  // "Clear my day for me" from the panic screen, even when already on Home.
+  const rescueAsked = params.get('rescue') === '1'
+  useEffect(() => {
+    if (rescueAsked) setRescueOpen(true)
+  }, [rescueAsked])
 
   const plan = useQuery({
     queryKey: ['plan', 'today'],
@@ -125,6 +130,17 @@ export function HomePage() {
         </div>
       </header>
 
+      <button
+        type="button"
+        className={styles.panic}
+        onClick={() => overwhelm.enter()}
+      >
+        <span className={styles.panicTitle}>Panic button</span>
+        <span className={styles.panicSub}>
+          Everything feels like too much? Tap here.
+        </span>
+      </button>
+
       {quiet ? (
         <section className={styles.quiet} aria-label="All quiet">
           <p className={styles.quietTitle}>All quiet in the cave. 👹</p>
@@ -142,22 +158,13 @@ export function HomePage() {
           <div className={styles.panelHead}>
             <h2 id="today-heading">Today</h2>
             {openTasks >= 4 ? (
-              <div className={styles.helpers}>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => overwhelm.enter()}
-                >
-                  I’m overwhelmed
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => setRescueOpen(true)}
-                >
-                  Sort my day
-                </Button>
-              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setRescueOpen(true)}
+              >
+                Sort my day
+              </Button>
             ) : tasks.length > 0 ? (
               <Button
                 size="sm"

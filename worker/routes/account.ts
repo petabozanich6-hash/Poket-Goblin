@@ -66,6 +66,7 @@ export const NOT_EXPORTED = new Set([
   'webauthn_credentials',
   'webauthn_challenges',
   'account_tokens',
+  'calendar_feeds',
   'user_roles',
   'processing_jobs',
 ])

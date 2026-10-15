@@ -46,6 +46,8 @@ export type SecurityEventType =
   | 'password_reset'
   | 'password_changed'
   | 'email_verified'
+  | 'calendar_feed_created'
+  | 'calendar_feed_revoked'
   | 'data_exported'
 
 /** Per-account security metadata. Failures here never break the request. */
