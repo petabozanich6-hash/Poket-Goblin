@@ -240,11 +240,12 @@ documentRoutes.post('/', async (c) => {
 
   // The same file again: reuse the open review, or point at the kept copy.
   const duplicate = await c.env.DB.prepare(
-    `SELECT id, retention FROM documents WHERE user_id = ? AND sha256 = ?
+    `SELECT id, retention, storage_key as storageKey
+     FROM documents WHERE user_id = ? AND sha256 = ?
      ORDER BY created_at DESC LIMIT 1`,
   )
     .bind(user.id, hash)
-    .first<{ id: string; retention: string }>()
+    .first<{ id: string; retention: string; storageKey: string }>()
   if (duplicate) {
     // Nothing from it added yet? Read it again: the reader may have improved
     // (or the AI was busy) since last time.
@@ -258,6 +259,13 @@ documentRoutes.post('/', async (c) => {
       null
     let autoAdded = { added: 0, already: 0 }
     if (!used) {
+      // An unreadable "Just sort it" original is deleted straight away, so
+      // read the copy just given (same bytes: the hash matched).
+      await getObjectStore(c.env).put(
+        duplicate.storageKey,
+        bytes,
+        validated.mime,
+      )
       processing = await processDocumentForUser(
         c.env,
         user.id,
