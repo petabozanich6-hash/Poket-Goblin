@@ -20,6 +20,8 @@ export type Operation =
       target: string
       domain: 'shopping' | 'task' | 'event' | 'any'
       clause: string
+      /** Said with a likely typo ("brought"): only act on a clear match. */
+      loose?: boolean
     }
   | { op: 'cancel'; target: string; clause: string }
   | { op: 'not_yet'; target: string; clause: string }
@@ -64,9 +66,12 @@ export type Operation =
 const OVERWHELM =
   /\b(overwhelm(?:ed|ing)?|too much|can'?t cope|cannot cope|don'?t know where to (?:start|begin)|drowning|frozen|paralys(?:ed|is)|everything is a mess|so stressed|stressed out|burnt? out)\b/i
 
-const SHOPPING_VERBS = /^(bought|got|grabbed|picked up|purchased|collected)$/
+// "brought" is a very common slip for "bought"; it only counts when it
+// clearly names something on the list (see `loose`).
+const SHOPPING_VERBS =
+  /^(bought|brought|got|grabbed|picked up|purchased|collected)$/
 const COMPLETION_VERBS =
-  'bought|got|grabbed|picked up|purchased|collected|paid|called|rang|phoned|finished|completed|done|sent|booked|returned|submitted|emailed|posted|cleaned|did|fixed|renewed|cancelled|handed in|dropped off|filed|wrote|replied to|texted|messaged|visited|attended|went to'
+  'bought|brought|got|grabbed|picked up|purchased|collected|paid|called|rang|phoned|finished|completed|done|sent|booked|returned|submitted|emailed|posted|cleaned|did|fixed|renewed|cancelled|handed in|dropped off|filed|wrote|replied to|texted|messaged|visited|attended|went to'
 
 const NUMBER_WORDS: Record<string, string> = {
   a: '1',
@@ -276,6 +281,7 @@ export function parseOperation(rawClause: string, now: Date): Operation {
       target: stripLeadingArticles(done[2]),
       domain,
       clause,
+      ...(done[1] === 'brought' ? { loose: true } : {}),
     }
   }
   const isDone = lower.match(

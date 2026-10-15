@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { deflateRawSync, deflateSync } from 'node:zlib'
 
 import { describe, expect, it } from 'vitest'
@@ -109,5 +112,94 @@ describe('pdf extraction', () => {
   it('stops at the inflate cap instead of exhausting memory', async () => {
     const bomb = pdf(`BT (${'A'.repeat(9 * 1024 * 1024)}) Tj ET`, true)
     expect(await extractPdfText(bomb)).toBe('')
+  })
+})
+
+/**
+ * A PDF the way modern tools write it: catalog → page tree, objects packed
+ * in a compressed object stream, a Type0 font showing hex glyph ids, and a
+ * compressed /ToUnicode map using bfchar plus both bfrange forms.
+ */
+function cidPdf(opts: { toUnicode: boolean }): Uint8Array {
+  const cmap = `/CIDInit /ProcSet findresource begin
+begincmap
+1 begincodespacerange <0000> <FFFF> endcodespacerange
+2 beginbfchar
+<0003> <0020>
+<0010> <2014>
+endbfchar
+2 beginbfrange
+<0024> <003D> <0041>
+<0044> <0046> [<0061> <0062> <00E9>]
+endbfrange
+endcmap`
+  // "CAB" via the incremental range (0x26 → C), a space, "abé" via the array
+  // form, an em dash, and a kerned TJ that should become a space.
+  const content =
+    'BT /F1 12 Tf 1 0 0 -1 72 720 Tm <002600240025> Tj <0003> Tj <004400450046> Tj ' +
+    '<0010> Tj ET BT 1 0 0 -1 72 700 Tm [<0024> -400 <0025>] TJ ET'
+  const packed = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    `<< /Type /Page /Parent 2 0 R /Contents 6 0 R /Resources << /Font << /F1 4 0 R >> >> >>`,
+    `<< /Type /Font /Subtype /Type0 /BaseFont /AAAAAA+Georgia /Encoding /Identity-H${opts.toUnicode ? ' /ToUnicode 5 0 R' : ''} >>`,
+  ]
+  let header = ''
+  let body = ''
+  packed.forEach((obj, i) => {
+    header += `${i + 1} ${body.length} `
+    body += `${obj}\n`
+  })
+  const objStm = deflateSync(Buffer.from(header + body, 'latin1'))
+  const cmapZ = deflateSync(Buffer.from(cmap, 'latin1'))
+  const contentZ = deflateSync(Buffer.from(content, 'latin1'))
+  const stream = (n: number, dict: string, data: Buffer) =>
+    Buffer.concat([
+      Buffer.from(
+        `${n} 0 obj\n<< ${dict} /Length ${data.length} /Filter /FlateDecode >>\nstream\n`,
+        'latin1',
+      ),
+      data,
+      Buffer.from('\nendstream\nendobj\n', 'latin1'),
+    ])
+  return new Uint8Array(
+    Buffer.concat([
+      Buffer.from('%PDF-1.7\n', 'latin1'),
+      stream(7, `/Type /ObjStm /N 4 /First ${header.length}`, objStm),
+      stream(5, '', cmapZ),
+      stream(6, '', contentZ),
+      Buffer.from('%%EOF\n', 'latin1'),
+    ]),
+  )
+}
+
+describe('pdf with embedded font character maps', () => {
+  it('decodes hex glyph ids through ToUnicode, inside object streams', async () => {
+    const text = await extractPdfText(cidPdf({ toUnicode: true }))
+    expect(text).toBe('CAB abé—\nA B')
+  })
+
+  it('never shows glyph-id garbage when a font has no map', async () => {
+    const res = await extractText(
+      cidPdf({ toUnicode: false }),
+      'application/pdf',
+    )
+    expect(res).toEqual({ text: '', needsVision: true })
+  })
+
+  it('reads a real Chrome-printed PDF (Type0 fonts, Identity-H)', async () => {
+    const bytes = new Uint8Array(
+      readFileSync(
+        join(
+          dirname(fileURLToPath(import.meta.url)),
+          'fixtures/chrome-cid-fonts.pdf',
+        ),
+      ),
+    )
+    const res = await extractText(bytes, 'application/pdf')
+    expect(res.needsVision).toBe(false)
+    expect(res.text).toMatch(/^Judicial Independence in Australia\n/)
+    expect(res.text).toContain('Submissions are due by 28 November 2026.')
+    expect(res.text).toContain('“quotes” and café accents')
   })
 })

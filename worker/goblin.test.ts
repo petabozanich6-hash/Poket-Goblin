@@ -80,6 +80,19 @@ describe('shopping, start to finish, with no approval screens', () => {
     ])
   })
 
+  it('understands the "brought" slip, but only for things on the list', async () => {
+    await say('Need milk and bread')
+    const res = await say('Brought milk')
+    expect(res.results).toMatchObject([
+      { kind: 'done', message: 'Milk crossed off your list! 👹' },
+    ])
+    expect(activeShopping()).toEqual([{ name: 'Bread', quantity: '' }])
+
+    const kids = await say('I brought the kids to school')
+    expect(kids.results).toEqual([])
+    expect(kids.capture).toEqual(['I brought the kids to school'])
+  })
+
   it('does not add duplicates', async () => {
     await say('I need milk')
     const again = await say('I need milk')
