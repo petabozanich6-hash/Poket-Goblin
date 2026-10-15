@@ -44,5 +44,10 @@ ENVIRONMENT = "production"
 [observability]
 enabled = true
 
+# Hourly housekeeping: deletes abandoned "Just sort it" documents (originals
+# older than 24 h) and unfinished uploads. Cron Triggers are free.
+[triggers]
+crons = ["17 * * * *"]
+
 [dev]
 port = 8787

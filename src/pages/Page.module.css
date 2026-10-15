@@ -182,4 +182,13 @@
   .inlineForm {
     grid-template-columns: 1fr;
   }
+
+  .listRow {
+    flex-wrap: wrap;
+  }
+
+  .listRow > div {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
 }

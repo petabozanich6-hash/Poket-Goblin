@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 
+import { builtinCategoryLabel } from '../../shared/categories'
 import type { Env } from '../env'
 import type { AuthUser } from '../lib/session'
 
@@ -28,7 +29,7 @@ categoryRoutes.get('/', async (c) => {
     categories: (rows.results ?? []).map((row) => ({
       id: row.id,
       slug: row.slug,
-      name: row.name,
+      name: row.isBuiltin ? builtinCategoryLabel(row.slug, row.name) : row.name,
       sortOrder: row.sortOrder,
       isBuiltin: Boolean(row.isBuiltin),
     })),

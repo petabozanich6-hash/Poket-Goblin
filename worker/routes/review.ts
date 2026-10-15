@@ -327,7 +327,12 @@ reviewRoutes.post('/:id/accept', async (c) => {
       createdId = newId('rem')
       const remindAt = localDateTimeToIso(
         dueDate,
-        typeof body?.startTime === 'string' ? body.startTime : '09:00',
+        typeof body?.startTime === 'string'
+          ? body.startTime
+          : typeof payload.startTime === 'string' &&
+              /^\d{2}:\d{2}$/.test(payload.startTime)
+            ? payload.startTime
+            : '09:00',
         false,
         offset,
       )

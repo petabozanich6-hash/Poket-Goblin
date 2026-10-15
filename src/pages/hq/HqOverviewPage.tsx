@@ -188,17 +188,22 @@ export function HqOverviewPage() {
       </Card>
 
       <Card>
-        <h2 className={styles.sectionTitle}>Document storage</h2>
+        <h2 className={styles.sectionTitle}>Documents</h2>
         <div className={styles.stats}>
           <Stat
-            label="Stored"
+            label="Kept storage"
             value={formatBytes(storage.trackedBytes)}
             hint={storage.source}
           />
-          <Stat label="Documents" value={storage.documents} />
+          <Stat label="Kept documents" value={storage.documents} />
           <Stat
             label="Processing failures"
             value={storage.processingFailures}
+          />
+          <Stat
+            label="Being sorted now"
+            value={storage.temporaryInReview}
+            hint="“Just sort it” uploads waiting for review (auto-deleted within 24 h)"
           />
           <Stat
             label="Awaiting OCR"

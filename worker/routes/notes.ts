@@ -1,3 +1,4 @@
+import { CATEGORY_NAME_SQL } from '../../shared/categories'
 import { Hono } from 'hono'
 
 import type { Env } from '../env'
@@ -13,7 +14,7 @@ export const noteRoutes = new Hono<{ Bindings: Env; Variables: Vars }>()
 
 const SELECT = `
   SELECT n.id, n.title, n.body, n.category_id as categoryId,
-         c.slug as categorySlug, c.name as categoryName,
+         c.slug as categorySlug, ${CATEGORY_NAME_SQL} as categoryName,
          n.pinned, n.linked_task_id as linkedTaskId,
          n.linked_event_id as linkedEventId,
          n.created_at as createdAt, n.updated_at as updatedAt

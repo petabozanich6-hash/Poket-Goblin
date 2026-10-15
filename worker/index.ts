@@ -4,6 +4,10 @@ import { secureHeaders } from 'hono/secure-headers'
 
 import type { Env } from './env'
 import { allowedOrigin } from './lib/cors'
+import {
+  sweepExpiredChallenges,
+  sweepExpiredDocuments,
+} from './lib/documents/lifecycle'
 import { newId } from './lib/ids'
 import {
   authSecretProblem,
@@ -147,4 +151,30 @@ app.onError(async (error, c) => {
   return c.json({ error: 'Something went wrong' }, 500)
 })
 
-export default app
+export { app }
+
+/**
+ * Hourly housekeeping (Cron Trigger in wrangler.toml): forget abandoned
+ * "Just sort it" documents and unfinished uploads, and drop expired passkey
+ * challenges. Logs counts only.
+ */
+async function scheduled(
+  _controller: ScheduledController,
+  env: Env,
+  ctx: ExecutionContext,
+) {
+  ctx.waitUntil(
+    (async () => {
+      const documents = await sweepExpiredDocuments(env)
+      await sweepExpiredChallenges(env)
+      console.log(
+        `housekeeping: ${documents.forgotten} document(s) forgotten, ${documents.failed} retry later`,
+      )
+    })(),
+  )
+}
+
+export default {
+  fetch: app.fetch,
+  scheduled,
+} satisfies ExportedHandler<Env>
