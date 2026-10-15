@@ -57,3 +57,8 @@ crons = ["17 * * * *"]
 
 [dev]
 port = 8787
+
+# Workers AI activation: see docs/WORKERS_AI.md. Uncomment only in the
+# approved deployment configuration; local inference also uses remote GPUs.
+# [ai]
+# binding = "AI"

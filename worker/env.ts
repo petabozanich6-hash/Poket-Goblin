@@ -4,7 +4,11 @@ export type Env = {
   AUTH_SECRET?: string
   /** Local Miniflare R2 or remote bucket (remote requires approval) */
   UPLOADS?: R2Bucket
-  /** none | openai_compatible */
+  /** none | openai_compatible | workers_ai */
+  AI?: Ai
+  AI_DAILY_GLOBAL_LIMIT?: string
+  /** Internal request context, set only by loadAiPolicy; never dashboard vars. */
+  aiRequest?: { userId: string; dailyLimit: number }
   AI_PROVIDER?: string
   AI_API_KEY?: string
   AI_BASE_URL?: string

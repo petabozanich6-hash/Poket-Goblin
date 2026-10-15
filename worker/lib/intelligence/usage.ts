@@ -51,7 +51,15 @@ export async function loadAiPolicy(
     plan: access.plan,
     limit: aiDailyLimitFor(access.plan, settings),
     providerEnabled,
-    env: providerEnabled ? env : { ...env, AI_PROVIDER: 'none' },
+    env: providerEnabled
+      ? {
+          ...env,
+          aiRequest: {
+            userId,
+            dailyLimit: aiDailyLimitFor(access.plan, settings),
+          },
+        }
+      : { ...env, AI_PROVIDER: 'none', aiRequest: undefined },
   }
 }
 

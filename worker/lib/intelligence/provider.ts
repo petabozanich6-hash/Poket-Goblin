@@ -11,8 +11,13 @@ import {
   type IntelligenceResult,
 } from '../../../shared/intelligence'
 import type { Env } from '../../env'
+import {
+  callWorkersAi,
+  workersAiModel,
+  WorkersAiBlockedError,
+} from './workersAi'
 
-export type ProviderKind = 'rules' | 'openai_compatible'
+export type ProviderKind = 'rules' | 'openai_compatible' | 'workers_ai'
 
 export function resolveProvider(env: Env): {
   kind: ProviderKind
@@ -20,6 +25,9 @@ export function resolveProvider(env: Env): {
   configured: boolean
 } {
   const name = (env.AI_PROVIDER ?? 'none').toLowerCase()
+  if (name === 'workers_ai' && env.AI && workersAiModel(env)) {
+    return { kind: 'workers_ai', model: workersAiModel(env), configured: true }
+  }
   const key = env.AI_API_KEY?.trim()
   if (name === 'openai_compatible' && key) {
     return {
@@ -187,32 +195,34 @@ export async function interpretIntelligence(
   }
 
   try {
-    const raw = await callOpenAiCompatible(
+    const call =
+      provider.kind === 'workers_ai' ? callWorkersAi : callOpenAiCompatible
+    const raw = await call(
       env,
       buildInterpretSystemPrompt(localNow),
       `<user_text>\n${text}\n</user_text>`,
       options.fetchImpl,
     )
     const result = finaliseAiInterpretation(raw, text, localNow)
-    if (result) return result
+    if (result) return { ...result, provider: provider.kind }
     const fallback = interpretWithRules(text, localNow)
     return {
       ...fallback,
       mode: 'ai_unavailable',
-      provider: 'openai_compatible+rules_fallback',
+      provider: `${provider.kind}+rules_fallback`,
       aiCalled: true,
       warnings: [
         ...fallback.warnings,
         'AI returned no valid suggestions; used rule-based fallback.',
       ],
     }
-  } catch {
+  } catch (error) {
     const fallback = interpretWithRules(text, localNow)
     return {
       ...fallback,
       mode: 'ai_unavailable',
-      provider: 'openai_compatible+rules_fallback',
-      aiCalled: true,
+      provider: `${provider.kind}+rules_fallback`,
+      aiCalled: !(error instanceof WorkersAiBlockedError),
       warnings: [
         ...fallback.warnings,
         'AI provider failed or timed out; used rule-based fallback.',
