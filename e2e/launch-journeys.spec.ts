@@ -52,18 +52,19 @@ test('Journey D: a messy brain dump becomes separate, categorised suggestions', 
       'Book the dentist on Tuesday. Buy oat milk. Pay the water bill by Friday.',
     )
   await page.getByRole('button', { name: 'Give it to the Goblin' }).click()
-  await expect(page.getByText('Here’s what I found.')).toBeVisible({
-    timeout: 15_000,
-  })
+  // The clear shopping request just happens; the rest waits for a yes.
+  await expect(
+    page.getByText('Oat milk added to your shopping list.'),
+  ).toBeVisible({ timeout: 15_000 })
   const keeps = page.getByRole('button', { name: /^keep$/i })
-  await expect(keeps).toHaveCount(3, { timeout: 15_000 })
-  for (let i = 0; i < 3; i += 1) {
+  await expect(keeps).toHaveCount(2, { timeout: 15_000 })
+  for (let i = 0; i < 2; i += 1) {
     await page
       .getByRole('button', { name: /^keep$/i })
       .first()
       .click()
     await expect(page.getByRole('button', { name: /^keep$/i })).toHaveCount(
-      2 - i,
+      1 - i,
     )
   }
   await page.goto('/life')

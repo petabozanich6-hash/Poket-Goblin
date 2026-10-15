@@ -71,6 +71,14 @@ describe('shopping', () => {
       name: 'eggs',
       quantity: '12',
     })
+    expect(parseShoppingEntry('milk tomorrow')).toEqual({
+      name: 'milk',
+      quantity: '',
+    })
+    expect(parseShoppingEntry('bread on Friday')).toEqual({
+      name: 'bread',
+      quantity: '',
+    })
     expect(parseShoppingEntry('3 tins of tomatoes')).toEqual({
       name: 'tomatoes',
       quantity: '3 tins',

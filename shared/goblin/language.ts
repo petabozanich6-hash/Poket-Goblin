@@ -111,7 +111,14 @@ function stripLeadingArticles(text: string): string {
 /** "two cartons of milk" → { name: 'milk', quantity: '2 cartons' } */
 export function parseShoppingEntry(raw: string): ShoppingEntry {
   let text = stripLeadingArticles(
-    raw.trim().replace(/\s+(?:please|as well|too|also)$/i, ''),
+    raw
+      .trim()
+      .replace(/\s+(?:please|as well|too|also)$/i, '')
+      // "milk tomorrow", "bread on Friday": when to buy isn't part of the name.
+      .replace(
+        /\s+(?:today|tonight|tomorrow|this (?:morning|afternoon|evening|week|weekend)|on the way home|(?:on |this |next )?(?:mon|tues|wednes|thurs|fri|satur|sun)day)$/i,
+        '',
+      ),
   )
   let quantity = ''
   const numberWord = Object.keys(NUMBER_WORDS)
