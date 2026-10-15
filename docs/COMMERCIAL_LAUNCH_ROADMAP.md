@@ -642,19 +642,21 @@ Privacy and AI-provider retention, stated without overclaiming:
 - Playwright: 4 passing, including the full Devourer journey in a real
   browser.
 
-### Deployment order (replaces the order in §11)
+### Deployment order (current)
 
-Migration `0007` was also added to `feat/owner-schema`, so a single schema PR
-carries both `0006` and `0007`:
+Goblin HQ (`feat/owner-hq`) was merged to `main` in PR #11 and is live.
+Migration `0006` is applied in production (verified: sign-in reads the new
+columns).
 
-1. Merge `feat/owner-schema` to `main`. This contains schema only, so customers
+1. Open and merge the schema-only PR from `feat/owner-schema`. Against
+   `main` it now contains just migration `0007` and its test, so customers
    see no change.
 2. Run the **D1 migrations (production)** workflow: `preflight`, which should
-   show `0006` and `0007` pending, then `apply` with approval.
-3. Merge `feat/owner-hq`, then `feat/document-devourer`, to `main`. Workers
-   Builds deploys them, and the cron trigger is created by that deploy.
-4. Run the Owner promotion (§11), then optionally add the R2 `tmp/` lifecycle
-   rule.
+   show only `0007` pending, then `apply` with approval.
+3. Merge `feat/document-devourer`. Workers Builds deploys it, and the deploy
+   creates the hourly cron trigger. **Don't merge it before step 2**: its code
+   reads the `0007` columns.
+4. Optionally add the R2 lifecycle rule for `tmp/` (2 days) as a backstop.
 
 ### Remaining document work
 
