@@ -251,6 +251,26 @@ describe('Just sort it (default)', () => {
       document: { id: first.body.document.id },
     })
     expect(h.query(`SELECT COUNT(*) as n FROM documents`)).toEqual([{ n: 1 }])
+    // Something was added the first time, so it isn't read twice.
+    expect(second.body.processing).toBeUndefined()
+    expect(h.query(`SELECT COUNT(*) as n FROM tasks`)).toEqual([{ n: 1 }])
+  })
+
+  it('reads the same file again when nothing came of it last time', async () => {
+    await askFirst(alice)
+    const first = await upload(alice, BILL)
+    // Pretend the first read was poor: its suggestions were all skipped.
+    for (const s of first.body.suggestions)
+      await call(alice, `/api/review/${s.id}/dismiss`, 'POST', {})
+    await call(alice, '/api/me/settings', 'PATCH', { goblinAutonomy: 'auto' })
+    const again = await upload(alice, BILL)
+    expect(again.body).toMatchObject({
+      duplicate: true,
+      message: 'You’ve given me this one before, so I read it again.',
+      processing: { status: 'ready' },
+      autoAdded: { added: 2 },
+    })
+    expect(h.query(`SELECT COUNT(*) as n FROM documents`)).toEqual([{ n: 1 }])
   })
 
   it('refuses to "finish" a kept document', async () => {
@@ -553,7 +573,7 @@ describe('deadline plans (any document with deadlines)', () => {
     ].join('\n')
     const { status, body } = await upload(alice, outline, { name: 'brief.txt' })
     expect(status).toBe(201)
-    expect(body.processing.summary).toMatch(/^I found 3 deadlines/)
+    expect(body.processing.summary).toMatch(/^I found 3 dates/)
     const items = body.suggestions as Json[]
     // Every planned item says which deadline it belongs to.
     expect(items.every((s) => typeof s.group === 'string')).toBe(true)

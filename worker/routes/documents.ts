@@ -246,6 +246,33 @@ documentRoutes.post('/', async (c) => {
     .bind(user.id, hash)
     .first<{ id: string; retention: string }>()
   if (duplicate) {
+    // Nothing from it added yet? Read it again: the reader may have improved
+    // (or the AI was busy) since last time.
+    const used = await c.env.DB.prepare(
+      `SELECT 1 FROM review_items WHERE user_id = ? AND source_type = 'document'
+         AND source_id = ? AND status = 'accepted' LIMIT 1`,
+    )
+      .bind(user.id, duplicate.id)
+      .first()
+    let processing: Awaited<ReturnType<typeof processDocumentForUser>> | null =
+      null
+    let autoAdded = { added: 0, already: 0 }
+    if (!used) {
+      processing = await processDocumentForUser(
+        c.env,
+        user.id,
+        duplicate.id,
+        options,
+      )
+      if (processing.status === 'ready') {
+        autoAdded = await autoAddFromDocument(
+          c.env.DB,
+          user.id,
+          duplicate.id,
+          options.timezoneOffsetMinutes ?? 0,
+        )
+      }
+    }
     const row = await c.env.DB.prepare(`${SELECT} WHERE id = ? AND user_id = ?`)
       .bind(duplicate.id, user.id)
       .first()
@@ -253,9 +280,11 @@ documentRoutes.post('/', async (c) => {
       {
         duplicate: true,
         document: mapDoc(row!),
+        ...(processing ? { processing, autoAdded } : {}),
         suggestions: await pendingSuggestions(c.env.DB, user.id, duplicate.id),
-        message:
-          duplicate.retention === 'keep'
+        message: processing
+          ? 'You’ve given me this one before, so I read it again.'
+          : duplicate.retention === 'keep'
             ? 'You’ve already saved this document.'
             : 'You’ve already given me this one — here’s what I found.',
       },

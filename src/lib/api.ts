@@ -101,11 +101,23 @@ export const api = {
   },
   /** Multipart upload — do not set JSON Content-Type. */
   upload: async <T>(path: string, form: FormData): Promise<T> => {
-    const response = await fetch(`/api${path}`, {
-      method: 'POST',
-      credentials: 'include',
-      body: form,
-    })
+    let response: Response
+    try {
+      response = await fetch(`/api${path}`, {
+        method: 'POST',
+        credentials: 'include',
+        body: form,
+      })
+    } catch {
+      // The browser refused to send it: no connection, or the file was
+      // moved, renamed or changed after it was chosen.
+      throw new ApiError(
+        0,
+        typeof navigator !== 'undefined' && navigator.onLine === false
+          ? 'You’re offline — try again when you’re back online.'
+          : 'I couldn’t send that file. If you moved, renamed or changed it after choosing it, choose it again.',
+      )
+    }
     const data = (await response.json().catch(() => ({}))) as {
       error?: string
     } & T

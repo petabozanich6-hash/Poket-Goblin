@@ -567,6 +567,16 @@ export function withDeadlinePlan<
     categorySlug: understanding.categorySlug,
   })
   if (!plan) return understanding
+  // Nothing dated, but worth saying what it contains (e.g. an outline).
+  // Its own guesses (e.g. "Pay phone bill" from a passing mention) would
+  // only add noise.
+  if (plan.deadlines.length === 0 && plan.suggestions.length === 0)
+    return {
+      ...understanding,
+      documentType: 'education',
+      summary: plan.summary,
+      suggestions: [],
+    }
   const simple = ['bill', 'appointment', 'medical'].includes(
     understanding.documentType,
   )

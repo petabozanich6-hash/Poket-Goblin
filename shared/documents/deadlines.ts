@@ -37,7 +37,7 @@ export type DeadlinePlan = {
   warnings: string[]
 }
 
-const MAX_DEADLINES = 12
+const MAX_DEADLINES = 24
 const MAX_SUGGESTIONS = 48
 
 const CUE =
@@ -47,8 +47,20 @@ const CUE =
 const NOT_A_DEADLINE =
   /\b(date\s+of\s+(?:issue|this\s+letter)|issued?|printed|dated|published|statement\s+date|invoice\s+date|letter\s+date|last\s+updated|version|©|copyright|born|date\s+of\s+birth|dob)\b/i
 
+/** Browser print headers/footers and "Date: …" lines say when it was printed. */
+const PRINT_LINE =
+  /^(?:\d{1,2}\/\d{1,2}\/\d{2,4},\s*\d{1,2}:\d{2}|(?:date|printed|issued|dated|generated|created|downloaded|last\s+(?:updated|modified))\b)/i
+
+/** Things worth a calendar entry even when only the week is written. */
+const WEEK_ONLY_CUE =
+  /\b(assessment\s*\d+[^\n]{0,40}?\b(?:due|exam|test|quiz)|exam(?:ination)?\b(?!\s+(?:preparation|prep|period|discussion|revision|timetable|information|info|support|paper|will|is|unit))|census\s+(?:day|date)|due\b)/i
+
 const URGENT =
   /\b(urgent(?:ly)?|immediately|as\s+soon\s+as\s+possible|asap|straight\s+away|right\s+away|without\s+delay|final\s+(?:notice|reminder|demand)|overdue|time[-\s]sensitive|act\s+now|high\s+priority)\b/i
+
+/** "If you need urgent support…": information, not something to do. */
+const URGENT_NOT_TASK =
+  /\b(if\s+you|in\s+case|for\s+urgent|urgent\s+(?:support|help|care|assistance|enquir(?:y|ies)|quer(?:y|ies)|matters?)|crisis|emergenc(?:y|ies))\b/i
 
 const WEEKDAY =
   /\b(?:mon|tues?|wed(?:nes)?|thu(?:rs?)?|fri|sat(?:ur)?|sun)(?:day)?\b,?/gi
@@ -116,6 +128,18 @@ function labelFrom(line: string, dates: FoundDate[]): string {
   let s = line
   for (const d of dates) s = s.split(d.text).join(' ')
   s = s
+    .replace(/(?:\p{Extended_Pictographic}|[\u2190-\u2BFF]|\uFE0F)/gu, ' ')
+    // Pieces of a date split over lines ("02 November" / "2026").
+    .replace(
+      /\b\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\b/gi,
+      ' ',
+    )
+    .replace(
+      /\b(?:january|february|march|april|june|july|august|september|october|november|december)\b/gi,
+      ' ',
+    )
+    .replace(/\b(?:19|20)\d{2}\b/g, ' ')
+    .replace(/\(?\s*click\s+(?:link|here)\s*\)?/gi, ' ')
     .replace(WEEKDAY, ' ')
     .replace(/\b\d{1,2}(?:[:.]\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.)/gi, ' ')
     .replace(/\b\d{1,2}:\d{2}\b/g, ' ')
@@ -132,7 +156,13 @@ function labelFrom(line: string, dates: FoundDate[]): string {
     /[\s\-.!?]+$/g,
     '',
   )
-  if (/^(?:the|a|an|and|or|of|for|date|dates?|due|please|your|our)?$/i.test(s))
+  // A week number left at the start of a schedule row ("13 Assessment…").
+  s = s.replace(/^\d{1,2}\s+(?=\D)/, '')
+  if (
+    /^(?:the|a|an|and|or|of|for|date|dates?|due|please|your|our|\d+|week\s+commencing.*|week)?$/i.test(
+      s,
+    )
+  )
     return ''
   return cap(shorten(s))
 }
@@ -151,14 +181,14 @@ function kindOf(text: string): DeadlineKind {
   )
     return 'payment'
   if (
-    /\b(meeting|hearing|interview|orientation|ceremony|graduation|appointment|excursion|induction|workshop|class|lecture|seminar|conference|court)\b/i.test(
+    /\b(meeting|hearing|interview|orientation|ceremony|graduation|appointment|excursion|induction|workshop|class|lecture|seminar|conference|court|tutorial|session|drop-?in|briefing|webinar|meet\s*&\s*greet|zoom|period|shutdown|holiday|break|recess|census)\b/i.test(
       text,
     ) &&
-    !/\b(submit|submission|essay|report|assignment)\b/i.test(text)
+    !/\b(due|submit|submission)\b/i.test(text)
   )
     return 'event'
   if (
-    /\b(essays?|reports?|assignments?|projects?|proposals?|portfolios?|thesis|dissertation|presentations?|reflections?|reviews?|case\s+stud(?:y|ies)|journal|draft|tax\s+return|return|lodge(?:ment)?|grant|submission|plan|budget|research)\b/i.test(
+    /\b(assessments?|essays?|reports?|assignments?|projects?|proposals?|portfolios?|thesis|dissertation|presentations?|reflections?|reviews?|case\s+stud(?:y|ies)|journal|draft|tax\s+return|return|lodge(?:ment)?|grant|submission|plan|budget|research)\b/i.test(
       text,
     )
   )
@@ -187,9 +217,31 @@ export type PlanOptions = { reference: Date; monthFirst?: boolean }
 
 export function findDeadlines(text: string, options: PlanOptions): Deadline[] {
   const today = options.reference.toISOString().slice(0, 10)
-  const dates = findDates(text, options)
+  // Dates in print headers/footers ("Date: Friday, 16 October…") never count.
+  const dates = findDates(text, options).filter(
+    (d) => !PRINT_LINE.test(lineAround(text, d.index).line),
+  )
   const out: Deadline[] = []
   const seen = new Set<string>()
+  // A study schedule lists the date each week starts; those aren't deadlines.
+  const weekSchedule = /\bweek\s+(?:commencing|beginning|starting)\b/i.test(
+    text,
+  )
+  const isWeekRow = (line: string, d: FoundDate) => {
+    if (!weekSchedule) return false
+    if (new RegExp(`^\\s*\\d{1,2}\\s+${d.text.split(/\s+/)[0]}`).test(line))
+      return true
+    // The week number on its own line just above ("5" / "16 November").
+    const at = lineAround(text, d.index).start
+    const lineStart = text.lastIndexOf('\n', at - 1) + 1
+    const prev = text.slice(
+      text.lastIndexOf('\n', lineStart - 2) + 1,
+      lineStart,
+    )
+    return (
+      /^\s*\d{1,2}\s*$/.test(prev) && line.startsWith(d.text.split(/\s+/)[0]!)
+    )
+  }
 
   for (const date of dates) {
     const { line, start } = lineAround(text, date.index)
@@ -209,22 +261,47 @@ export function findDeadlines(text: string, options: PlanOptions): Deadline[] {
       continue
     if (daysBetween(today, date.iso) < -7) continue
 
+    if (PRINT_LINE.test(line) || isWeekRow(line, date)) continue
+
     const lineDates = dates.filter(
       (d) => d.index >= start && d.index < start + line.length,
     )
     let label = labelFrom(line, lineDates)
-    if (label.length < 3) {
+    // "1 19 October 2026" under "Week Commencing": a week starting, not a deadline.
+    const bareWeekRow =
+      !label && /^\s*\d{1,2}\s/.test(line.replace(date.text, ' '))
+    let labelLine = line
+    if (label.length < 3 && !bareWeekRow) {
       // A table cell on its own line: the label is usually the line above.
       const prevEnd = start - 1
       const prevStart = text.lastIndexOf('\n', prevEnd - 1) + 1
       const prev = text.slice(prevStart, Math.max(prevStart, prevEnd)).trim()
-      if (prev && prev.length < 120 && findDates(prev, options).length === 0)
+      if (prev && prev.length < 120 && findDates(prev, options).length === 0) {
         label = labelFrom(prev, [])
+        labelLine = `${prev} ${line}`
+      }
     }
-    if (label.length < 3) label = 'Deadline'
+    // No real label (a week start, a page date): not something to do.
+    if (label.length < 3) continue
     const key = `${label.toLowerCase()}|${date.iso}`
     if (seen.has(key)) continue
     seen.add(key)
+    const time = timeNear(text, date.index)
+    let kind = kindOf(`${label} ${labelLine}`)
+    // Something at a set time is an appointment to turn up to, unless it's
+    // a deadline ("due 5pm") or an exam.
+    if (
+      time &&
+      (kind === 'work' || kind === 'deadline' || kind === 'form') &&
+      !/\b(due|submit|submission|deadline|close|closes|by)\b/i.test(labelLine)
+    )
+      kind = 'event'
+    // A period written as a range ("21 December – 4 January") is one entry.
+    if (
+      kind === 'event' &&
+      out.some((o) => o.label.toLowerCase() === label.toLowerCase())
+    )
+      continue
 
     // Urgency belongs to this deadline's own words, or to the sentence or
     // heading just before it ("URGENT: Your tax return is overdue.").
@@ -244,11 +321,13 @@ export function findDeadlines(text: string, options: PlanOptions): Deadline[] {
     out.push({
       label,
       iso: date.iso,
-      time: timeNear(text, date.index),
-      kind: kindOf(`${label} ${line}`),
+      time,
+      kind,
       weight: Number.isFinite(weight) && weight <= 100 ? weight : null,
       urgent:
-        URGENT.test(line) || URGENT.test(context) || (days >= 0 && days <= 2),
+        URGENT.test(line) ||
+        URGENT.test(context) ||
+        (days >= 0 && days <= 2 && kind !== 'event'),
       overdue: days < 0,
       uncertain: date.uncertain,
       reason: date.reason,
@@ -256,6 +335,45 @@ export function findDeadlines(text: string, options: PlanOptions): Deadline[] {
       index: date.index,
     })
     if (out.length >= MAX_DEADLINES) break
+  }
+
+  // Important items given only by week ("Assessment 2 Exam" in the row for
+  // the week of 25 January): use that week's date and ask to check it.
+  for (const m of text.matchAll(new RegExp(WEEK_ONLY_CUE.source, 'gi'))) {
+    if (out.length >= MAX_DEADLINES) break
+    const { line, start } = lineAround(text, m.index)
+    if (PRINT_LINE.test(line)) continue
+    const label = labelFrom(line, [])
+    if (label.length < 3) continue
+    // Already found with a real date (on this line or the next).
+    const near = dates.find(
+      (d) => d.index >= start && d.index < start + line.length + 160,
+    )
+    if (near && out.some((o) => Math.abs(o.index - near.index) < 5)) continue
+    if (out.some((o) => o.label.toLowerCase() === label.toLowerCase())) continue
+    if (!weekSchedule) continue
+    const week = [...dates]
+      .reverse()
+      .find(
+        (d) =>
+          d.index < start &&
+          start - d.index < 400 &&
+          isWeekRow(lineAround(text, d.index).line, d),
+      )
+    if (!week || daysBetween(today, week.iso) < -7) continue
+    out.push({
+      label,
+      iso: week.iso,
+      time: null,
+      kind: kindOf(`${label} ${line}`),
+      weight: null,
+      urgent: false,
+      overdue: daysBetween(today, week.iso) < 0,
+      uncertain: true,
+      reason: `only the week (${week.text.replace(/\s+/g, ' ')}) is written — check the exact date`,
+      excerpt: line.replace(/\s+/g, ' ').slice(0, 160),
+      index: m.index,
+    })
   }
 
   // "within 14 days" — counted from today, and flagged to check.
@@ -328,7 +446,7 @@ function stepsFor(d: Deadline): { steps: Step[]; lead: number } {
   }
   const big =
     (d.weight ?? 0) >= 25 ||
-    /\b(essay|report|project|thesis|dissertation|portfolio|proposal|tax\s+return|grant|application|research)\b/i.test(
+    /\b(assessment|essay|report|project|thesis|dissertation|portfolio|proposal|tax\s+return|grant|application|research)\b/i.test(
       x,
     )
   switch (d.kind) {
@@ -414,6 +532,40 @@ function suggestion(
   }
 }
 
+/**
+ * A course outline that lists assessments but no dates: say what's coming,
+ * and that the schedule (with dates) is what to feed in next.
+ */
+function assessmentOverview(text: string): string | null {
+  const found = new Map<string, string>()
+  for (const m of text.matchAll(/\bassessment\s+(\d{1,2})\b/gi)) {
+    const n = m[1]!
+    if (found.has(n)) continue
+    const after = text.slice(m.index, m.index + 160)
+    const weight = after.match(/\b(\d{1,3})\s?%/)
+    if (!weight) continue
+    const desc = after
+      .slice(after.indexOf(weight[0]) + weight[0].length)
+      .replace(/^\s*(?:yes|no)\b/i, '')
+      .split('\n')[0]!
+      .replace(/\s+(?:comprising|including|with|of|which|that)\b.*$/i, '')
+      .trim()
+      .toLowerCase()
+    found.set(
+      n,
+      `Assessment ${n} (${weight[1]}%${desc ? `, ${shorten(desc, 40)}` : ''})`,
+    )
+    if (found.size >= 6) break
+  }
+  if (found.size === 0) return null
+  const list = [...found.values()]
+  const joined =
+    list.length === 1
+      ? list[0]
+      : `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`
+  return `This outlines ${list.length === 1 ? 'one assessment' : `${list.length} assessments`}: ${joined}. It doesn’t give due dates — feed me the study schedule or assessment page and I’ll plan them.`
+}
+
 /** Steps back from each deadline, plus the deadline itself in the calendar. */
 export function planDeadlines(
   text: string,
@@ -467,7 +619,7 @@ export function planDeadlines(
     )
 
     const { steps, lead } = stepsFor(d)
-    if (d.urgent && days <= 2) {
+    if (d.urgent && days <= 2 && d.kind !== 'event') {
       suggestions.push(
         suggestion(
           {
@@ -549,6 +701,7 @@ export function planDeadlines(
     const { line } = lineAround(text, m.index)
     const sentence = line.replace(/\s+/g, ' ').slice(0, 160)
     if (suggestions.some((s) => s.sourceExcerpt === sentence)) continue
+    if (URGENT_NOT_TASK.test(sentence)) continue
     const what = cap(cleanPhrase(sentence.replace(/[.!]+$/, '')))
     if (what.length < 8) continue
     suggestions.push({
@@ -568,7 +721,12 @@ export function planDeadlines(
     })
   }
 
-  if (deadlines.length === 0 && !suggestions.length) return null
+  if (deadlines.length === 0 && !suggestions.length) {
+    const overview = assessmentOverview(text)
+    return overview
+      ? { deadlines: [], suggestions: [], summary: overview, warnings }
+      : null
+  }
 
   const urgentCount = suggestions.filter(
     (s) => s.urgent && !s.title.startsWith('Overdue:'),
@@ -576,10 +734,10 @@ export function planDeadlines(
   const next = deadlines.find((d) => !d.overdue)
   const parts: string[] = []
   if (deadlines.length === 1 && next) {
-    parts.push(`I found one deadline: ${next.label} on ${formatDay(next.iso)}.`)
+    parts.push(`I found one date: ${next.label} on ${formatDay(next.iso)}.`)
   } else if (deadlines.length > 1) {
     parts.push(
-      `I found ${deadlines.length} deadlines${next ? ` — the next is ${next.label} on ${formatDay(next.iso)}` : ''}.`,
+      `I found ${deadlines.length} dates${next ? ` — the next is ${next.label} on ${formatDay(next.iso)}` : ''}.`,
     )
   }
   const overdue = deadlines.filter((d) => d.overdue).length

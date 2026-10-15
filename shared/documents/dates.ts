@@ -164,7 +164,32 @@ export function findDates(text: string, options: DateOptions): FoundDate[] {
     add(m, iso ? { iso, uncertain, reason } : null)
   }
 
-  return found.sort((x, y) => x.index - y.index)
+  found.sort((x, y) => x.index - y.index)
+  // "Wednesday 28th October" with no year, between dates that have one:
+  // take the year from the nearest earlier full date when that keeps the
+  // order (a schedule always runs forwards).
+  for (let i = 0; i < found.length; i += 1) {
+    const d = found[i]!
+    if (d.reason !== 'No year given') continue
+    const before = found
+      .slice(0, i)
+      .reverse()
+      .find((x) => x.reason !== 'No year given' && !x.uncertain)
+    if (!before) continue
+    const [, m, day] = d.iso.split('-').map(Number) as [number, number, number]
+    const year = Number(before.iso.slice(0, 4))
+    const guess =
+      valid(year, m, day) && valid(year, m, day)! >= before.iso
+        ? valid(year, m, day)
+        : valid(year + 1, m, day)
+    if (
+      guess &&
+      (Date.parse(guess) - Date.parse(before.iso)) / 86_400_000 <= 120
+    ) {
+      found[i] = { ...d, iso: guess, uncertain: false, reason: null }
+    }
+  }
+  return found
 }
 
 /** Words that mark a deadline or the date something happens. */

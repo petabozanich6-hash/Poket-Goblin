@@ -53,7 +53,7 @@ test('panic button, plan from a document, and phone calendar', async ({
     ),
   })
   await page.getByRole('button', { name: 'Feed it to the goblin' }).click()
-  await expect(page.getByText(/^I found 2 deadlines/)).toBeVisible()
+  await expect(page.getByText(/^I found 2 dates/)).toBeVisible()
   // Everything certain is added straight away; nothing to approve.
   await expect(
     page.getByText(/Added 8 things to your tasks and calendar\./),
