@@ -45,6 +45,11 @@ ENVIRONMENT = "production"
 AI_PROVIDER = "workers_ai"
 AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fp8"
 AI_DAILY_GLOBAL_LIMIT = "5"
+# Stripe Premium price ids (not secret). Empty = Premium shows "Coming soon".
+# The keys are Worker secrets: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET.
+# Live keys stay refused until STRIPE_LIVE_ENABLED = "true" (owner approval).
+STRIPE_PRICE_MONTHLY = ""
+STRIPE_PRICE_YEARLY = ""
 
 # Workers Logs: request + console logs in the dashboard (no extra resource).
 [observability]

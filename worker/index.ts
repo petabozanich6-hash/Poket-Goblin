@@ -20,6 +20,7 @@ import { adminRoutes } from './routes/admin'
 import { authRoutes } from './routes/auth'
 import { captureRoutes } from './routes/captures'
 import { calendarRoutes, icsFeedRoutes } from './routes/calendar'
+import { billingRoutes, billingWebhookRoutes } from './routes/billing'
 import { categoryRoutes } from './routes/categories'
 import { connectionRoutes } from './routes/connections'
 import { dashboardRoutes } from './routes/dashboard'
@@ -90,6 +91,8 @@ app.route('/auth', authRoutes)
 app.route('/platform', platformRoutes)
 // Calendar apps can't sign in: the private link's token is the key.
 app.route('/ics', icsFeedRoutes)
+// Stripe can't sign in: its signature is the key.
+app.route('/billing/webhook', billingWebhookRoutes)
 
 app.use('*', async (c, next) => {
   if (
@@ -97,6 +100,7 @@ app.use('*', async (c, next) => {
     c.req.path.startsWith('/api/platform') ||
     c.req.path === '/api/health' ||
     c.req.path.startsWith('/api/ics/') ||
+    c.req.path === '/api/billing/webhook' ||
     c.req.path === '/api/connections/oauth/callback'
   ) {
     return next()
@@ -134,6 +138,7 @@ app.route('/documents', documentRoutes)
 app.route('/review', reviewRoutes)
 app.route('/connections', connectionRoutes)
 app.route('/magical', magicalRoutes)
+app.route('/billing', billingRoutes)
 app.route('/admin', adminRoutes)
 
 app.notFound((c) => c.json({ error: 'Not found' }, 404))

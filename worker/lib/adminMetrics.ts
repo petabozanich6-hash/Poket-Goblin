@@ -6,6 +6,7 @@
  * Privacy: only counts, sizes, dates and statuses. No titles, bodies, file
  * names or other customer content leave these queries.
  */
+import { billingConfig } from './billing/stripe'
 import type { Env } from '../env'
 import { PLAN_SQL, type Plan } from './access'
 import { resolveProvider } from './intelligence/provider'
@@ -38,7 +39,7 @@ async function count(
 }
 
 export function stripeConfigured(env: Env): boolean {
-  return Boolean(env.STRIPE_SECRET_KEY)
+  return billingConfig(env).enabled
 }
 
 export async function customerMetrics(db: D1Database, now: Date) {

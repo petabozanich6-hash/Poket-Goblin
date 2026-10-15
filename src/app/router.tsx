@@ -19,6 +19,7 @@ import { MyLifeLayout, MyLifeOverview } from '@/pages/MyLifePage'
 import { PlanPage } from '@/pages/PlanPage'
 import { SearchPage } from '@/pages/SearchPage'
 import { SettingsPage } from '@/pages/SettingsPage'
+import { SubscriptionPage } from '@/pages/SubscriptionPage'
 import { TasksPage } from '@/pages/TasksPage'
 import { TellPage } from '@/pages/TellPage'
 import { HqCustomerPage } from '@/pages/hq/HqCustomerPage'
@@ -93,6 +94,7 @@ export function AppRouter() {
             <Route path="search" element={<SearchPage />} />
           </Route>
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/settings/plan" element={<SubscriptionPage />} />
           {/* Still reachable from inside Tell the Goblin. */}
           <Route path="/ask" element={<AssistantPage />} />
           <Route path="/capture" element={<CapturePage />} />

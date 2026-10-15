@@ -682,7 +682,7 @@ applied** in production.
 | Tell the Goblin (universal capture)          | Implemented and tested; reuses the existing engines                                           |
 | My Life hub with search                      | Implemented and tested                                                                        |
 | Legal                                        | Drafts in `docs/legal/` for professional review; not published                                |
-| Stripe billing and free-tier limits          | **Not started.** Needs Stripe test-mode keys                                                  |
+| Stripe billing and free-tier limits          | **Built** (docs/BILLING.md). Needs a Stripe test product, keys and prices to switch on        |
 | Owner promotion                              | Preflight passed (read-only, 2026-10-15). **Not applied**                                     |
 
 ### Safe production order
@@ -708,7 +708,7 @@ applied** in production.
 | Housekeeping            | PASS (local)                             | Removed items are soft-deleted and hidden everywhere; completed tasks and reminders leave active views               |
 | Workers AI              | Active in production; UNVERIFIED quality | 3 Workers AI brain-dump sorts recorded on 2026-10-15; global cap 5/day; config now in `wrangler.toml`                |
 | Calendar and email sync | NOT STARTED                              | Needs Google Cloud and Microsoft Entra app registrations and approved OAuth scopes                                   |
-| Stripe                  | NOT STARTED                              | Needs Stripe test-mode keys                                                                                          |
+| Stripe                  | BUILT, NOT SWITCHED ON                   | Needs a test product, keys and price ids (docs/BILLING.md)                                                           |
 | Email branding          | NOT STARTED                              | Current emails are functional but plain                                                                              |
 
 How it fits together:

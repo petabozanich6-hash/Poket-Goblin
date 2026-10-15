@@ -10,6 +10,8 @@ import type {
 } from '@shared/types'
 import { CAPACITY_HINTS, CAPACITY_LABELS } from '@shared/types'
 
+import { Link } from 'react-router'
+
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import {
@@ -77,7 +79,10 @@ export function SettingsPage() {
           Plan: <strong>{access?.planLabel ?? 'Free'}</strong>
           {access?.plan === 'owner_premium'
             ? ' — every Premium feature, permanently.'
-            : null}
+            : null}{' '}
+          <Link to="/settings/plan">
+            {access?.plan === 'free' ? 'See plans' : 'Plan and billing'}
+          </Link>
         </p>
         <p className={styles.sub}>
           Account ID: <code>{user?.id}</code>{' '}
