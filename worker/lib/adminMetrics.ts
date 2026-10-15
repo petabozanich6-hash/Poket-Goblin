@@ -201,7 +201,8 @@ export async function storageMetrics(
 ) {
   const totals = await db
     .prepare(
-      `SELECT COUNT(*) as documents, COALESCE(SUM(byte_size), 0) as bytes FROM documents`,
+      `SELECT COUNT(*) as documents, COALESCE(SUM(byte_size), 0) as bytes
+       FROM documents WHERE retention = 'keep'`,
     )
     .first<{ documents: number; bytes: number }>()
   const perPlan = await db
@@ -209,6 +210,7 @@ export async function storageMetrics(
       `SELECT plan, COUNT(*) as documents, COALESCE(SUM(bytes), 0) as bytes FROM (
          SELECT ${PLAN_SQL} as plan, d.byte_size as bytes
          FROM documents d JOIN users u ON u.id = d.user_id
+         WHERE d.retention = 'keep'
        ) GROUP BY plan`,
     )
     .all<{ plan: Plan; documents: number; bytes: number }>()
@@ -216,6 +218,7 @@ export async function storageMetrics(
     .prepare(
       `SELECT u.id as userId, ${PLAN_SQL} as plan, SUM(d.byte_size) as bytes
        FROM documents d JOIN users u ON u.id = d.user_id
+       WHERE d.retention = 'keep'
        GROUP BY u.id`,
     )
     .all<{ userId: string; plan: Plan; bytes: number }>()
@@ -231,7 +234,7 @@ export async function storageMetrics(
     trackedBytes: Number(totals?.bytes ?? 0),
     documents: Number(totals?.documents ?? 0),
     source:
-      'Sizes recorded for each upload in D1. Objects added to the bucket outside Pocket Goblin are not counted.',
+      'Documents customers chose to keep, from sizes recorded in D1. Temporary “Just sort it” files are excluded; objects added outside Pocket Goblin are not counted.',
     byPlan: (perPlan.results ?? []).map((r) => ({
       plan: r.plan,
       documents: Number(r.documents),
@@ -240,6 +243,10 @@ export async function storageMetrics(
     processingFailures: await count(
       db,
       `SELECT COUNT(*) as n FROM documents WHERE status = 'failed'`,
+    ),
+    temporaryInReview: await count(
+      db,
+      `SELECT COUNT(*) as n FROM documents WHERE retention = 'temporary'`,
     ),
     awaitingOcr: await count(
       db,

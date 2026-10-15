@@ -339,7 +339,7 @@ describe('customer privacy', () => {
     )
     const upload = await h.env.DB.prepare('SELECT 1').first()
     expect(upload).toBeTruthy()
-    const { default: app } = await import('./index')
+    const { app } = await import('./index')
     const res = await app.request(
       '/api/documents',
       { method: 'POST', headers: { Cookie: alice.cookie }, body: form },
@@ -487,13 +487,27 @@ describe('Owner entitlements', () => {
       'file',
       new File(['hello goblin'], 'note.txt', { type: 'text/plain' }),
     )
-    const { default: app } = await import('./index')
+    form.append('mode', 'keep')
+    const { app } = await import('./index')
     const res = await app.request(
       '/api/documents',
       { method: 'POST', headers: { Cookie: owner.cookie }, body: form },
       h.env,
     )
     expect(res.status).toBe(413)
+
+    // "Just sort it" never counts towards kept storage.
+    const sort = new FormData()
+    sort.append(
+      'file',
+      new File(['hello goblin'], 'note.txt', { type: 'text/plain' }),
+    )
+    const sorted = await app.request(
+      '/api/documents',
+      { method: 'POST', headers: { Cookie: owner.cookie }, body: sort },
+      h.env,
+    )
+    expect(sorted.status).toBe(201)
   })
 
   it('still validates files for the Owner', async () => {
@@ -504,7 +518,7 @@ describe('Owner entitlements', () => {
         type: 'application/x-msdownload',
       }),
     )
-    const { default: app } = await import('./index')
+    const { app } = await import('./index')
     const res = await app.request(
       '/api/documents',
       { method: 'POST', headers: { Cookie: owner.cookie }, body: form },

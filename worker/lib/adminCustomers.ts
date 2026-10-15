@@ -29,9 +29,10 @@ const SUMMARY_SELECT = `
                  AND r.role = 'owner' AND r.revoked_at IS NULL) as isOwner,
          (SELECT MAX(COALESCE(s.last_seen_at, s.created_at)) FROM sessions s
           WHERE s.user_id = u.id) as lastSeenAt,
-         (SELECT COUNT(*) FROM documents d WHERE d.user_id = u.id) as documentCount,
+         (SELECT COUNT(*) FROM documents d WHERE d.user_id = u.id
+          AND d.retention = 'keep') as documentCount,
          (SELECT COALESCE(SUM(d.byte_size), 0) FROM documents d
-          WHERE d.user_id = u.id) as storageBytes,
+          WHERE d.user_id = u.id AND d.retention = 'keep') as storageBytes,
          (SELECT COUNT(*) FROM documents d WHERE d.user_id = u.id AND d.status = 'failed')
          + (SELECT COUNT(*) FROM ai_events a WHERE a.user_id = u.id
             AND a.outcome = 'ai_unavailable'

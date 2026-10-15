@@ -70,6 +70,7 @@ export type Overview = {
     source: string
     byPlan: { plan: Plan; documents: number; bytes: number }[]
     processingFailures: number
+    temporaryInReview: number
     awaitingOcr: number
     nearQuota: { userId: string; plan: Plan; bytes: number; quota: number }[]
   }

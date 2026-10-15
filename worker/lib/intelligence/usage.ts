@@ -71,7 +71,8 @@ export async function assertUnderLimit(
   return { ok: true }
 }
 
-export type AiFeature = 'brain_dump' | 'interpret' | 'breakdown' | 'assist'
+export type AiFeature =
+  'brain_dump' | 'interpret' | 'breakdown' | 'assist' | 'document'
 export type AiOutcome =
   'ai' | 'ai_unavailable' | 'rules' | 'limit_reached' | 'disabled'
 

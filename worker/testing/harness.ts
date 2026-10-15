@@ -4,7 +4,7 @@
  */
 import { createTestD1, type TestD1 } from '../../test/sqliteD1.mjs'
 import type { Env } from '../env'
-import app from '../index'
+import { app } from '../index'
 import { clearRateLimits } from '../lib/rateLimit'
 
 export const ORIGIN = 'http://localhost:5173'
