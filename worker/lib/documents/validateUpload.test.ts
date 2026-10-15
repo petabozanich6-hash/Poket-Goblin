@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { validateUpload } from './validateUpload'
+import { MAX_UPLOAD_BYTES, validateUpload } from './validateUpload'
 
 describe('validateUpload', () => {
   it('accepts PDF magic bytes', () => {
@@ -32,5 +32,24 @@ describe('validateUpload', () => {
     })
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.kind).toBe('plain')
+  })
+
+  it('allows files up to 10 MiB and rejects anything larger', () => {
+    expect(MAX_UPLOAD_BYTES).toBe(10 * 1024 * 1024)
+    const atLimit = new Uint8Array(MAX_UPLOAD_BYTES).fill(0x41)
+    expect(
+      validateUpload({
+        filename: 'big.txt',
+        declaredMime: 'text/plain',
+        bytes: atLimit,
+      }).ok,
+    ).toBe(true)
+    const over = validateUpload({
+      filename: 'big.txt',
+      declaredMime: 'text/plain',
+      bytes: new Uint8Array(MAX_UPLOAD_BYTES + 1).fill(0x41),
+    })
+    expect(over.ok).toBe(false)
+    if (!over.ok) expect(over.error).toContain('10 MB')
   })
 })

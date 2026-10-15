@@ -27,6 +27,8 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    // Maps are generated for local debugging but neither referenced from the
+    // bundle nor uploaded (public/.assetsignore excludes *.map).
+    sourcemap: 'hidden',
   },
 })

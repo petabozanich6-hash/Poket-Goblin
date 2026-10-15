@@ -101,8 +101,8 @@ export function DocumentsPage() {
           Storage: {docsQuery.data?.storage ?? '…'} · Max{' '}
           {docsQuery.data
             ? Math.round(docsQuery.data.maxUploadBytes / (1024 * 1024))
-            : 8}
-          MiB · PDF, Word, text, common images
+            : 10}
+          MB · PDF, Word, text, common images
         </p>
         <form className={styles.stackTight} onSubmit={onUpload}>
           <Input label="Upload file" name="file" type="file" required />
