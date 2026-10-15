@@ -17,6 +17,7 @@ import {
 } from '../../../shared/documents/understand'
 import { userLocalNow } from '../../../shared/intelligence/grounding'
 import type { Env } from '../../env'
+import { WorkersAiBlockedError } from '../intelligence/workersAi'
 import { newId } from '../ids'
 import { resolveProvider } from '../intelligence/provider'
 import {
@@ -107,7 +108,8 @@ export async function processDocumentForUser(
 
     const policy = await loadAiPolicy(env.DB, env, userId)
     const gate = await assertUnderLimit(env.DB, policy, userId)
-    const aiReady = resolveProvider(policy.env).configured && gate.ok
+    const provider = resolveProvider(policy.env)
+    const aiReady = provider.configured && gate.ok
 
     let understanding: Omit<DocumentUnderstanding, 'status'> | null = null
     let mode: ProcessResult['mode'] = 'rules'
@@ -116,8 +118,11 @@ export async function processDocumentForUser(
       !gate.ok ? 'limit_reached' : policy.providerEnabled ? 'rules' : 'disabled'
 
     const canUseAi =
-      aiReady && (extracted.text.length > 0 || extracted.needsVision)
+      aiReady &&
+      (extracted.text.length > 0 ||
+        (extracted.needsVision && provider.kind === 'openai_compatible'))
     if (canUseAi) {
+      let aiCalled = true
       try {
         const raw = await callDocumentAi(
           policy.env,
@@ -135,10 +140,11 @@ export async function processDocumentForUser(
         } else {
           outcome = 'ai_unavailable'
         }
-      } catch {
+      } catch (error) {
+        aiCalled = !(error instanceof WorkersAiBlockedError)
         outcome = 'ai_unavailable'
       }
-      await recordUsage(env.DB, userId, 'openai_compatible')
+      if (aiCalled) await recordUsage(env.DB, userId, provider.kind)
     }
 
     if (!understanding && extracted.text) {
@@ -156,7 +162,7 @@ export async function processDocumentForUser(
       env.DB,
       userId,
       'document',
-      mode === 'ai' ? 'openai_compatible' : 'rules',
+      canUseAi ? provider.kind : 'rules',
       outcome,
     )
 

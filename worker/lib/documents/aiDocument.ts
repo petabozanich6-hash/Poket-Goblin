@@ -22,6 +22,8 @@ import {
   type SuggestionType,
 } from '../../../shared/documents/understand'
 import type { Env } from '../../env'
+import { resolveProvider } from '../intelligence/provider'
+import { callWorkersAi } from '../intelligence/workersAi'
 
 const MAX_PROMPT_TEXT = 12_000
 const MAX_SUGGESTIONS = 8
@@ -202,6 +204,15 @@ export async function callDocumentAi(
   today: string,
   fetchImpl: FetchLike = fetch,
 ): Promise<unknown> {
+  if (resolveProvider(env).kind === 'workers_ai') {
+    if (!('text' in input))
+      throw new Error('Workers AI text model cannot read images')
+    return callWorkersAi(
+      env,
+      documentSystemPrompt(today),
+      `<document>\n${input.text.slice(0, MAX_PROMPT_TEXT)}\n</document>`,
+    )
+  }
   const base = (env.AI_BASE_URL ?? 'https://api.openai.com/v1').replace(
     /\/$/,
     '',

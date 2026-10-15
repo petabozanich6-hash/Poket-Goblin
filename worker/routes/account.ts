@@ -51,6 +51,7 @@ export const EXPORTED_TABLES: Record<string, { omit?: string[] }> = {
   user_entitlements: { omit: ['stripe_customer_id', 'stripe_subscription_id'] },
   security_events: {},
   ai_usage_daily: {},
+  ai_request_limits: {},
   ai_events: {},
   search_history: {},
   achievements: {},

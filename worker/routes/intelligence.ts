@@ -41,8 +41,8 @@ intelligenceRoutes.get('/status', async (c) => {
     dailyLimit: policy.limit,
     usedToday: usage.requestCount,
     modeLabel: provider.configured
-      ? 'AI credentials present — structured interpret may use AI; assistant stays grounded'
-      : 'Rule-based goblin brain (no AI credentials)',
+      ? 'AI provider configured — structured interpret may use AI; assistant stays grounded'
+      : 'Rule-based goblin brain (AI provider not configured)',
   })
 })
 
