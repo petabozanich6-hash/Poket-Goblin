@@ -16,8 +16,28 @@ export type AuthUser = {
 
 type AppVars = { user: AuthUser }
 
+const DEV_FALLBACK_SECRET = 'local-dev-only-change-me'
+export const MIN_AUTH_SECRET_LENGTH = 32
+
+/**
+ * Production must have a real AUTH_SECRET. Session tokens are stored as
+ * SHA-256(secret:token), so a public fallback would weaken every session.
+ * Returns a reason when the secret is unusable in this environment.
+ */
+export function authSecretProblem(env: Env): string | null {
+  if (env.ENVIRONMENT !== 'production') return null
+  const secret = env.AUTH_SECRET?.trim() ?? ''
+  if (!secret) return 'AUTH_SECRET is not set'
+  if (secret.length < MIN_AUTH_SECRET_LENGTH) {
+    return `AUTH_SECRET is shorter than ${MIN_AUTH_SECRET_LENGTH} characters`
+  }
+  return null
+}
+
 export function getSecret(env: Env): string {
-  return env.AUTH_SECRET || 'local-dev-only-change-me'
+  const problem = authSecretProblem(env)
+  if (problem) throw new Error(problem)
+  return env.AUTH_SECRET || DEV_FALLBACK_SECRET
 }
 
 export async function createSession(

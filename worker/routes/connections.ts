@@ -155,8 +155,10 @@ connectionRoutes.get('/oauth/callback', async (c) => {
   const code = c.req.query('code')
   const error = c.req.query('error')
   if (error) {
+    // Never reflect query parameters into HTML: this route is public and
+    // served from the app's own origin.
     return c.html(
-      `<p>Connection cancelled (${error}). You can close this window.</p>`,
+      `<p>Connection cancelled. You can close this window.</p>`,
       400,
     )
   }
@@ -168,7 +170,11 @@ connectionRoutes.get('/oauth/callback', async (c) => {
   )
     .bind(state)
     .first<{ userId: string; provider: string; expiresAt: string }>()
-  if (!row || row.expiresAt < new Date().toISOString()) {
+  if (
+    !row ||
+    !isProvider(row.provider) ||
+    row.expiresAt < new Date().toISOString()
+  ) {
     return c.json({ error: 'Invalid or expired OAuth state' }, 400)
   }
 

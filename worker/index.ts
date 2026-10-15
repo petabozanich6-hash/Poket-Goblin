@@ -1,8 +1,10 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { secureHeaders } from 'hono/secure-headers'
 
 import type { Env } from './env'
-import { resolveUser, type AuthUser } from './lib/session'
+import { allowedOrigin } from './lib/cors'
+import { authSecretProblem, resolveUser, type AuthUser } from './lib/session'
 import { authRoutes } from './routes/auth'
 import { captureRoutes } from './routes/captures'
 import { categoryRoutes } from './routes/categories'
@@ -29,10 +31,23 @@ const app = new Hono<{ Bindings: Env; Variables: Vars }>().basePath('/api')
 app.use(
   '*',
   cors({
-    origin: (origin) => origin || 'http://localhost:5173',
+    origin: (origin, c) => allowedOrigin(origin, c.env.ENVIRONMENT),
     credentials: true,
     allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
+  }),
+)
+
+app.use(
+  '*',
+  secureHeaders({
+    contentSecurityPolicy: {
+      defaultSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+    },
+    xFrameOptions: 'DENY',
+    // HSTS is a domain-wide decision (owner approval D4); not set here.
+    strictTransportSecurity: false,
   }),
 )
 
@@ -43,6 +58,18 @@ app.get('/health', (c) =>
     environment: c.env.ENVIRONMENT,
   }),
 )
+
+// Fail closed: without a real AUTH_SECRET in production, refuse anything
+// that reads or writes sessions instead of silently using a public fallback.
+app.use('*', async (c, next) => {
+  if (c.req.path === '/api/health') return next()
+  const problem = authSecretProblem(c.env)
+  if (problem) {
+    console.error(`Auth disabled: ${problem}`)
+    return c.json({ error: 'Service temporarily unavailable' }, 503)
+  }
+  return next()
+})
 
 app.route('/auth', authRoutes)
 

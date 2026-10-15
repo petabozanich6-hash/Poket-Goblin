@@ -1,11 +1,21 @@
 import { Hono } from 'hono'
 
+import type { ReminderEntityType } from '../../shared/types'
 import type { Env } from '../env'
 import { newId } from '../lib/ids'
+import { isOwnedRecord, linkNotFound } from '../lib/ownership'
 import type { AuthUser } from '../lib/session'
 import { asString } from '../lib/validate'
 
 type Vars = { user: AuthUser }
+
+const REMINDER_ENTITY_TYPES: ReadonlySet<string> = new Set<ReminderEntityType>([
+  'task',
+  'event',
+  'bill',
+  'follow_up',
+  'general',
+])
 
 export const reminderRoutes = new Hono<{ Bindings: Env; Variables: Vars }>()
 
@@ -76,6 +86,21 @@ reminderRoutes.post('/', async (c) => {
     return c.json({ error: 'Title and remindAt are required' }, 400)
   }
 
+  const entityType =
+    typeof body?.entityType === 'string' ? body.entityType : 'general'
+  if (!REMINDER_ENTITY_TYPES.has(entityType)) {
+    return c.json({ error: 'Unknown reminder type' }, 400)
+  }
+  const entityId = typeof body?.entityId === 'string' ? body.entityId : null
+  if (entityId) {
+    if (entityType !== 'task' && entityType !== 'event') {
+      return c.json({ error: 'Only task and event reminders can link' }, 400)
+    }
+    if (!(await isOwnedRecord(c.env.DB, user.id, entityType, entityId))) {
+      return c.json(linkNotFound(entityType), 404)
+    }
+  }
+
   const id = newId('rem')
   await c.env.DB.prepare(
     `INSERT INTO reminders
@@ -87,8 +112,8 @@ reminderRoutes.post('/', async (c) => {
       user.id,
       title,
       remindAt,
-      typeof body?.entityType === 'string' ? body.entityType : 'general',
-      typeof body?.entityId === 'string' ? body.entityId : null,
+      entityType,
+      entityId,
       typeof body?.repeatFrequency === 'string' ? body.repeatFrequency : 'none',
     )
     .run()

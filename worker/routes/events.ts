@@ -7,6 +7,7 @@ import {
   readOffsetMinutes,
 } from '../lib/datetime'
 import { newId } from '../lib/ids'
+import { firstUnownedLink, linkNotFound } from '../lib/ownership'
 import type { AuthUser } from '../lib/session'
 import { asString } from '../lib/validate'
 
@@ -98,6 +99,13 @@ eventRoutes.post('/', async (c) => {
     ? localDateTimeToIso(date, endTime, false, offset)
     : addHoursIso(startsAt, allDay ? 24 : 1)
 
+  const linkedTaskId =
+    typeof body?.linkedTaskId === 'string' ? body.linkedTaskId : null
+  const unowned = await firstUnownedLink(c.env.DB, user.id, [
+    { kind: 'task', id: linkedTaskId },
+  ])
+  if (unowned) return c.json(linkNotFound(unowned), 404)
+
   const id = newId('evt')
   await c.env.DB.prepare(
     `INSERT INTO events
@@ -115,7 +123,7 @@ eventRoutes.post('/', async (c) => {
       startsAt,
       endsAt,
       allDay ? 1 : 0,
-      typeof body?.linkedTaskId === 'string' ? body.linkedTaskId : null,
+      linkedTaskId,
     )
     .run()
 

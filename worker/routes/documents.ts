@@ -8,6 +8,7 @@ import {
   validateUpload,
 } from '../lib/documents/validateUpload'
 import { newId } from '../lib/ids'
+import { firstUnownedLink, linkNotFound } from '../lib/ownership'
 import type { AuthUser } from '../lib/session'
 import { getObjectStore } from '../lib/storage'
 import { asString } from '../lib/validate'
@@ -185,6 +186,19 @@ documentRoutes.patch('/:id', async (c) => {
       : (existing.displayName as string)
   if (!displayName) return c.json({ error: 'Name is required' }, 400)
 
+  const linkedTaskId =
+    typeof body?.linkedTaskId === 'string' ? body.linkedTaskId : null
+  const linkedEventId =
+    typeof body?.linkedEventId === 'string' ? body.linkedEventId : null
+  const linkedReminderId =
+    typeof body?.linkedReminderId === 'string' ? body.linkedReminderId : null
+  const unowned = await firstUnownedLink(c.env.DB, user.id, [
+    { kind: 'task', id: linkedTaskId },
+    { kind: 'event', id: linkedEventId },
+    { kind: 'reminder', id: linkedReminderId },
+  ])
+  if (unowned) return c.json(linkNotFound(unowned), 404)
+
   await c.env.DB.prepare(
     `UPDATE documents SET
       display_name = ?,
@@ -198,21 +212,21 @@ documentRoutes.patch('/:id', async (c) => {
     .bind(
       displayName,
       typeof body?.categorySlug === 'string' ? body.categorySlug : null,
-      typeof body?.linkedTaskId === 'string' ? body.linkedTaskId : null,
-      typeof body?.linkedEventId === 'string' ? body.linkedEventId : null,
-      typeof body?.linkedReminderId === 'string' ? body.linkedReminderId : null,
+      linkedTaskId,
+      linkedEventId,
+      linkedReminderId,
       id,
       user.id,
     )
     .run()
 
-  if (typeof body?.linkedTaskId === 'string') {
+  if (linkedTaskId) {
     await c.env.DB.prepare(
       `INSERT OR IGNORE INTO record_links
         (id, user_id, from_type, from_id, to_type, to_id, reason)
        VALUES (?, ?, 'document', ?, 'task', ?, 'User linked')`,
     )
-      .bind(newId('link'), user.id, id, body.linkedTaskId)
+      .bind(newId('link'), user.id, id, linkedTaskId)
       .run()
   }
 
