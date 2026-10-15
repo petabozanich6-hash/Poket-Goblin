@@ -573,7 +573,7 @@ describe('deadline plans (any document with deadlines)', () => {
     ].join('\n')
     const { status, body } = await upload(alice, outline, { name: 'brief.txt' })
     expect(status).toBe(201)
-    expect(body.processing.summary).toMatch(/^I found 3 deadlines/)
+    expect(body.processing.summary).toMatch(/^I found 3 dates/)
     const items = body.suggestions as Json[]
     // Every planned item says which deadline it belongs to.
     expect(items.every((s) => typeof s.group === 'string')).toBe(true)

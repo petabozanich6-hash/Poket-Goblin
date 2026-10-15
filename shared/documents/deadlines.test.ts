@@ -136,7 +136,7 @@ describe('planning back from each deadline', () => {
     const exam = p.suggestions.filter((s) => s.group === 'Final exam')
     expect(exam[0]).toMatchObject({ type: 'appointment', title: 'Final exam' })
     expect(exam.filter((s) => /Revise/.test(s.title))).toHaveLength(2)
-    expect(p.summary).toMatch(/^I found 3 deadlines — the next is/)
+    expect(p.summary).toMatch(/^I found 3 dates — the next is/)
     expect(p.warnings[0]).toMatch(/Week 5/)
   })
 
@@ -198,7 +198,7 @@ describe('withDeadlinePlan', () => {
     const base = understandDocument(COURSE, 'outline.pdf', { reference })
     const result = withDeadlinePlan(base, COURSE, { reference })
     expect(result.suggestions.length).toBeGreaterThan(10)
-    expect(result.summary).toMatch(/I found 3 deadlines/)
+    expect(result.summary).toMatch(/I found 3 dates/)
   })
 
   it('leaves a simple bill alone, but lifts its urgency', () => {
@@ -231,5 +231,102 @@ describe('from a real PDF', () => {
       ['Group presentation', '2026-11-27', 20],
       ['Final exam', '2026-12-10', 50],
     ])
+  })
+})
+
+/**
+ * Shaped like a real university study schedule printed from the web: a print
+ * header and footer, week numbers and week-start dates in their own cells,
+ * emoji, sessions at set times, a date without a year, a census day and an
+ * exam given only by week.
+ */
+const SCHEDULE = `Study Schedule
+Book: Study Schedule
+Printed by: A Student
+Date: Friday, 16 October 2026, 8:19 AM
+Study Schedule - Trimester 3 2026
+Week Commencing Topic Assessment
+16/10/2026, 08:19 Study Schedule | Example Uni
+Week Commencing Topic Assessment
+1 19 October 2026
+Module 1: Approaching the topic
+Meet & Greet - Drop In Tutorial Session
+Tuesday 20th October 2026 - 4:30pm
+2 26 October 2026
+Module 2: Contexts
+Essay Construction Briefing (Click Link)
+Wednesday 28th October - 4:30pm
+5
+16 November
+2026
+⚠ Census Day
+Assignment preparation and writing
+6
+23 November
+2026
+Module 5: Practice
+🌟 Assessment 1 Due🌟
+Sunday 29th November 2026 - 11:59pm
+Non-teaching / University Shutdown Period (21st December 2026 - 4th January 2027)
+10 04 January 2027 Exam Preparation and Writing
+13 25 January 2027 Assessment and Intensive Period 2
+🌟 Assessment 2 (Assurance Task) Exam
+🌟
+16/10/2026, 08:19 Study Schedule | Example Uni`
+
+describe('a real-world study schedule', () => {
+  const plan = () => planDeadlines(SCHEDULE, { reference })!
+
+  it('finds what matters and ignores print dates and week starts', () => {
+    expect(
+      plan().deadlines.map((d) => [d.label, d.iso, d.kind, d.uncertain]),
+    ).toEqual([
+      ['Meet & Greet - Drop In Tutorial Session', '2026-10-20', 'event', false],
+      // No year written: taken from the dates around it.
+      ['Essay Construction Briefing', '2026-10-28', 'event', false],
+      ['Census Day', '2026-11-16', 'event', true],
+      ['Assessment 1', '2026-11-29', 'work', false],
+      [
+        'Non-teaching / University Shutdown Period',
+        '2026-12-21',
+        'event',
+        false,
+      ],
+      // Only the week is written: in the calendar, but asks to check.
+      ['Assessment 2 Assurance Task Exam', '2027-01-25', 'exam', true],
+    ])
+  })
+
+  it('sessions keep their time; the assessment gets steps back from the due date', () => {
+    const items = plan().suggestions
+    expect(
+      items.find((s) => s.title === 'Meet & Greet - Drop In Tutorial Session'),
+    ).toMatchObject({ type: 'appointment', startTime: '16:30' })
+    expect(items.find((s) => s.title === 'Due: Assessment 1')).toMatchObject({
+      dueDate: '2026-11-29',
+      startTime: '23:59',
+    })
+    expect(
+      items.filter((s) => s.group === 'Assessment 1' && s.type === 'task'),
+    ).toHaveLength(5)
+    // Nothing from the print header, footer or week-start rows.
+    expect(
+      items.some((s) => /Printed|Example Uni|Week Commencing/.test(s.title)),
+    ).toBe(false)
+  })
+
+  it('summarises an outline that lists assessments but no dates', () => {
+    const outline = `Assessment Weighting Mandatory Description
+Assessment 1 40% Yes Written assignment
+Assessment 2
+60% Yes Exam paper comprising multiple choice
+If you need urgent support in a crisis, contact Student Wellbeing.`
+    expect(planDeadlines(outline, { reference })).toEqual({
+      deadlines: [],
+      suggestions: [],
+      warnings: [],
+      summary:
+        'This outlines 2 assessments: Assessment 1 (40%, written assignment) and Assessment 2 (60%, exam paper). It doesn’t give due dates — feed me the study schedule or assessment page and I’ll plan them.',
+    })
   })
 })

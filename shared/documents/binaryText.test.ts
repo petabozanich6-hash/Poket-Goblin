@@ -203,3 +203,70 @@ describe('pdf with embedded font character maps', () => {
     expect(res.text).toContain('“quotes” and café accents')
   })
 })
+
+describe('pdf printed from a web page (Type 3 fonts, letter-by-letter)', () => {
+  it('measures letters in the font’s own units, so words stay whole', async () => {
+    // Chrome prints web fonts as Type 3 fonts with a 1/2048 FontMatrix and
+    // places each letter with its own Td. "Study Schedule" here.
+    const cmap = `1 begincodespacerange <00> <FF> endcodespacerange
+${'Study Schedule'.length} beginbfchar
+${[...new Set('Study Schedule')]
+  .map(
+    (ch) =>
+      `<${ch.charCodeAt(0).toString(16).padStart(2, '0')}> <00${ch.charCodeAt(0).toString(16).padStart(2, '0')}>`,
+  )
+  .join('\n')}
+endbfchar`
+    const widths = Array.from({ length: 128 }, (_, c) =>
+      c === 32 ? 532 : 1100,
+    )
+    const size = 20
+    let x = 0
+    let content = `BT /F1 ${size} Tf 1 0 0 -1 40 700 Tm`
+    for (const [i, ch] of [...'Study Schedule'].entries()) {
+      const hex = ch.charCodeAt(0).toString(16).padStart(2, '0')
+      if (i > 0) content += ` ${x.toFixed(4)} 0 Td`
+      content += ` <${hex}> Tj`
+      x = ((ch === ' ' ? 532 : 1100) / 2048) * size
+    }
+    content += ' ET'
+    const objects = [
+      '<< /Type /Catalog /Pages 2 0 R >>',
+      '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+      '<< /Type /Page /Parent 2 0 R /Contents 5 0 R /Resources << /Font << /F1 4 0 R >> >> >>',
+      `<< /Type /Font /Subtype /Type3 /FontMatrix [.00048828125 0 0 -.00048828125 0 0] /FirstChar 0 /LastChar 127 /Widths [${widths.join(' ')}] /ToUnicode 6 0 R >>`,
+    ]
+    let body = '%PDF-1.7\n'
+    objects.forEach((o, i) => {
+      body += `${i + 1} 0 obj\n${o}\nendobj\n`
+    })
+    const pdfBytes = Buffer.concat([
+      Buffer.from(body, 'latin1'),
+      Buffer.from(
+        `5 0 obj\n<< /Length ${content.length} >>\nstream\n${content}\nendstream\nendobj\n6 0 obj\n<< /Length ${cmap.length} >>\nstream\n${cmap}\nendstream\nendobj\n%%EOF\n`,
+        'latin1',
+      ),
+    ])
+    expect(await extractPdfText(new Uint8Array(pdfBytes))).toBe(
+      'Study Schedule',
+    )
+  })
+
+  it('reads a letter-spaced page Chrome printed', async () => {
+    const bytes = new Uint8Array(
+      readFileSync(
+        join(
+          dirname(fileURLToPath(import.meta.url)),
+          'fixtures/chrome-letter-spaced.pdf',
+        ),
+      ),
+    )
+    const text = await extractPdfText(bytes)
+    expect(text).toMatch(
+      /^Study Schedule\nGlobal: UNE myLearn Site: TRIMESTER 3 2026/,
+    )
+    expect(text).toContain(
+      'Assessment 1: Reflective essay (40%) due 20 November 2026',
+    )
+  })
+})

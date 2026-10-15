@@ -18,6 +18,8 @@ type Font = {
   /** Glyph advance widths in 1/1000 em, to tell letter gaps from word gaps. */
   widths: Map<number, number>
   defaultWidth: number
+  /** Width units to ems: 1/1000, or a Type 3 font's own FontMatrix. */
+  widthScale: number
 }
 
 const MAX_OBJECTS = 50_000
@@ -281,13 +283,24 @@ function fontWidths(
   return { widths, defaultWidth: average }
 }
 
+/** Type 3 fonts (Chrome prints web fonts this way) use 1/2048-style units. */
+function widthScaleOf(dict: string): number {
+  if (!/\/Subtype\s*\/Type3/.test(dict)) return 0.001
+  const m = valueOf(dict, 'FontMatrix')?.match(/[-+]?(?:\d+\.?\d*|\.\d+)/)
+  const a = m ? Math.abs(Number(m[0])) : 0.001
+  return a > 0 && a < 1 ? a : 0.001
+}
+
 async function loadFont(
   objects: Map<number, PdfObject>,
   dict: string,
   inflate: Inflate,
 ): Promise<Font> {
   const type0 = /\/Subtype\s*\/Type0/.test(dict)
-  const metrics = fontWidths(objects, dict, type0)
+  const metrics = {
+    ...fontWidths(objects, dict, type0),
+    widthScale: widthScaleOf(dict),
+  }
   const tu = refNum(valueOf(dict, 'ToUnicode'))
   const cmapObj = tu === null ? undefined : objects.get(tu)
   if (cmapObj) {
@@ -469,7 +482,9 @@ function textOfContent(content: string, fonts: Map<string, Font>): string {
   const show = (s: string) => {
     for (const g of glyphs(s, font)) {
       out += g.text
-      const w = (font?.widths.get(g.code) ?? font?.defaultWidth ?? 500) / 1000
+      const w =
+        (font?.widths.get(g.code) ?? font?.defaultWidth ?? 500) *
+        (font?.widthScale ?? 0.001)
       const isSpace = (font?.codeBytes ?? 1) === 1 && g.code === 32
       const advance =
         (w * size + charSpacing + (isSpace ? wordSpacing : 0)) * scale
@@ -562,6 +577,7 @@ function textOfContent(content: string, fonts: Map<string, Font>): string {
         for (const el of array ?? []) {
           if (el.t === 'str') show(el.v)
           else if (el.t === 'num') {
+            // TJ adjustments are always thousandths of an em.
             const shift = (-el.v / 1000) * size * scale
             tm = [
               tm[0]!,
