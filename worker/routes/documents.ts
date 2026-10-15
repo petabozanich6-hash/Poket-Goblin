@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 
 import type { Env } from '../env'
 import { loadAccess } from '../lib/access'
+import { autoAddFromDocument, undoAutoAdd } from '../lib/documents/autoAdd'
 import {
   DAILY_DOCUMENT_PROCESSING,
   forgetDocument,
@@ -364,6 +365,15 @@ documentRoutes.post('/', async (c) => {
   }
 
   const result = await processDocumentForUser(c.env, user.id, id, options)
+  const autoAdded =
+    result.status === 'ready'
+      ? await autoAddFromDocument(
+          c.env.DB,
+          user.id,
+          id,
+          options.timezoneOffsetMinutes ?? 0,
+        )
+      : { added: 0, already: 0 }
   const row = await c.env.DB.prepare(`${SELECT} WHERE id = ? AND user_id = ?`)
     .bind(id, user.id)
     .first()
@@ -372,10 +382,28 @@ documentRoutes.post('/', async (c) => {
     {
       document: mapDoc(row!),
       processing: result,
+      autoAdded,
       suggestions: await pendingSuggestions(c.env.DB, user.id, id),
     },
     201,
   )
+})
+
+/** Undo everything the Devourer added on its own from this document. */
+documentRoutes.post('/:id/undo-auto', async (c) => {
+  const user = c.get('user')
+  const id = c.req.param('id')
+  const doc = await c.env.DB.prepare(
+    `SELECT 1 FROM documents WHERE id = ? AND user_id = ?`,
+  )
+    .bind(id, user.id)
+    .first()
+  if (!doc) return c.json({ error: 'Document not found' }, 404)
+  const undone = await undoAutoAdd(c.env.DB, user.id, id)
+  return c.json({
+    undone,
+    suggestions: await pendingSuggestions(c.env.DB, user.id, id),
+  })
 })
 
 /**

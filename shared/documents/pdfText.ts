@@ -15,6 +15,9 @@ type Font = {
   map: Map<number, string> | null
   /** Type0 fonts without a map are glyph ids — unreadable without vision. */
   opaque: boolean
+  /** Glyph advance widths in 1/1000 em, to tell letter gaps from word gaps. */
+  widths: Map<number, number>
+  defaultWidth: number
 }
 
 const MAX_OBJECTS = 50_000
@@ -207,12 +210,84 @@ export function parseCMap(text: string): {
   return { codeBytes, map }
 }
 
+/** Numbers and nested arrays of a PDF array, e.g. "[3 [500 600] 10 20 250]". */
+function parseArray(text: string): (number | number[])[] {
+  const out: (number | number[])[] = []
+  let inner: number[] | null = null
+  for (const m of text.matchAll(/\[|\]|[-+]?(?:\d+\.?\d*|\.\d+)/g)) {
+    if (m[0] === '[') {
+      if (out.length === 0 && inner === null && m.index === text.indexOf('['))
+        continue
+      inner = []
+    } else if (m[0] === ']') {
+      if (inner) {
+        out.push(inner)
+        inner = null
+      }
+    } else (inner ?? out).push(Number(m[0]))
+  }
+  return out
+}
+
+function fontWidths(
+  objects: Map<number, PdfObject>,
+  dict: string,
+  type0: boolean,
+): { widths: Map<number, number>; defaultWidth: number } {
+  const widths = new Map<number, number>()
+  if (type0) {
+    const descendants = deref(objects, valueOf(dict, 'DescendantFonts'))
+    const ref = descendants?.match(/(\d+)\s+\d+\s+R/)
+    const cid = ref ? objects.get(Number(ref[1]))?.dict : descendants
+    if (!cid) return { widths, defaultWidth: 1000 }
+    const dw = Number(valueOf(cid, 'DW') ?? NaN)
+    const w = deref(objects, valueOf(cid, 'W'))
+    if (w) {
+      const items = parseArray(w)
+      for (let i = 0; i < items.length && widths.size < 65_536;) {
+        const first = items[i]
+        const next = items[i + 1]
+        if (typeof first !== 'number') {
+          i += 1
+          continue
+        }
+        if (Array.isArray(next)) {
+          next.forEach((width, k) => widths.set(first + k, width))
+          i += 2
+        } else if (
+          typeof next === 'number' &&
+          typeof items[i + 2] === 'number'
+        ) {
+          const last = Math.min(next, first + 65_535)
+          for (let c = first; c <= last; c += 1)
+            widths.set(c, items[i + 2] as number)
+          i += 3
+        } else i += 1
+      }
+    }
+    return { widths, defaultWidth: Number.isFinite(dw) ? dw : 1000 }
+  }
+  const firstChar = Number(valueOf(dict, 'FirstChar') ?? 0)
+  const list = deref(objects, valueOf(dict, 'Widths'))
+  if (list) {
+    parseArray(list).forEach((width, k) => {
+      if (typeof width === 'number') widths.set(firstChar + k, width)
+    })
+  }
+  const known = [...widths.values()].filter((w) => w > 0)
+  const average = known.length
+    ? known.reduce((a, b) => a + b, 0) / known.length
+    : 500
+  return { widths, defaultWidth: average }
+}
+
 async function loadFont(
   objects: Map<number, PdfObject>,
   dict: string,
   inflate: Inflate,
 ): Promise<Font> {
   const type0 = /\/Subtype\s*\/Type0/.test(dict)
+  const metrics = fontWidths(objects, dict, type0)
   const tu = refNum(valueOf(dict, 'ToUnicode'))
   const cmapObj = tu === null ? undefined : objects.get(tu)
   if (cmapObj) {
@@ -220,24 +295,34 @@ async function loadFont(
     if (data) {
       const { codeBytes, map } = parseCMap(latin1(data))
       if (map.size)
-        return { codeBytes: type0 ? 2 : codeBytes, map, opaque: false }
+        return {
+          codeBytes: type0 ? 2 : codeBytes,
+          map,
+          opaque: false,
+          ...metrics,
+        }
     }
   }
-  return { codeBytes: type0 ? 2 : 1, map: null, opaque: type0 }
+  return { codeBytes: type0 ? 2 : 1, map: null, opaque: type0, ...metrics }
 }
 
-function decode(s: string, font: Font | undefined): string {
-  if (!font) return s
-  if (font.opaque) return ''
-  if (!font.map) return s
-  let out = ''
-  for (let i = 0; i + font.codeBytes <= s.length; i += font.codeBytes) {
+type Glyph = { code: number; text: string }
+
+function glyphs(s: string, font: Font | undefined): Glyph[] {
+  const bytes = font?.codeBytes ?? 1
+  const out: Glyph[] = []
+  for (let i = 0; i + bytes <= s.length; i += bytes) {
     let code = 0
-    for (let b = 0; b < font.codeBytes; b += 1)
-      code = code * 256 + s.charCodeAt(i + b)
-    const u = font.map.get(code)
-    if (u !== undefined) out += u
-    else if (font.codeBytes === 1) out += String.fromCharCode(code)
+    for (let b = 0; b < bytes; b += 1) code = code * 256 + s.charCodeAt(i + b)
+    let text = ''
+    if (!font) text = String.fromCharCode(code)
+    else if (font.opaque) text = ''
+    else if (!font.map) text = String.fromCharCode(code)
+    else {
+      const u = font.map.get(code)
+      text = u ?? (bytes === 1 ? String.fromCharCode(code) : '')
+    }
+    out.push({ code, text })
   }
   return out
 }
@@ -327,23 +412,80 @@ function* tokens(c: string): Generator<Token> {
   }
 }
 
+/**
+ * Lay text out the way a PDF viewer does: follow the text matrix and each
+ * glyph's width, so a gap between two pieces of text becomes a space only
+ * when it is word-sized. PDFs that place every letter separately (common
+ * when printing web pages) then read as words, not "S t u d y".
+ */
 function textOfContent(content: string, fonts: Map<string, Font>): string {
   let out = ''
   let font: Font | undefined
+  let size = 1
+  let charSpacing = 0
+  let wordSpacing = 0
+  let scale = 1
+  let leading = 0
+  // Text matrix [a b c d e f] and the start of the current line.
+  let tm = [1, 0, 0, 1, 0, 0]
+  let tlm = [1, 0, 0, 1, 0, 0]
+  // Where the last glyph ended, in the same space as tm's e/f.
+  let penX: number | null = null
+  let penY: number | null = null
   let stack: Token[] = []
   let array: Token[] | null = null
-  let y: number | null = null
+
+  const em = () => Math.abs(size * (tm[0] || 1)) || 1
   const newline = () => {
     if (out && !out.endsWith('\n')) out += '\n'
   }
   const space = () => {
     if (out && !/\s$/.test(out)) out += ' '
   }
-  const moveTo = (ny: number, sameLineSpace: boolean) => {
-    if (y !== null && Math.abs(ny - y) > 0.5) newline()
-    else if (sameLineSpace) space()
-    y = ny
+  /** Decide what separates the new position from the last text drawn. */
+  const settle = () => {
+    const x = tm[4]!
+    const y = tm[5]!
+    if (penX === null || penY === null) return
+    if (Math.abs(y - penY) > em() * 0.5) newline()
+    else {
+      const gap = x - penX
+      if (gap > em() * 0.15 || gap < -em() * 0.5) space()
+    }
   }
+  const moveLine = (tx: number, ty: number) => {
+    const [a, b, c, d, e, f] = tlm as [
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+    ]
+    tlm = [a, b, c, d, e + tx * a + ty * c, f + tx * b + ty * d]
+    tm = [...tlm]
+    settle()
+  }
+  const show = (s: string) => {
+    for (const g of glyphs(s, font)) {
+      out += g.text
+      const w = (font?.widths.get(g.code) ?? font?.defaultWidth ?? 500) / 1000
+      const isSpace = (font?.codeBytes ?? 1) === 1 && g.code === 32
+      const advance =
+        (w * size + charSpacing + (isSpace ? wordSpacing : 0)) * scale
+      tm = [
+        tm[0]!,
+        tm[1]!,
+        tm[2]!,
+        tm[3]!,
+        tm[4]! + advance * tm[0]!,
+        tm[5]! + advance * tm[1]!,
+      ]
+    }
+    penX = tm[4]!
+    penY = tm[5]!
+  }
+
   for (const tok of tokens(content)) {
     if (tok.t === '[') {
       array = []
@@ -355,41 +497,84 @@ function textOfContent(content: string, fonts: Map<string, Font>): string {
       continue
     }
     const nums = stack.filter((s) => s.t === 'num').map((s) => s.v as number)
+    const last = (n: number) => nums[nums.length - n]
     switch (tok.v) {
+      case 'BT':
+        tm = [1, 0, 0, 1, 0, 0]
+        tlm = [1, 0, 0, 1, 0, 0]
+        break
       case 'Tf': {
         const name = [...stack].reverse().find((s) => s.t === 'name')
         font = name ? fonts.get(name.v as string) : undefined
+        if (last(1) !== undefined) size = last(1)!
         break
       }
-      case 'Tj':
+      case 'Tc':
+        charSpacing = last(1) ?? 0
+        break
+      case 'Tw':
+        wordSpacing = last(1) ?? 0
+        break
+      case 'Tz':
+        scale = (last(1) ?? 100) / 100
+        break
+      case 'TL':
+        leading = last(1) ?? 0
+        break
+      case 'Td':
+        if (nums.length >= 2) moveLine(last(2)!, last(1)!)
+        break
+      case 'TD':
+        if (nums.length >= 2) {
+          leading = -last(1)!
+          moveLine(last(2)!, last(1)!)
+        }
+        break
+      case 'Tm':
+        if (nums.length >= 6) {
+          tm = nums.slice(-6)
+          tlm = [...tm]
+          settle()
+        }
+        break
+      case 'T*':
+        moveLine(0, -leading)
+        newline()
+        break
       case "'":
       case '"': {
-        if (tok.v !== 'Tj') newline()
+        if (tok.v === '"' && nums.length >= 2) {
+          wordSpacing = nums[0]!
+          charSpacing = nums[1]!
+        }
+        moveLine(0, -leading)
+        newline()
         const s = [...stack].reverse().find((x) => x.t === 'str')
-        if (s) out += decode(s.v as string, font)
+        if (s) show(s.v as string)
+        break
+      }
+      case 'Tj': {
+        const s = [...stack].reverse().find((x) => x.t === 'str')
+        if (s) show(s.v as string)
         break
       }
       case 'TJ':
         for (const el of array ?? []) {
-          if (el.t === 'str') out += decode(el.v, font)
-          else if (el.t === 'num' && el.v < -200) space()
+          if (el.t === 'str') show(el.v)
+          else if (el.t === 'num') {
+            const shift = (-el.v / 1000) * size * scale
+            tm = [
+              tm[0]!,
+              tm[1]!,
+              tm[2]!,
+              tm[3]!,
+              tm[4]! + shift * tm[0]!,
+              tm[5]!,
+            ]
+            if (shift > size * 0.15) space()
+            penX = tm[4]!
+          }
         }
-        break
-      case 'Td':
-      case 'TD':
-        if (nums.length >= 2) moveTo((y ?? 0) + nums[nums.length - 1]!, true)
-        break
-      case 'Tm':
-        // A new run on the same line is usually a new table cell or column:
-        // keep a gap so "Essay" and "30%" don't fuse into "Essay30%".
-        if (nums.length >= 6) moveTo(nums[nums.length - 1]!, true)
-        break
-      case 'T*':
-        newline()
-        break
-      case 'ET':
-        break
-      case 'BT':
         break
     }
     stack = []

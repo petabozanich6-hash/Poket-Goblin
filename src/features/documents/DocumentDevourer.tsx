@@ -17,6 +17,7 @@ import {
   dismissReviewItem,
   finishDevouring,
   keepDocumentInstead,
+  undoAutoAdded,
   type DevourResponse,
   type DocumentSuggestion,
 } from '@/features/explore/exploreApi'
@@ -238,6 +239,8 @@ export function DevourReview({
     null,
   )
   const [addedNote, setAddedNote] = useState<string | null>(null)
+  const [auto, setAuto] = useState(result.autoAdded ?? { added: 0, already: 0 })
+  const added = result.suggestions.filter((s) => s.status === 'accepted')
 
   const refresh = () =>
     Promise.all(
@@ -304,6 +307,23 @@ export function DevourReview({
     await refresh()
   }
 
+  const undo = useMutation({
+    mutationFn: () => undoAutoAdded(doc.id),
+    onSuccess: async (data) => {
+      setOpen(
+        data.suggestions.filter((s) =>
+          ['pending', 'snoozed', 'edited'].includes(s.status),
+        ),
+      )
+      setSaved((n) => Math.max(0, n - data.undone))
+      setAuto({ added: 0, already: 0 })
+      setAddedNote(null)
+      await refresh()
+    },
+    onError: (err) => setError(errorText(err)),
+  })
+
+  const actedFirst = auto.added > 0
   const groups = planGroups(open)
   const loose = open.filter((s) => !s.group)
 
@@ -362,6 +382,45 @@ export function DevourReview({
         </ul>
       ) : null}
 
+      {actedFirst ? (
+        <div className={styles.autoAdded} role="status">
+          <p className={styles.addedNote}>
+            <Check size={16} aria-hidden /> Added {auto.added} thing
+            {auto.added === 1 ? '' : 's'} to your tasks and calendar.
+            {auto.already
+              ? ` ${auto.already} ${auto.already === 1 ? 'was' : 'were'} already there.`
+              : ''}
+          </p>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => undo.mutate()}
+            disabled={undo.isPending}
+          >
+            Undo
+          </Button>
+          {added.length > 0 ? (
+            <details className={styles.addedList}>
+              <summary>See what I added</summary>
+              <ul>
+                {added.map((s) => (
+                  <li key={s.id}>
+                    {s.title}
+                    {s.dueDate ? (
+                      <span className={styles.muted}>
+                        {' '}
+                        · {formatDay(s.dueDate)}
+                        {s.startTime ? ` at ${s.startTime}` : ''}
+                      </span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
+        </div>
+      ) : null}
+
       {addedNote ? (
         <p className={styles.addedNote} role="status">
           <Check size={16} aria-hidden /> {addedNote}
@@ -371,7 +430,9 @@ export function DevourReview({
       {groups.length > 0 ? (
         <section className={styles.plan} aria-labelledby="plan-heading">
           <div className={styles.planTop}>
-            <h3 id="plan-heading">Your plan</h3>
+            <h3 id="plan-heading">
+              {actedFirst ? 'Check these — I wasn’t sure' : 'Your plan'}
+            </h3>
             <Button
               onClick={() => void addWholePlan()}
               disabled={adding !== null}
@@ -379,7 +440,9 @@ export function DevourReview({
               <CalendarDays size={16} aria-hidden />
               {adding
                 ? `Adding ${adding.done} of ${adding.total}…`
-                : `Add the whole plan (${open.length})`}
+                : actedFirst
+                  ? `Add these too (${open.length})`
+                  : `Add the whole plan (${open.length})`}
             </Button>
           </div>
           <p className={styles.muted}>
@@ -415,7 +478,11 @@ export function DevourReview({
 
       {loose.length > 0 ? (
         <>
-          <p className={styles.muted}>Nothing is added until you say yes.</p>
+          <p className={styles.muted}>
+            {actedFirst
+              ? 'These need a quick check before I add them.'
+              : 'Nothing is added until you say yes.'}
+          </p>
           <ul className={styles.suggestions}>
             {loose.map((s) => (
               <SuggestionRow
@@ -430,7 +497,7 @@ export function DevourReview({
             ))}
           </ul>
         </>
-      ) : !unreadable && groups.length === 0 && !addedNote ? (
+      ) : !unreadable && groups.length === 0 && !addedNote && !actedFirst ? (
         <p className={styles.muted}>
           {saved > 0
             ? `Added ${saved} item${saved === 1 ? '' : 's'}.`

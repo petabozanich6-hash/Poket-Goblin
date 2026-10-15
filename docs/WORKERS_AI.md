@@ -2,8 +2,11 @@
 
 Status: **active in production since 2026-10-15** (enabled in the Cloudflare
 dashboard: `AI` binding, `AI_PROVIDER=workers_ai`, the model below, and
-`AI_DAILY_GLOBAL_LIMIT=5`). Those settings are now also in `wrangler.toml`, so
-automatic deploys from `main` keep them. Local `npm run dev` passes
+`AI_DAILY_GLOBAL_LIMIT`). Those settings are now also in `wrangler.toml`, so
+automatic deploys from `main` keep them. The platform-wide cap started at 5
+calls a day while AI was being verified. That ran out in normal use and sent
+every document to the built-in reader, so it is now 300 a day (about a tenth
+of a cent per document read). Each person's own daily limit still applies. Local `npm run dev` passes
 `AI_PROVIDER=none`, so no remote inference happens locally.
 
 Previous status: implemented for review, **not activated or deployed**. Production is

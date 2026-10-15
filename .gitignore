@@ -58,3 +58,6 @@ Thumbs.db
 .cache
 .temp
 .tmp
+
+# Real documents for local testing only (never committed)
+private-test-docs/

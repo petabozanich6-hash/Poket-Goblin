@@ -1,3 +1,7 @@
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Lets one test force a crash inside text extraction; otherwise real code.
@@ -69,6 +73,10 @@ const call = async (
 
 const exists = (key: string) => getObjectStore(h.env).exists(key)
 
+/** "Ask me before the Goblin changes anything": the manual review flow. */
+const askFirst = (user: TestUser) =>
+  call(user, '/api/me/settings', 'PATCH', { goblinAutonomy: 'ask' })
+
 beforeEach(async () => {
   failExtraction.value = false
   h = createHarness()
@@ -108,6 +116,7 @@ describe('Just sort it (default)', () => {
   })
 
   it('saves approved actions, then deletes the original and everything derived from it', async () => {
+    await askFirst(alice)
     const { body } = await upload(alice, BILL)
     const docId = body.document.id
     const key = String(
@@ -147,6 +156,7 @@ describe('Just sort it (default)', () => {
   })
 
   it('creates nothing from rejected suggestions', async () => {
+    await askFirst(alice)
     const { body } = await upload(alice, BILL)
     for (const s of body.suggestions) {
       await call(alice, `/api/review/${s.id}/dismiss`, 'POST', {})
@@ -300,6 +310,7 @@ describe('Keep this document', () => {
 
 describe('isolation', () => {
   it('never lets another user see, download, keep, finish or delete an upload', async () => {
+    await askFirst(alice)
     const { body } = await upload(alice, BILL)
     const id = body.document.id
     expect((await call(bob, `/api/documents/${id}`)).status).toBe(404)
@@ -314,6 +325,9 @@ describe('isolation', () => {
       (await call(bob, `/api/documents/${id}/finish`, 'POST', {})).status,
     ).toBe(404)
     expect((await call(bob, `/api/documents/${id}`, 'DELETE')).status).toBe(404)
+    expect(
+      (await call(bob, `/api/documents/${id}/undo-auto`, 'POST', {})).status,
+    ).toBe(404)
     expect(
       (await call(bob, `/api/documents?retention=temporary`)).body.documents,
     ).toEqual([])
@@ -366,6 +380,10 @@ describe('untrusted content and AI', () => {
 
   it('treats instructions in a document as text (rules)', async () => {
     const { body } = await upload(alice, INJECTION)
+    // Whatever is added automatically is the Goblin's own wording, never
+    // the document's instructions.
+    for (const t of h.query(`SELECT title FROM tasks`) as { title: string }[])
+      expect(t.title).not.toMatch(/ignore|administrator|owner|delete|email/i)
     for (const s of body.suggestions) {
       expect([
         'task',
@@ -376,7 +394,6 @@ describe('untrusted content and AI', () => {
       ]).toContain(s.type)
     }
     expect(h.query(`SELECT * FROM user_roles`)).toEqual([])
-    expect(h.query(`SELECT * FROM tasks`)).toEqual([])
   })
 
   it('validates whatever the AI returns and never acts on it', async () => {
@@ -527,6 +544,7 @@ describe('deadline plans (any document with deadlines)', () => {
   }
 
   it('turns several deadlines into one plan that can be added in full', async () => {
+    await askFirst(alice)
     const outline = [
       'Project brief and schedule',
       `Research proposal (40%) due ${inDays(40)}`,
@@ -580,5 +598,111 @@ describe('deadline plans (any document with deadlines)', () => {
       'Pay electricity bill',
       'Electricity bill due 28 October 2030',
     ])
+  })
+})
+
+describe('the Devourer acts first', () => {
+  const inDays = (n: number) => {
+    const d = new Date(Date.now() + n * 86_400_000)
+    return `${d.getUTCDate()} ${d.toLocaleString('en', { month: 'long', timeZone: 'UTC' })} ${d.getUTCFullYear()}`
+  }
+  const BRIEF = () =>
+    [
+      'Project brief',
+      `Research proposal (40%) due ${inDays(40)}`,
+      `Progress meeting on ${inDays(50)}`,
+      'Respond within 28 days of this notice.',
+    ].join('\n')
+
+  it('adds confident items straight away and leaves unsure ones to check', async () => {
+    const { body } = await upload(alice, BRIEF(), { name: 'brief.txt' })
+    expect(body.autoAdded.added).toBeGreaterThan(5)
+    // The "within 28 days" item is a guess: it waits for a yes.
+    const waiting = (body.suggestions as Json[]).filter(
+      (s) => s.status === 'pending',
+    )
+    expect(waiting.length).toBeGreaterThan(0)
+    expect(waiting.every((s) => s.uncertain)).toBe(true)
+    expect(
+      h.query(
+        `SELECT title FROM events WHERE user_id = ? ORDER BY starts_at`,
+        alice.id,
+      ),
+    ).toEqual([
+      { title: 'Due: Research proposal' },
+      { title: 'Progress meeting' },
+    ])
+    expect(
+      (
+        h.query(
+          `SELECT COUNT(*) as n FROM tasks WHERE user_id = ? AND status = 'open'`,
+          alice.id,
+        )[0] as { n: number }
+      ).n,
+    ).toBeGreaterThan(3)
+  })
+
+  it('Undo takes it all back and offers the items for checking instead', async () => {
+    const { body } = await upload(alice, BRIEF(), { name: 'brief.txt' })
+    const res = await call(
+      alice,
+      `/api/documents/${body.document.id}/undo-auto`,
+      'POST',
+      {},
+    )
+    expect(res.status).toBe(200)
+    expect(res.body.undone).toBe(body.autoAdded.added)
+    expect(
+      h.query(
+        `SELECT COUNT(*) as n FROM tasks WHERE user_id = ? AND status = 'open'`,
+        alice.id,
+      ),
+    ).toEqual([{ n: 0 }])
+    expect(
+      h.query(
+        `SELECT COUNT(*) as n FROM events WHERE user_id = ? AND status = 'scheduled'`,
+        alice.id,
+      ),
+    ).toEqual([{ n: 0 }])
+    expect(
+      (res.body.suggestions as Json[]).filter((s) => s.status === 'pending')
+        .length,
+    ).toBe(body.suggestions.length)
+  })
+
+  it('never makes a twin of something already on the list', async () => {
+    await call(alice, '/api/tasks', 'POST', { title: 'Pay electricity bill' })
+    const { body } = await upload(alice, BILL)
+    expect(body.autoAdded.already).toBe(1)
+    expect(
+      h.query(
+        `SELECT COUNT(*) as n FROM tasks WHERE title = 'Pay electricity bill'`,
+      ),
+    ).toEqual([{ n: 1 }])
+  })
+
+  it('"Ask me first" adds nothing on its own', async () => {
+    await askFirst(alice)
+    const { body } = await upload(alice, BRIEF(), { name: 'brief.txt' })
+    expect(body.autoAdded).toEqual({ added: 0, already: 0 })
+    expect(h.query(`SELECT COUNT(*) as n FROM tasks`)).toEqual([{ n: 0 }])
+    expect(h.query(`SELECT COUNT(*) as n FROM events`)).toEqual([{ n: 0 }])
+  })
+
+  it('reads a letter-spaced web page printed to PDF', async () => {
+    const pdf = readFileSync(
+      join(
+        dirname(fileURLToPath(import.meta.url)),
+        '../shared/documents/fixtures/chrome-letter-spaced.pdf',
+      ),
+    )
+    const { body } = await upload(alice, new Uint8Array(pdf), {
+      name: 'Study Schedule.pdf',
+      type: 'application/pdf',
+    })
+    expect(body.processing.summary).toMatch(/Reflective essay/)
+    expect(
+      h.query(`SELECT title FROM events WHERE user_id = ?`, alice.id),
+    ).toEqual([{ title: 'Due: Assessment 1 Reflective essay' }])
   })
 })
