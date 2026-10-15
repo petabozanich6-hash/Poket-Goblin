@@ -797,6 +797,28 @@ describe('photos and scans (Workers AI)', () => {
     expect(tasks).toContain('Book Parent-teacher interviews')
   })
 
+  it('reads a photo given again after it couldn’t be read the first time', async () => {
+    // First time, no vision model: unreadable, and the original is deleted.
+    const first = await upload(alice, photo, {
+      name: 'Screenshot.png',
+      type: 'image/jpeg',
+    })
+    expect(first.body.document.status).toBe('needs_ocr')
+    // Same picture again, now that photos can be read.
+    const ai = workersAi()
+    const again = await upload(alice, photo, {
+      name: 'Screenshot.png',
+      type: 'image/jpeg',
+      env: ai.env,
+    })
+    expect(again.body.duplicate).toBe(true)
+    expect(again.body.processing.warnings).not.toContain(
+      'The file was missing from storage.',
+    )
+    expect(again.body.processing.summary).toMatch(/^I found 3 dates/)
+    expect(again.body.autoAdded.added).toBeGreaterThan(3)
+  })
+
   it('reads a scanned PDF by its page photo', async () => {
     const ai = workersAi()
     // A one-page "scan": the page is just the JPEG.
