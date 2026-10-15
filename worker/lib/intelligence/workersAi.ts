@@ -136,3 +136,81 @@ export async function callWorkersAi(
     clearTimeout(timer)
   }
 }
+
+/**
+ * Photos and scans: Llama 4 Scout writes out the text it sees, and nothing
+ * else. That text then goes through the same reader and planner as a PDF,
+ * so a photo of a letter gets the same dates, tasks and plans. Measured on
+ * a phone-sized photo of a school letter (2026-10-16): word-perfect, ~15 s,
+ * ~60–75 neurons.
+ */
+export const WORKERS_AI_VISION_MODEL = '@cf/meta/llama-4-scout-17b-16e-instruct'
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024
+
+const TRANSCRIBE_PROMPT =
+  'Transcribe every piece of text in this image exactly as written, line by line, including dates, times and amounts. Output only the text, nothing else. If there is no readable text, output nothing.'
+
+export async function transcribeImageWithWorkersAi(
+  env: Env,
+  image: Uint8Array,
+  mime: string,
+  timeoutMs = 30_000,
+): Promise<string> {
+  if (env.AI_PROVIDER?.toLowerCase() !== 'workers_ai' || !env.AI) {
+    throw new WorkersAiBlockedError('Workers AI not configured')
+  }
+  if (
+    image.byteLength > MAX_IMAGE_BYTES ||
+    !/^image\/(jpeg|png|webp)$/.test(mime)
+  ) {
+    throw new WorkersAiBlockedError('Image not supported')
+  }
+  try {
+    await reserveWorkersAi(env)
+  } catch {
+    throw new WorkersAiBlockedError('Workers AI budget unavailable')
+  }
+  let binary = ''
+  for (let i = 0; i < image.length; i += 0x8000) {
+    binary += String.fromCharCode(...image.subarray(i, i + 0x8000))
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    const result = await Promise.race([
+      // Newer than the bundled type list, like the text model.
+      (env.AI.run as (model: string, inputs: unknown) => Promise<unknown>)(
+        WORKERS_AI_VISION_MODEL,
+        {
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: TRANSCRIBE_PROMPT },
+                {
+                  type: 'image_url',
+                  image_url: { url: `data:${mime};base64,${btoa(binary)}` },
+                },
+              ],
+            },
+          ],
+          max_tokens: 2000,
+          temperature: 0,
+        },
+      ),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error('Workers AI timed out')),
+          timeoutMs,
+        )
+      }),
+    ])
+    const response =
+      result && typeof result === 'object' && 'response' in result
+        ? (result as { response: unknown }).response
+        : null
+    if (typeof response !== 'string') throw new Error('Empty vision response')
+    return response.slice(0, 20_000)
+  } finally {
+    clearTimeout(timer)
+  }
+}

@@ -39,9 +39,12 @@ up, storage would still not keep temporary originals.
 
 - **Cloudflare** stores and processes everything as Pocket Goblin's
   infrastructure provider (Workers, D1, R2).
-- **The AI provider**, only when one is configured (`AI_PROVIDER` /
-  `AI_API_KEY`). The production deployment currently has none, and the
-  built-in reader runs inside Pocket Goblin. When configured:
+- **The AI provider**, only when one is configured. Production uses
+  **Cloudflare Workers AI** (`AI_PROVIDER=workers_ai`), so documents stay
+  with Cloudflare, Pocket Goblin's infrastructure provider. Photos and the
+  first page of scanned PDFs go to its vision model (Llama 4 Scout) only to
+  write out the text they show; that text is then read like any PDF. When
+  configured:
   - Text documents: up to 12,000 characters of extracted text are sent.
   - Photos and scans: the image is sent, because only a vision model can read
     it.

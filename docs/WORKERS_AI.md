@@ -24,8 +24,15 @@ external provider.
 - Tell the Goblin / structured interpretation: AI suggestions pass through the
   existing validation, source grounding and review-before-save flow.
 - Document Devourer: readable text uses the same binding, with existing document
-  validation. Photos and scanned PDFs still require OCR; this text model is not
-  a vision model. No image is sent to it.
+  validation.
+- Photos and scanned PDFs (since 2026-10-16): `@cf/meta/llama-4-scout-17b-16e-instruct`
+  writes out the text in the image, and that text goes through the same reader,
+  planner and automatic adding as a PDF. For a scanned PDF, the first page's JPEG
+  is sent. One AI call per document: a photo doesn't also get a text-model call.
+  Measured on a phone-sized photo of a school letter: word-perfect, ~15 s,
+  ~60–75 neurons. It counts towards the same per-person and platform limits.
+  `@cf/google/gemma-3-12b-it` isn't enabled on this account, and Mistral Small
+  3.1 had no route, so Scout is the choice.
 - Assistant chat and task breakdown retain their existing labelled rule engines.
 
 The selected model is `@cf/meta/llama-3.1-8b-instruct-fast` (switched from `-fp8` on 2026-10-16: a document read took ~60 s on `-fp8` and always hit the timeout; `-fast` takes ~6 s with the same results and slightly fewer neurons). It supports JSON mode
@@ -129,7 +136,8 @@ Once staging inference is authorized and configured:
 2. Submit “Call mum tomorrow. Buy milk.” Verify `mode: ai`, `provider: workers_ai`,
    the local date, and review before saving. Check no unrelated items appear.
 3. Upload a harmless text document and check suggestions and provider metadata.
-   Try a photo: it should ask for OCR, without making a Workers AI call.
+   Try a photo of a letter: its dates should be added, with "I read this from a
+   photo" in the notes.
 4. Lower the global budget and exhaust it; subsequent inputs must still work
    through the labelled fallback. Test the Goblin HQ AI switch similarly.
 5. Check Cloudflare Workers AI usage for actual calls and costs, without logging

@@ -637,7 +637,11 @@ export function DocumentDevourer({
         />
       </label>
       <Button type="submit" disabled={upload.isPending}>
-        {upload.isPending ? 'The goblin is reading…' : 'Feed it to the goblin'}
+        {upload.isPending
+          ? upload.variables?.file.type.startsWith('image/')
+            ? 'Reading your photo — about 15 seconds…'
+            : 'The goblin is reading…'
+          : 'Feed it to the goblin'}
       </Button>
       {error ? (
         <p className={styles.error} role="alert">

@@ -26,6 +26,8 @@ export type Deadline = {
   uncertain: boolean
   reason: string | null
   excerpt: string
+  /** The sentence before and after, for "Book online." or "bring a hat". */
+  nearby?: string
   /** Where the date was written in the text. */
   index: number
 }
@@ -60,7 +62,7 @@ const URGENT =
 
 /** "If you need urgent support…": information, not something to do. */
 const URGENT_NOT_TASK =
-  /\b(if\s+you|in\s+case|for\s+urgent|urgent\s+(?:support|help|care|assistance|enquir(?:y|ies)|quer(?:y|ies)|matters?)|crisis|emergenc(?:y|ies))\b/i
+  /\b(if\s+you\s+(?:need|require|are\s+in|feel)|in\s+case|for\s+urgent|urgent\s+(?:support|help|care|assistance|enquir(?:y|ies)|quer(?:y|ies)|matters?)|crisis|emergenc(?:y|ies))\b/i
 
 const WEEKDAY =
   /\b(?:mon|tues?|wed(?:nes)?|thu(?:rs?)?|fri|sat(?:ur)?|sun)(?:day)?\b,?/gi
@@ -90,28 +92,36 @@ const IMPERATIVE =
 
 /** Plain to-do wording: drop greetings, "please", "you must", urgency words. */
 function cleanPhrase(s: string): string {
-  return s
-    .replace(/^(?:(?:hi|hello|dear)\s+[^,]{1,40},\s*)/i, '')
-    .replace(new RegExp(URGENT.source, 'gi'), ' ')
-    .replace(
-      /^\W*(?:reminder|important|notice|note|action\s+required)\b\W*/i,
-      '',
-    )
-    .replace(
-      /^\s*(?:please\s+|kindly\s+|you\s+(?:must|need\s+to|will\s+need\s+to|should|are\s+required\s+to)\s+|we\s+need\s+you\s+to\s+)+/i,
-      '',
-    )
-    .replace(/\bplease\s+/gi, '')
-    .replace(
-      /\s+(?:to\s+avoid|otherwise|in\s+order\s+to|so\s+that|so\s+we\s+can|or\s+(?:you|we|else|a\s+(?:late|penalty))|failure\s+to|if\s+you\s+(?:do\s+not|don’t|don't))\b.*$/i,
-      '',
-    )
-    .replace(
-      /(?:\s+(?:back|in|off|of|and|or|the|a|an|to|for|with|is|are|was|were|will\s+be|must\s+be|should\s+be|has|have))+\s*$/i,
-      '',
-    )
-    .replace(/\s+/g, ' ')
-    .trim()
+  return (
+    s
+      .replace(/^(?:(?:hi|hello|dear)\s+[^,]{1,40},\s*)/i, '')
+      .replace(new RegExp(URGENT.source, 'gi'), ' ')
+      .replace(
+        /^\W*(?:reminder|important|notice|note|action\s+required)\b\W*/i,
+        '',
+      )
+      .replace(
+        /^\s*(?:please\s+|kindly\s+|you\s+(?:must|need\s+to|will\s+need\s+to|should|are\s+required\s+to)\s+|we\s+need\s+you\s+to\s+)+/i,
+        '',
+      )
+      .replace(/\bplease\s+/gi, '')
+      // "…with the $25 excursion fee": the amount goes in the details instead.
+      .replace(
+        /\s+(?:with|and|plus|including)\s+(?:the\s+|a\s+|your\s+)?(?:[$€£]\s?\d[\d.,]*|\d[\d.,]*\s?(?:dollars|aud|usd|gbp|eur))[^,.;]*$/i,
+        '',
+      )
+      .replace(
+        /\s+(?:to\s+avoid|otherwise|in\s+order\s+to|so\s+that|so\s+we\s+can|or\s+(?:you|we|else|a\s+(?:late|penalty))|failure\s+to|if\s+you\s+(?:do\s+not|don’t|don't))\b.*$/i,
+        '',
+      )
+      .replace(
+        /(?:\s+(?:back|in|off|of|and|or|the|a|an|to|for|with|is|are|was|were|will\s+be|must\s+be|should\s+be|has|have))+\s*$/i,
+        '',
+      )
+      .replace(/\s+/g, ' ')
+      .replace(/^[\s:;,.\-–—]+/, '')
+      .trim()
+  )
 }
 
 function shorten(s: string, max = 60): string {
@@ -158,6 +168,11 @@ function labelFrom(line: string, dates: FoundDate[]): string {
   )
   // A week number left at the start of a schedule row ("13 Assessment…").
   s = s.replace(/^\d{1,2}\s+(?=\D)/, '')
+  // "Year 4 will visit the Australian Museum" → "Australian Museum visit".
+  s = s.replace(
+    /^.*?\b(?:will|are\s+going\s+to|is\s+going\s+to)\s+(?:visit|go\s+to|travel\s+to|attend)\s+(?:the\s+)?(.+)$/i,
+    (_, place: string) => `${place} visit`,
+  )
   if (
     /^(?:the|a|an|and|or|of|for|date|dates?|due|please|your|our|\d+|week\s+commencing.*|week)?$/i.test(
       s,
@@ -168,6 +183,13 @@ function labelFrom(line: string, dates: FoundDate[]): string {
 }
 
 function kindOf(text: string): DeadlineKind {
+  // "Sign and return the permission slip with the $25 fee" is a form first.
+  if (
+    /\b(sign|return|complete|fill(?:\s+in|\s+out)?)\b[^.\n]{0,40}\b(forms?|slips?|consent|permission)\b/i.test(
+      text,
+    )
+  )
+    return 'form'
   if (
     /\b(exam(?:ination)?s?|tests?|quiz(?:zes)?|viva|mid-?semester|in-?class\s+assessment)\b/i.test(
       text,
@@ -332,6 +354,10 @@ export function findDeadlines(text: string, options: PlanOptions): Deadline[] {
       uncertain: date.uncertain,
       reason: date.reason,
       excerpt: line.replace(/\s+/g, ' ').slice(0, 160),
+      nearby:
+        `${context} ${line} ${text.slice(start + line.length, start + line.length + 160)}`
+          .replace(/\s+/g, ' ')
+          .trim(),
       index: date.index,
     })
     if (out.length >= MAX_DEADLINES) break
@@ -496,10 +522,22 @@ function stepsFor(d: Deadline): { steps: Step[]; lead: number } {
           { daysBefore: 2, title: `${x}: fill in and send` },
         ],
       }
-    case 'event':
-      return /\b(meeting|hearing|interview|court|presentation)\b/i.test(x)
-        ? { lead: 1, steps: [{ daysBefore: 1, title: `Prepare for ${x}` }] }
-        : { lead: 0, steps: [] }
+    case 'event': {
+      const steps: Step[] = []
+      // "Book online" / "book a time": booking comes well before the day.
+      if (
+        /\bbook(?:\s+(?:online|a\s+time|your|now|in))\b/i.test(
+          d.nearby ?? d.excerpt,
+        )
+      )
+        steps.push({ daysBefore: 7, title: `Book ${x}` })
+      if (/\b(meeting|hearing|interview|court|presentation)\b/i.test(x))
+        steps.push({ daysBefore: 1, title: `Prepare for ${x}` })
+      return {
+        lead: steps.length ? Math.max(...steps.map((s) => s.daysBefore)) : 0,
+        steps,
+      }
+    }
     default:
       return {
         lead: 5,
@@ -782,7 +820,18 @@ export function planDeadlines(
   for (const m of text.matchAll(new RegExp(URGENT.source, 'gi'))) {
     if (suggestions.filter((s) => s.urgent).length >= 3) break
     // Already covered by a dated deadline nearby.
-    if (deadlines.some((d) => Math.abs(d.index - m.index) < 250)) continue
+    const said = lineAround(text, m.index)
+      .line.replace(/\s+/g, ' ')
+      .slice(0, 60)
+    if (
+      deadlines.some(
+        (d) =>
+          d.urgent &&
+          (d.excerpt.includes(said.slice(0, 40)) ||
+            (d.nearby ?? '').split(d.excerpt)[0]!.includes(said.slice(0, 40))),
+      )
+    )
+      continue
     const { line } = lineAround(text, m.index)
     const sentence = line.replace(/\s+/g, ' ').slice(0, 160)
     if (suggestions.some((s) => s.sourceExcerpt === sentence)) continue
@@ -815,6 +864,37 @@ export function planDeadlines(
     return overview
       ? { deadlines: [], suggestions: [], summary: overview, warnings }
       : null
+  }
+
+  // "Students will need a packed lunch, a hat and a water bottle": a
+  // packing reminder the day before the nearest event.
+  for (const m of text.matchAll(
+    /\b(?:will\s+need|need\s+to\s+bring|please\s+bring|remember\s+to\s+bring|bring\s+along|please\s+pack|don[’']t\s+forget)\s+([^.\n]{3,100})/gi,
+  )) {
+    // Packing lists follow the event they're for: prefer the one just before.
+    const near = deadlines.filter(
+      (d) =>
+        d.kind === 'event' && !d.overdue && Math.abs(d.index - m.index) < 600,
+    )
+    const event =
+      near
+        .filter((d) => d.index < m.index)
+        .sort((a, b) => b.index - a.index)[0] ??
+      near.sort((a, b) => a.index - b.index)[0]
+    if (!event) continue
+    const items = m[1]!.replace(/^(?:a|an|the|your)\s+/i, '').trim()
+    const day = addDays(event.iso, -1)
+    suggestions.push(
+      suggestion(
+        {
+          type: 'task',
+          title: `Pack for ${event.label}: ${shorten(items, 60)}`,
+          dueDate: day >= today ? day : today,
+        },
+        event,
+        category,
+      ),
+    )
   }
 
   // A week-by-week schedule: each week's topic becomes that week's study.

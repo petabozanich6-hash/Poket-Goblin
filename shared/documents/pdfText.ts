@@ -628,6 +628,49 @@ async function pageOrder(objects: Map<number, PdfObject>): Promise<number[]> {
     .slice(0, MAX_PAGES)
 }
 
+/** A page's /Resources, inherited from its parents when not its own. */
+function resourcesOf(
+  objects: Map<number, PdfObject>,
+  pageDict: string,
+): string | null {
+  let dict: string | null = pageDict
+  for (let depth = 0; dict && depth < 32; depth += 1) {
+    const resources = deref(objects, valueOf(dict, 'Resources'))
+    if (resources) return resources
+    dict = deref(objects, valueOf(dict, 'Parent'))
+  }
+  return null
+}
+
+/**
+ * A scanned PDF is usually a photo per page. The first page's photo (a
+ * JPEG) can go straight to a vision model, which then reads it like a
+ * photo the person uploaded.
+ */
+export async function firstPageImage(
+  bytes: Uint8Array,
+  inflate: Inflate,
+): Promise<Uint8Array | null> {
+  const objects = await parseObjects(bytes, latin1(bytes), inflate)
+  const [first] = await pageOrder(objects)
+  if (first === undefined) return null
+  const resources = resourcesOf(objects, objects.get(first)!.dict)
+  const xobjects = resources
+    ? deref(objects, valueOf(resources, 'XObject'))
+    : null
+  let best: Uint8Array | null = null
+  for (const m of xobjects?.matchAll(/\/[^\s/<>[\]()]+\s+(\d+)\s+\d+\s+R/g) ??
+    []) {
+    const o = objects.get(Number(m[1]))
+    if (!o?.data || !/\/Subtype\s*\/Image/.test(o.dict)) continue
+    if (!/\/DCTDecode/.test(o.dict)) continue
+    // Only a plain JPEG can be sent as is.
+    if (/\/Filter\s*\[[^\]]*\/(?!DCTDecode)\w+/.test(o.dict)) continue
+    if (!best || o.data.length > best.length) best = o.data
+  }
+  return best && best.length > 5_000 ? best : null
+}
+
 /** Text of a structured PDF, or '' when nothing decodable was found. */
 export async function structuredPdfText(
   bytes: Uint8Array,
@@ -641,13 +684,7 @@ export async function structuredPdfText(
   let total = 0
 
   const fontsFor = async (pageDict: string): Promise<Map<string, Font>> => {
-    let dict: string | null = pageDict
-    let resources: string | null = null
-    for (let depth = 0; dict && depth < 32; depth += 1) {
-      resources = deref(objects, valueOf(dict, 'Resources'))
-      if (resources) break
-      dict = deref(objects, valueOf(dict, 'Parent'))
-    }
+    const resources = resourcesOf(objects, pageDict)
     const fonts = new Map<string, Font>()
     const fontDict = resources
       ? deref(objects, valueOf(resources, 'Font'))
