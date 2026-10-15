@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "concurrently -k -n web,api -c green,magenta \"npm:dev:web\" \"npm:dev:api\"",
     "dev:web": "vite",
-    "dev:api": "node -e \"require('fs').mkdirSync('dist',{recursive:true})\" && wrangler dev --port 8787 --local --var ENVIRONMENT:development",
+    "dev:api": "node -e \"require('fs').mkdirSync('dist',{recursive:true})\" && wrangler dev --port 8787 --local --var ENVIRONMENT:development --var AI_PROVIDER:none",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "deploy:dry-run": "npm run build && wrangler deploy --dry-run --var ENVIRONMENT:production",
