@@ -6,7 +6,7 @@
 - Bytes in private object storage via `UPLOADS` R2 binding
 - Local Miniflare R2 (no remote paid bucket required)
 - Memory fallback only when the binding is absent (tests)
-- Server-side magic-byte validation · 8 MiB limit
+- Server-side magic-byte validation · 10 MB limit (10 MiB)
 - Processing: upload → store → extract → interpret → review items
 - OCR: abstracted as `needs_ocr` status — **not configured** until approved
 
