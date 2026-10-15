@@ -7,7 +7,11 @@
  * caller then reports that honestly (or uses a vision model if configured).
  */
 
+import { structuredPdfText } from './pdfText'
+
 const MAX_INFLATED = 8 * 1024 * 1024
+/** Across all streams of one PDF (fonts, pages, object streams). */
+const MAX_INFLATED_TOTAL = 48 * 1024 * 1024
 export const MAX_TEXT = 20_000
 
 async function inflate(
@@ -195,7 +199,30 @@ function looksLikeText(s: string): boolean {
   return printable / sample.length > 0.85
 }
 
+function tidy(s: string): string {
+  return s
+    .replace(/[ \t]+/g, ' ')
+    .replace(/ *\n */g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
 export async function extractPdfText(bytes: Uint8Array): Promise<string> {
+  // Fonts with character maps first (Chrome, Word, InDesign, publishers);
+  // the simple literal-string scan below catches anything else.
+  try {
+    let budget = MAX_INFLATED_TOTAL
+    const budgeted = async (d: Uint8Array) => {
+      if (budget <= 0) return null
+      const out = await inflate(d, 'deflate')
+      budget -= out?.byteLength ?? 0
+      return out
+    }
+    const structured = tidy(await structuredPdfText(bytes, budgeted, MAX_TEXT))
+    if (looksLikeText(structured)) return structured.slice(0, MAX_TEXT)
+  } catch {
+    // Malformed structure: fall through to the simple scan.
+  }
   const raw = latin1(bytes)
   const texts: string[] = []
   const re = /<<([\s\S]{0,2000}?)>>\s*stream\r?\n/g
@@ -239,12 +266,7 @@ export async function extractPdfText(bytes: Uint8Array): Promise<string> {
       if (total > MAX_TEXT) break
     }
   }
-  const joined = texts
-    .join('\n')
-    .replace(/[ \t]+/g, ' ')
-    .replace(/ *\n */g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
+  const joined = tidy(texts.join('\n'))
   return looksLikeText(joined) ? joined.slice(0, MAX_TEXT) : ''
 }
 
