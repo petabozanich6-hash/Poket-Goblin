@@ -38,7 +38,7 @@ export type DeadlinePlan = {
 }
 
 const MAX_DEADLINES = 24
-const MAX_SUGGESTIONS = 48
+const MAX_SUGGESTIONS = 80
 
 const CUE =
   /\b(due|deadline|submit|submission|lodge(?:ment)?|hand(?:ed)?\s+in|return(?:ed)?\s+(?:by|before)|closes?|closing\s+date|no\s+later\s+than|before|by|exam(?:ination)?s?|tests?|quiz(?:zes)?|assessments?|assignments?|essays?|reports?|presentations?|projects?|proposals?|portfolios?|thesis|applications?|apply|renew(?:al)?|expir(?:es|y|ation)|pay(?:ment)?|invoice|reply|respond|rsvp|enrol(?:ment)?|register|registration|meeting|hearing|interview|orientation|census\s+date|milestone|review)\b/i
@@ -566,6 +566,91 @@ function assessmentOverview(text: string): string | null {
   return `This outlines ${list.length === 1 ? 'one assessment' : `${list.length} assessments`}: ${joined}. It doesn’t give due dates — feed me the study schedule or assessment page and I’ll plan them.`
 }
 
+export type WeekTopic = { week: number; iso: string; topic: string }
+
+/** Lines that are sessions, deadlines or breaks, not a week's study topic. */
+const NOT_A_TOPIC =
+  /\b(session|tutorial|drop-?in|briefing|meet\s*&|census|due|exam(?:ination)?\b(?!\s+(?:prep|preparation|revision))|period|shutdown|holiday|break|recess|printed|https?:)|\||\d{1,2}(?:[:.]\d{2})?\s*(?:am|pm)\b/i
+
+/**
+ * "Week Commencing" schedules: the week number, the date it starts and what
+ * to study that week ("Module 1: Approaching loss, grief and mourning").
+ */
+export function findWeeklyTopics(
+  text: string,
+  options: PlanOptions,
+): WeekTopic[] {
+  if (!/\bweek\s+(?:commencing|beginning|starting)\b/i.test(text)) return []
+  const rows: {
+    week: number
+    date: FoundDate
+    end: number
+    lineStart: number
+  }[] = []
+  for (const d of findDates(text, options)) {
+    const lineStart = text.lastIndexOf('\n', d.index - 1) + 1
+    const before = text.slice(lineStart, d.index)
+    let week: number | null = null
+    let rowStart = lineStart
+    const same = before.match(/^\s*(\d{1,2})\s+$/)
+    if (same) week = Number(same[1])
+    else if (!before.trim()) {
+      // The week number in its own cell, on the line above.
+      const prevStart = text.lastIndexOf('\n', lineStart - 2) + 1
+      const prev = text
+        .slice(prevStart, Math.max(prevStart, lineStart - 1))
+        .trim()
+      if (/^\d{1,2}$/.test(prev)) {
+        week = Number(prev)
+        rowStart = prevStart
+      }
+    }
+    if (week === null || week < 1 || week > 60) continue
+    rows.push({
+      week,
+      date: d,
+      end: d.index + d.text.length,
+      lineStart: rowStart,
+    })
+  }
+  const topics: WeekTopic[] = []
+  rows.forEach((row, i) => {
+    const stop = rows[i + 1]?.lineStart ?? text.length
+    const lines = text
+      .slice(row.end, Math.max(row.end, stop))
+      .split('\n')
+      .map((l) =>
+        l
+          .replace(
+            /(?:\p{Extended_Pictographic}|[\u2190-\u2BFF]|\uFE0F)/gu,
+            ' ',
+          )
+          .replace(/\s+/g, ' ')
+          .trim(),
+      )
+    for (let k = 0; k < lines.length; k += 1) {
+      const line = lines[k]!
+      if (line.length < 4 || NOT_A_TOPIC.test(line)) continue
+      if (findDates(line, options).length) continue
+      let topic = line
+      // A topic wrapped onto the next line ("…grief and" / "mourning").
+      const next = lines[k + 1]
+      if (next && /^[a-z]/.test(next) && !NOT_A_TOPIC.test(next))
+        topic = `${topic} ${next}`
+      topics.push({
+        week: row.week,
+        iso: row.date.iso,
+        topic: shorten(
+          topic.replace(/\s+:/g, ':').replace(/[\s:;,-]+$/, ''),
+          90,
+        ),
+      })
+      break
+    }
+  })
+  return topics
+}
+
 /** Steps back from each deadline, plus the deadline itself in the calendar. */
 export function planDeadlines(
   text: string,
@@ -721,11 +806,35 @@ export function planDeadlines(
     })
   }
 
-  if (deadlines.length === 0 && !suggestions.length) {
+  if (
+    deadlines.length === 0 &&
+    !suggestions.length &&
+    findWeeklyTopics(text, options).length === 0
+  ) {
     const overview = assessmentOverview(text)
     return overview
       ? { deadlines: [], suggestions: [], summary: overview, warnings }
       : null
+  }
+
+  // A week-by-week schedule: each week's topic becomes that week's study.
+  const weeks = findWeeklyTopics(text, options).filter(
+    (w) => addDays(w.iso, 6) >= today,
+  )
+  for (const w of weeks) {
+    suggestions.push({
+      kind: 'suggestion',
+      type: 'task',
+      title: `Week ${w.week}: ${w.topic}`,
+      details: `Study for the week starting ${formatDay(w.iso)}.`,
+      dueDate: addDays(w.iso, 6),
+      confidence: 'high',
+      uncertain: false,
+      missingInformation: [],
+      sourceExcerpt: w.topic,
+      categorySlug: category,
+      group: 'Week by week',
+    })
   }
 
   const urgentCount = suggestions.filter(
@@ -744,6 +853,10 @@ export function planDeadlines(
   if (next)
     parts.push(
       'I’ve planned the steps back from each date and put the due dates in your calendar.',
+    )
+  if (weeks.length)
+    parts.push(
+      `I’ve also made a week-by-week study plan (${weeks.length} week${weeks.length === 1 ? '' : 's'}).`,
     )
   if (overdue)
     parts.push(

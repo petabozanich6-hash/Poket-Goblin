@@ -229,6 +229,8 @@ export async function callDocumentAi(
       env,
       system,
       `<document>\n${fitBytes(input.text.slice(0, MAX_PROMPT_TEXT), WORKERS_AI_INPUT_BYTES - new TextEncoder().encode(system).length - 64)}\n</document>`,
+      // Reading a whole document takes longer than a brain dump.
+      20_000,
     )
   }
   const base = (env.AI_BASE_URL ?? 'https://api.openai.com/v1').replace(

@@ -43,7 +43,7 @@ ENVIRONMENT = "production"
 # 2026-10-15. Kept here so automatic deploys from main don't remove them
 # (deploys replace dashboard-only variables). Local dev uses .dev.vars.
 AI_PROVIDER = "workers_ai"
-AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fp8"
+AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fast"
 # Platform-wide AI calls per UTC day (cost guard; each person also has a
 # daily limit by plan). Roughly a tenth of a cent per document read.
 AI_DAILY_GLOBAL_LIMIT = "300"

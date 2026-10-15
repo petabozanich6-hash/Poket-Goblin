@@ -560,7 +560,11 @@ export function withDeadlinePlan<
     DocumentUnderstanding,
     'documentType' | 'summary' | 'suggestions' | 'warnings' | 'categorySlug'
   >,
->(understanding: U, text: string, options: UnderstandOptions = {}): U {
+>(
+  understanding: U,
+  text: string,
+  options: UnderstandOptions & { fromAi?: boolean } = {},
+): U {
   const plan = planDeadlines(text.replace(/\r/g, ''), {
     reference: options.reference ?? new Date(),
     monthFirst: options.monthFirst,
@@ -581,10 +585,22 @@ export function withDeadlinePlan<
     understanding.documentType,
   )
   if (plan.deadlines.length >= 2 || (plan.deadlines.length === 1 && !simple)) {
+    // When the AI read it too, its plain-language description leads, and
+    // any dated item it spotted that the plan doesn't have joins "check
+    // these" (AI items are never added automatically).
+    const ai = understanding.suggestions.filter((s) => s.origin === 'ai')
+    const planned = new Set(
+      plan.suggestions.map((s) => s.dueDate).filter(Boolean),
+    )
+    const extras = ai
+      .filter((s) => s.dueDate && !planned.has(s.dueDate))
+      .map((s) => ({ ...s, group: 'Also spotted', uncertain: true }))
     return {
       ...understanding,
-      summary: plan.summary,
-      suggestions: plan.suggestions,
+      summary: options.fromAi
+        ? `${understanding.summary} ${plan.summary}`
+        : plan.summary,
+      suggestions: [...plan.suggestions, ...extras],
       warnings: [...understanding.warnings, ...plan.warnings],
     }
   }

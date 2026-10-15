@@ -28,7 +28,7 @@ external provider.
   a vision model. No image is sent to it.
 - Assistant chat and task breakdown retain their existing labelled rule engines.
 
-The selected model is `@cf/meta/llama-3.1-8b-instruct-fp8`. It supports JSON mode
+The selected model is `@cf/meta/llama-3.1-8b-instruct-fast` (switched from `-fp8` on 2026-10-16: a document read took ~60 s on `-fp8` and always hit the timeout; `-fast` takes ~6 s with the same results and slightly fewer neurons). It supports JSON mode
 and is explicitly allowlisted; an unsupported `AI_MODEL` leaves the app on rules.
 Use one small model initially, with no automatic upgrades or retries. Model
 quality still needs staging checks with representative, non-sensitive examples.
@@ -104,7 +104,7 @@ Sources:
 ```toml
 # Add under the existing [vars] table:
 AI_PROVIDER = "workers_ai"
-AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fp8"
+AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fast"
 AI_DAILY_GLOBAL_LIMIT = "100"
 
 # Separate top-level table:
