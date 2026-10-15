@@ -1,0 +1,82 @@
+import { describe, expect, it } from 'vitest'
+
+import {
+  applyMigrations,
+  createTestD1,
+  migrationFiles,
+} from '../test/sqliteD1.mjs'
+
+describe('migration 0006 (owner administration schema)', () => {
+  it('applies on top of a populated database without changing existing rows', () => {
+    const t = createTestD1({ upTo: 5 })
+    t.run(
+      `INSERT INTO users (id, email, password_hash, display_name, created_at)
+       VALUES ('user_a', 'someone@example.com', 'pbkdf2$100000$aa$bb', 'Someone', '2026-10-01T00:00:00.000Z')`,
+    )
+    t.run(
+      `INSERT INTO sessions (id, user_id, token_hash, expires_at)
+       VALUES ('sess_a', 'user_a', 'hash_a', '2999-01-01T00:00:00.000Z')`,
+    )
+    t.run(
+      `INSERT INTO tasks (id, user_id, title) VALUES ('task_a', 'user_a', 'Private task')`,
+    )
+    const before = t.query('SELECT * FROM users')
+
+    applyMigrations(t.sqlite, migrationFiles().slice(5))
+
+    const after = t.query(
+      'SELECT id, email, password_hash, display_name, created_at FROM users',
+    )
+    expect(after).toEqual(before)
+    expect(t.query('SELECT status, suspended_at FROM users')).toEqual([
+      { status: 'active', suspended_at: null },
+    ])
+    expect(
+      t.query('SELECT token_hash, last_seen_at, elevated_until FROM sessions'),
+    ).toEqual([
+      { token_hash: 'hash_a', last_seen_at: null, elevated_until: null },
+    ])
+    expect(t.query('SELECT title FROM tasks')).toEqual([
+      { title: 'Private task' },
+    ])
+  })
+
+  it('grants nobody any role or entitlement', () => {
+    const t = createTestD1()
+    expect(t.query('SELECT name FROM roles')).toEqual([{ name: 'owner' }])
+    expect(t.query('SELECT * FROM user_roles')).toEqual([])
+    expect(t.query('SELECT * FROM user_entitlements')).toEqual([])
+    expect(t.query('SELECT * FROM platform_settings')).toEqual([])
+  })
+
+  it('allows only one active grant of a role per user', () => {
+    const t = createTestD1()
+    t.run(
+      `INSERT INTO users (id, email, password_hash, display_name)
+       VALUES ('user_a', 'a@example.com', 'x', 'A')`,
+    )
+    t.run(
+      `INSERT INTO user_roles (id, user_id, role, granted_by) VALUES ('r1', 'user_a', 'owner', 'test')`,
+    )
+    expect(() =>
+      t.run(
+        `INSERT INTO user_roles (id, user_id, role, granted_by) VALUES ('r2', 'user_a', 'owner', 'test')`,
+      ),
+    ).toThrow()
+    expect(() =>
+      t.run(
+        `INSERT INTO user_roles (id, user_id, role, granted_by) VALUES ('r3', 'user_a', 'superuser', 'test')`,
+      ),
+    ).toThrow()
+  })
+
+  it('rejects unknown account statuses', () => {
+    const t = createTestD1()
+    expect(() =>
+      t.run(
+        `INSERT INTO users (id, email, password_hash, display_name, status)
+         VALUES ('user_b', 'b@example.com', 'x', 'B', 'owner')`,
+      ),
+    ).toThrow()
+  })
+})
