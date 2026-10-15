@@ -543,7 +543,8 @@ async function complete(
   ctx: Ctx,
   target: string,
   domain: 'shopping' | 'task' | 'event' | 'any',
-): Promise<ActResult> {
+  loose = false,
+): Promise<ActResult | null> {
   const now = new Date().toISOString()
   const shopping =
     domain === 'shopping' || domain === 'any'
@@ -601,6 +602,8 @@ async function complete(
       message: `${cap(title)} was already crossed off. 👍`,
     }
   }
+  // "I brought the kids to school" isn't about the shopping list.
+  if (loose) return null
   return {
     kind: 'info',
     message:
@@ -1099,10 +1102,16 @@ export async function actOnText(
       case 'shopping_add':
         response.results.push(...(await shoppingAdd(ctx, op.items)))
         break
-      case 'complete':
-        response.results.push(await complete(ctx, op.target, op.domain))
-        ctx.lastTitle = op.target
+      case 'complete': {
+        const result = await complete(ctx, op.target, op.domain, op.loose)
+        if (result) {
+          response.results.push(result)
+          ctx.lastTitle = op.target
+        } else {
+          response.capture.push(op.clause)
+        }
         break
+      }
       case 'cancel':
         response.results.push(await cancel(ctx, op.target))
         break
