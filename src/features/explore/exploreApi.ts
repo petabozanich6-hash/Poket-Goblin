@@ -14,6 +14,84 @@ export type VaultDocument = {
   createdAt: string
   updatedAt: string
   hasExtractedText: boolean
+  retention: 'keep' | 'temporary'
+  expiresAt: string | null
+  documentType: string | null
+  goblinSummary: string | null
+}
+
+export type DocumentSuggestion = {
+  id: string
+  title: string
+  details: string
+  type: 'task' | 'reminder' | 'appointment' | 'note' | 'follow_up'
+  status: string
+  uncertain: boolean
+  dueDate: string | null
+  startTime: string | null
+  missingInformation: string[]
+  sourceExcerpt: string
+}
+
+export type DevourResponse = {
+  document: VaultDocument
+  suggestions: DocumentSuggestion[]
+  processing?: {
+    status: string
+    summary: string
+    warnings: string[]
+    mode: string
+  }
+  duplicate?: boolean
+  message?: string
+}
+
+/** True when the reader's locale writes numeric dates month-first (e.g. US). */
+export function localeWritesMonthFirst(): boolean {
+  try {
+    const parts = new Intl.DateTimeFormat(undefined, {
+      day: 'numeric',
+      month: 'numeric',
+      year: 'numeric',
+    }).formatToParts(new Date(2020, 10, 22))
+    const order = parts.filter((p) => p.type === 'day' || p.type === 'month')
+    return order[0]?.type === 'month'
+  } catch {
+    return false
+  }
+}
+
+export function devourDocument(file: File, mode: 'sort' | 'keep') {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('mode', mode)
+  form.append('timezoneOffsetMinutes', String(new Date().getTimezoneOffset()))
+  form.append('monthFirst', String(localeWritesMonthFirst()))
+  return api.upload<DevourResponse>('/documents', form)
+}
+
+export function fetchDocument(id: string) {
+  return api.get<{
+    document: VaultDocument
+    suggestions: DocumentSuggestion[]
+  }>(`/documents/${id}`)
+}
+
+export function fetchSortingDocuments() {
+  return api.get<{ documents: VaultDocument[] }>(
+    '/documents?retention=temporary',
+  )
+}
+
+export function finishDevouring(id: string) {
+  return api.post<{ devoured: boolean; saved: number }>(
+    `/documents/${id}/finish`,
+    {},
+  )
+}
+
+export function keepDocumentInstead(id: string) {
+  return api.post<{ document: VaultDocument }>(`/documents/${id}/keep`, {})
 }
 
 export type ReviewItem = {
@@ -56,16 +134,9 @@ export function fetchDocuments(params?: {
     documents: VaultDocument[]
     storage: string
     maxUploadBytes: number
+    keptBytes: number
+    keptAllowanceBytes: number
   }>(`/documents${q ? `?${q}` : ''}`)
-}
-
-export function uploadDocument(file: File) {
-  const form = new FormData()
-  form.append('file', file)
-  return api.upload<{
-    document: VaultDocument
-    processing: { status: string; warnings: string[] }
-  }>('/documents', form)
 }
 
 export function renameDocument(id: string, displayName: string) {
@@ -107,7 +178,13 @@ export function fetchReviewItems(status = 'pending') {
 
 export function acceptReviewItem(
   id: string,
-  input?: { title?: string; type?: string; dueDate?: string | null },
+  input?: {
+    title?: string
+    type?: string
+    dueDate?: string | null
+    startTime?: string | null
+    allowDuplicate?: boolean
+  },
 ) {
   return api.post<{ ok: boolean; createdId: string; createdKind: string }>(
     `/review/${id}/accept`,

@@ -182,11 +182,18 @@ function formatDay(iso: string): string {
 }
 
 function excerptAround(text: string, index: number, length = 140): string {
-  const start = Math.max(0, index - 40)
-  return text
-    .slice(start, start + length)
-    .replace(/\s+/g, ' ')
-    .trim()
+  // Start and end on word boundaries so quotes never begin mid-word.
+  let start = Math.max(0, index - 40)
+  if (start > 0) {
+    const space = text.slice(start, index).search(/\s/)
+    start = space >= 0 ? start + space + 1 : index
+  }
+  let end = Math.min(text.length, start + length)
+  if (end < text.length) {
+    const lastSpace = text.slice(start, end).search(/\s\S*$/)
+    if (lastSpace > 0) end = start + lastSpace
+  }
+  return text.slice(start, end).replace(/\s+/g, ' ').trim()
 }
 
 function dateMissing(date: FoundDate | null, what: string): string[] {
