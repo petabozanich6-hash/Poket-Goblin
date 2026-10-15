@@ -8,7 +8,7 @@ Migrations in `migrations/` are applied to the production database by a
 | ---------- | ----------------------------------------- |
 | Database   | `pocket-goblin`                           |
 | D1 ID      | `91a90710-dbd7-4a0c-8c90-b97cd3c86d90`    |
-| Migrations | `migrations/0001_…` to `0005_…`, in order |
+| Migrations | `migrations/0001_…` to `0006_…`, in order |
 
 The workflow only ever targets that database. The ID is pinned in the
 workflow and in `scripts/d1-migrations.mjs`. Every run checks that

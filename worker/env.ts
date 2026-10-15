@@ -15,4 +15,9 @@ export type Env = {
   GOOGLE_OAUTH_CLIENT_SECRET?: string
   MICROSOFT_OAUTH_CLIENT_ID?: string
   MICROSOFT_OAUTH_CLIENT_SECRET?: string
+  /**
+   * Stripe integration point (not implemented yet). Its presence only flips
+   * Goblin HQ from "Stripe is not connected" to "arrives with integration".
+   */
+  STRIPE_SECRET_KEY?: string
 }

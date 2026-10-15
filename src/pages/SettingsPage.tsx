@@ -19,7 +19,8 @@ import { applyTheme } from '@/lib/theme'
 import styles from './Page.module.css'
 
 export function SettingsPage() {
-  const { settings, saveSettings } = useAuth()
+  const { user, access, settings, saveSettings } = useAuth()
+  const [copied, setCopied] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const achievements = useQuery({
@@ -64,6 +65,36 @@ export function SettingsPage() {
           </p>
         </div>
       </header>
+
+      <Card>
+        <h2>Account</h2>
+        <p className={styles.sub}>
+          Plan: <strong>{access?.planLabel ?? 'Free'}</strong>
+          {access?.plan === 'owner_premium'
+            ? ' — every Premium feature, permanently.'
+            : null}
+        </p>
+        <p className={styles.sub}>
+          Account ID: <code>{user?.id}</code>{' '}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (!user) return
+              void navigator.clipboard
+                ?.writeText(user.id)
+                .then(() => setCopied(true))
+                .catch(() => undefined)
+            }}
+          >
+            {copied ? 'Copied' : 'Copy'}
+          </Button>
+        </p>
+        <p className={styles.sub}>
+          Support may ask for this ID. It is not a password and gives no access
+          on its own.
+        </p>
+      </Card>
 
       <Card>
         <h2>Capacity default</h2>

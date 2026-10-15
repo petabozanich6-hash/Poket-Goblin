@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { useAuth } from '@/features/auth/useAuth'
+import { PlatformBanner } from '@/features/platform/PlatformBanner'
 import { ApiError } from '@/lib/api'
 
 import styles from './AuthPage.module.css'
@@ -41,6 +42,7 @@ export function AuthPage() {
 
   return (
     <div className={styles.page}>
+      <PlatformBanner />
       <Card className={styles.panel}>
         <div className={styles.hero}>
           <div>

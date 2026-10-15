@@ -1,5 +1,6 @@
 import {
   Brain,
+  Crown,
   CalendarDays,
   FileText,
   Home,
@@ -21,6 +22,7 @@ import { FloatingCapture } from '@/features/magical/FloatingCapture'
 import { NudgeTray } from '@/features/magical/NudgeTray'
 import { OverwhelmMode } from '@/features/magical/OverwhelmMode'
 import { OverwhelmProvider } from '@/features/magical/OverwhelmContext'
+import { PlatformBanner } from '@/features/platform/PlatformBanner'
 
 import styles from './AppShell.module.css'
 
@@ -82,7 +84,7 @@ function NavItems({
 }
 
 export function AppShell() {
-  const { user, settings, logout } = useAuth()
+  const { user, settings, access, logout } = useAuth()
 
   useEffect(() => {
     document.documentElement.dataset.reducedMotion = settings?.reducedMotion
@@ -126,8 +128,34 @@ export function AppShell() {
             <div aria-labelledby="more-shelves">
               <NavItems links={secondaryLinks} quiet />
             </div>
+            {/* Display only: Goblin HQ authorises every request on the server. */}
+            {access?.isOwner ? (
+              <>
+                <p className={styles.navGroup} id="owner-shelves">
+                  Owner
+                </p>
+                <div aria-labelledby="owner-shelves">
+                  <NavLink
+                    to="/hq"
+                    className={({ isActive }) =>
+                      [
+                        styles.navLink,
+                        styles.navOwner,
+                        isActive ? styles.active : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')
+                    }
+                  >
+                    <Crown size={18} aria-hidden />
+                    Goblin HQ
+                  </NavLink>
+                </div>
+              </>
+            ) : null}
           </nav>
           <main className={styles.main} id="main" tabIndex={-1}>
+            <PlatformBanner />
             <Outlet />
           </main>
         </div>

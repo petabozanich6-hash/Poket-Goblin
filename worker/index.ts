@@ -4,7 +4,14 @@ import { secureHeaders } from 'hono/secure-headers'
 
 import type { Env } from './env'
 import { allowedOrigin } from './lib/cors'
-import { authSecretProblem, resolveUser, type AuthUser } from './lib/session'
+import { newId } from './lib/ids'
+import {
+  authSecretProblem,
+  resolveSession,
+  type AuthUser,
+  type SessionInfo,
+} from './lib/session'
+import { adminRoutes } from './routes/admin'
 import { authRoutes } from './routes/auth'
 import { captureRoutes } from './routes/captures'
 import { categoryRoutes } from './routes/categories'
@@ -17,6 +24,7 @@ import { intelligenceRoutes } from './routes/intelligence'
 import { magicalRoutes } from './routes/magical'
 import { meRoutes } from './routes/me'
 import { noteRoutes } from './routes/notes'
+import { platformRoutes } from './routes/platform'
 import { planRoutes } from './routes/plan'
 import { reminderRoutes } from './routes/reminders'
 import { reviewRoutes } from './routes/review'
@@ -24,7 +32,7 @@ import { searchRoutes } from './routes/search'
 import { shoppingRoutes } from './routes/shopping'
 import { taskRoutes } from './routes/tasks'
 
-type Vars = { user: AuthUser }
+type Vars = { user: AuthUser; session: SessionInfo }
 
 const app = new Hono<{ Bindings: Env; Variables: Vars }>().basePath('/api')
 
@@ -34,7 +42,7 @@ app.use(
     origin: (origin, c) => allowedOrigin(origin, c.env.ENVIRONMENT),
     credentials: true,
     allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization'],
+    allowHeaders: ['Content-Type', 'Authorization', 'X-Pocket-Goblin-Admin'],
   }),
 )
 
@@ -72,18 +80,27 @@ app.use('*', async (c, next) => {
 })
 
 app.route('/auth', authRoutes)
+app.route('/platform', platformRoutes)
 
 app.use('*', async (c, next) => {
   if (
     c.req.path.startsWith('/api/auth') ||
+    c.req.path.startsWith('/api/platform') ||
     c.req.path === '/api/health' ||
     c.req.path === '/api/connections/oauth/callback'
   ) {
     return next()
   }
-  const user = await resolveUser(c.env.DB, c.env, c.req.header('Cookie'))
-  if (!user) return c.json({ error: 'Unauthorized' }, 401)
-  c.set('user', user)
+  const resolved = await resolveSession(c.env.DB, c.env, c.req.header('Cookie'))
+  if (resolved.kind === 'suspended') {
+    return c.json(
+      { error: 'This account is suspended.', code: 'account_suspended' },
+      403,
+    )
+  }
+  if (resolved.kind === 'none') return c.json({ error: 'Unauthorized' }, 401)
+  c.set('user', resolved.user)
+  c.set('session', resolved.session)
   return next()
 })
 
@@ -104,7 +121,30 @@ app.route('/documents', documentRoutes)
 app.route('/review', reviewRoutes)
 app.route('/connections', connectionRoutes)
 app.route('/magical', magicalRoutes)
+app.route('/admin', adminRoutes)
 
 app.notFound((c) => c.json({ error: 'Not found' }, 404))
+
+// Unhandled errors: log the route and error class (never bodies) so Goblin
+// HQ can report application health, then return a generic 500.
+app.onError(async (error, c) => {
+  console.error(error)
+  try {
+    await c.env.DB.prepare(
+      `INSERT INTO app_errors (id, method, route, status, error_name)
+       VALUES (?, ?, ?, 500, ?)`,
+    )
+      .bind(
+        newId('err'),
+        c.req.method,
+        c.req.routePath || c.req.path,
+        (error instanceof Error ? error.name : 'Error').slice(0, 80),
+      )
+      .run()
+  } catch {
+    // The database may be the thing that failed; the response still goes out.
+  }
+  return c.json({ error: 'Something went wrong' }, 500)
+})
 
 export default app

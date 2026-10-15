@@ -1,9 +1,18 @@
 export class ApiError extends Error {
   status: number
+  /** Machine-readable reason from the API, e.g. "step_up_required". */
+  code?: string
+  data: Record<string, unknown>
 
-  constructor(status: number, message: string) {
+  constructor(
+    status: number,
+    message: string,
+    data: Record<string, unknown> = {},
+  ) {
     super(message)
     this.status = status
+    this.data = data
+    this.code = typeof data.code === 'string' ? data.code : undefined
   }
 }
 
@@ -19,11 +28,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   const data = (await response.json().catch(() => ({}))) as {
     error?: string
+    code?: string
   } & T
 
   if (!response.ok) {
+    // A missing passkey step-up is not a signed-out session.
+    const sessionGone =
+      (response.status === 401 && data.code !== 'step_up_required') ||
+      (response.status === 403 && data.code === 'account_suspended')
     if (
-      response.status === 401 &&
+      sessionGone &&
       !path.startsWith('/auth/') &&
       typeof window !== 'undefined' &&
       window.location.pathname !== '/'
@@ -36,6 +50,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
         (response.status === 401
           ? 'Your session ended — please log in again.'
           : 'Request failed'),
+      data as Record<string, unknown>,
     )
   }
 
@@ -55,6 +70,23 @@ export const api = {
       body: body !== undefined ? JSON.stringify(body) : undefined,
     }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  /**
+   * Goblin HQ calls. The header is required by the server for administrative
+   * changes (with the Origin check it blocks cross-site requests).
+   */
+  admin: {
+    get: <T>(path: string) => request<T>(`/admin${path}`),
+    send: <T>(
+      method: 'POST' | 'PUT' | 'DELETE',
+      path: string,
+      body?: unknown,
+    ) =>
+      request<T>(`/admin${path}`, {
+        method,
+        headers: { 'X-Pocket-Goblin-Admin': '1' },
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      }),
+  },
   /** Multipart upload — do not set JSON Content-Type. */
   upload: async <T>(path: string, form: FormData): Promise<T> => {
     const response = await fetch(`/api${path}`, {

@@ -93,18 +93,34 @@ function readCookie(header: string | undefined, name: string): string | null {
   return null
 }
 
-export async function resolveUser(
+export type SessionInfo = {
+  id: string
+  /** End of the current passkey step-up, if any (ISO string). */
+  elevatedUntil: string | null
+}
+
+export type ResolvedSession =
+  | { kind: 'none' }
+  | { kind: 'suspended'; userId: string }
+  | { kind: 'active'; user: AuthUser; session: SessionInfo }
+
+/** Activity is recorded at most this often per session. */
+const LAST_SEEN_INTERVAL_MS = 60 * 60_000
+
+export async function resolveSession(
   db: D1Database,
   env: Env,
   cookieHeader: string | undefined,
-): Promise<AuthUser | null> {
+  now: Date = new Date(),
+): Promise<ResolvedSession> {
   const token = readCookie(cookieHeader, SESSION_COOKIE)
-  if (!token) return null
+  if (!token) return { kind: 'none' }
   const tokenHash = await hashToken(token, getSecret(env))
   const row = await db
     .prepare(
       `SELECT u.id, u.email, u.display_name as displayName, u.created_at as createdAt,
-              s.expires_at as expiresAt
+              u.status, s.id as sessionId, s.expires_at as expiresAt,
+              s.last_seen_at as lastSeenAt, s.elevated_until as elevatedUntil
        FROM sessions s
        JOIN users u ON u.id = s.user_id
        WHERE s.token_hash = ?`,
@@ -115,23 +131,55 @@ export async function resolveUser(
       email: string
       displayName: string
       createdAt: string
+      status: string
+      sessionId: string
       expiresAt: string
+      lastSeenAt: string | null
+      elevatedUntil: string | null
     }>()
 
-  if (!row) return null
-  if (new Date(row.expiresAt).getTime() < Date.now()) {
+  if (!row) return { kind: 'none' }
+  if (new Date(row.expiresAt).getTime() < now.getTime()) {
     await db
       .prepare('DELETE FROM sessions WHERE token_hash = ?')
       .bind(tokenHash)
       .run()
-    return null
+    return { kind: 'none' }
   }
+  if (row.status !== 'active') return { kind: 'suspended', userId: row.id }
+
+  if (
+    !row.lastSeenAt ||
+    now.getTime() - new Date(row.lastSeenAt).getTime() > LAST_SEEN_INTERVAL_MS
+  ) {
+    await db
+      .prepare('UPDATE sessions SET last_seen_at = ? WHERE id = ?')
+      .bind(now.toISOString(), row.sessionId)
+      .run()
+  }
+
   return {
-    id: row.id,
-    email: row.email,
-    displayName: row.displayName,
-    createdAt: row.createdAt,
+    kind: 'active',
+    user: {
+      id: row.id,
+      email: row.email,
+      displayName: row.displayName,
+      createdAt: row.createdAt,
+    },
+    session: { id: row.sessionId, elevatedUntil: row.elevatedUntil },
   }
+}
+
+/** Revoke every session for a user (suspension, security response). */
+export async function revokeAllSessions(
+  db: D1Database,
+  userId: string,
+): Promise<number> {
+  const result = await db
+    .prepare('DELETE FROM sessions WHERE user_id = ?')
+    .bind(userId)
+    .run()
+  return result.meta.changes ?? 0
 }
 
 export async function destroySession(

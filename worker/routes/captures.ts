@@ -14,7 +14,13 @@ import {
   readOffsetMinutes,
 } from '../lib/datetime'
 import { interpretIntelligence } from '../lib/intelligence/provider'
-import { assertUnderLimit, recordUsage } from '../lib/intelligence/usage'
+import {
+  assertUnderLimit,
+  loadAiPolicy,
+  outcomeOf,
+  recordAiEvent,
+  recordUsage,
+} from '../lib/intelligence/usage'
 import { newId } from '../lib/ids'
 import {
   claimCaptureItem,
@@ -253,10 +259,11 @@ captureRoutes.post('/', async (c) => {
       .run()
   }
 
-  const gate = await assertUnderLimit(c.env.DB, c.env, user.id)
+  const policy = await loadAiPolicy(c.env.DB, c.env, user.id)
+  const gate = await assertUnderLimit(c.env.DB, policy, user.id)
   let intelligence: IntelligenceResult
   try {
-    intelligence = await interpretIntelligence(c.env, rawText, {
+    intelligence = await interpretIntelligence(policy.env, rawText, {
       timezoneOffsetMinutes: readOffsetMinutes(body),
       allowAi: gate.ok,
     })
@@ -272,6 +279,13 @@ captureRoutes.post('/', async (c) => {
   if (intelligence.aiCalled) {
     await recordUsage(c.env.DB, user.id, intelligence.provider)
   }
+  await recordAiEvent(
+    c.env.DB,
+    user.id,
+    'brain_dump',
+    intelligence.provider,
+    outcomeOf(intelligence, gate.ok, policy.providerEnabled),
+  )
 
   let suggestions = intelligence.suggestions.filter((s) =>
     isCaptureKind(s.type),
