@@ -2,11 +2,24 @@ import type { Env } from '../../env'
 
 export class WorkersAiBlockedError extends Error {}
 
-export const WORKERS_AI_MODEL = '@cf/meta/llama-3.1-8b-instruct-fp8'
+/**
+ * Llama 3.1 8B "fast": the same model family as the original fp8 choice, but
+ * a document read takes ~6 s instead of ~60 s (measured 2026-10-16) and costs
+ * slightly fewer neurons. The fp8 variant never finished inside the timeout.
+ */
+export const WORKERS_AI_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast'
 // Explicit allowlist: changing models requires reviewing cost and JSON support.
-export function workersAiModel(env: Env): typeof WORKERS_AI_MODEL | null {
+const ALLOWED_MODELS = [
+  WORKERS_AI_MODEL,
+  '@cf/meta/llama-3.1-8b-instruct-fp8',
+] as const
+export function workersAiModel(
+  env: Env,
+): (typeof ALLOWED_MODELS)[number] | null {
   const model = env.AI_MODEL?.trim() || WORKERS_AI_MODEL
-  return model === WORKERS_AI_MODEL ? model : null
+  return (ALLOWED_MODELS as readonly string[]).includes(model)
+    ? (model as (typeof ALLOWED_MODELS)[number])
+    : null
 }
 
 function globalLimit(raw: string | undefined): number {
@@ -67,6 +80,7 @@ export async function callWorkersAi(
   env: Env,
   system: string,
   user: string,
+  timeoutMs = 12_000,
 ): Promise<unknown> {
   const model = workersAiModel(env)
   if (env.AI_PROVIDER?.toLowerCase() !== 'workers_ai' || !env.AI || !model) {
@@ -84,7 +98,8 @@ export async function callWorkersAi(
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     const result = await Promise.race([
-      env.AI.run(model, {
+      // The "-fast" variant is newer than the bundled type list.
+      env.AI.run(model as '@cf/meta/llama-3.1-8b-instruct-fp8', {
         messages: [
           { role: 'system', content: system },
           { role: 'user', content: user },
@@ -97,7 +112,7 @@ export async function callWorkersAi(
       new Promise<never>((_, reject) => {
         timer = setTimeout(
           () => reject(new Error('Workers AI timed out')),
-          12_000,
+          timeoutMs,
         )
       }),
     ])

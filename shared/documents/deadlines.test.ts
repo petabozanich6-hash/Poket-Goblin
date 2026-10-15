@@ -315,6 +315,18 @@ describe('a real-world study schedule', () => {
     ).toBe(false)
   })
 
+  it('turns each week’s topic into that week’s study', () => {
+    const weekly = plan().suggestions.filter((s) => s.group === 'Week by week')
+    expect(weekly.map((s) => [s.title, s.dueDate])).toEqual([
+      ['Week 1: Module 1: Approaching the topic', '2026-10-25'],
+      ['Week 2: Module 2: Contexts', '2026-11-01'],
+      ['Week 5: Assignment preparation and writing', '2026-11-22'],
+      ['Week 6: Module 5: Practice', '2026-11-29'],
+      ['Week 10: Exam Preparation and Writing', '2027-01-10'],
+    ])
+    expect(plan().summary).toMatch(/week-by-week study plan \(5 weeks\)/)
+  })
+
   it('summarises an outline that lists assessments but no dates', () => {
     const outline = `Assessment Weighting Mandatory Description
 Assessment 1 40% Yes Written assignment
@@ -328,5 +340,63 @@ If you need urgent support in a crisis, contact Student Wellbeing.`
       summary:
         'This outlines 2 assessments: Assessment 1 (40%, written assignment) and Assessment 2 (60%, exam paper). It doesn’t give due dates — feed me the study schedule or assessment page and I’ll plan them.',
     })
+  })
+})
+
+describe('the AI and the built-in reader together', () => {
+  it('leads with the AI’s description and keeps its extra dates to check', () => {
+    const fromAi = {
+      documentType: 'education' as const,
+      summary: 'This is your study schedule for Trimester 3.',
+      categorySlug: 'work_study',
+      warnings: [],
+      suggestions: [
+        {
+          kind: 'suggestion' as const,
+          type: 'appointment' as const,
+          title: 'Library orientation',
+          details: '',
+          dueDate: '2026-11-05',
+          confidence: 'medium' as const,
+          uncertain: false,
+          missingInformation: [],
+          sourceExcerpt: '',
+          categorySlug: null,
+          origin: 'ai' as const,
+        },
+        {
+          kind: 'suggestion' as const,
+          type: 'reminder' as const,
+          title: 'Review study schedule',
+          details: '',
+          dueDate: null,
+          confidence: 'low' as const,
+          uncertain: false,
+          missingInformation: [],
+          sourceExcerpt: '',
+          categorySlug: null,
+          origin: 'ai' as const,
+        },
+      ],
+    }
+    const result = withDeadlinePlan(fromAi, SCHEDULE, {
+      reference,
+      fromAi: true,
+    })
+    expect(result.summary).toMatch(
+      /^This is your study schedule for Trimester 3\. I found 6 dates/,
+    )
+    const extra = result.suggestions.find(
+      (s) => s.title === 'Library orientation',
+    )
+    expect(extra).toMatchObject({
+      group: 'Also spotted',
+      uncertain: true,
+      origin: 'ai',
+    })
+    // Undated AI chatter is left out.
+    expect(
+      result.suggestions.some((s) => s.title === 'Review study schedule'),
+    ).toBe(false)
   })
 })

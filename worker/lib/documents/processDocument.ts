@@ -173,6 +173,7 @@ export async function processDocumentForUser(
       understanding = withDeadlinePlan(understanding, extracted.text, {
         reference: local,
         monthFirst: options.monthFirst,
+        fromAi: mode === 'ai',
       })
     }
     await recordAiEvent(

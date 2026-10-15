@@ -195,14 +195,12 @@ export async function interpretIntelligence(
   }
 
   try {
-    const call =
-      provider.kind === 'workers_ai' ? callWorkersAi : callOpenAiCompatible
-    const raw = await call(
-      env,
-      buildInterpretSystemPrompt(localNow),
-      `<user_text>\n${text}\n</user_text>`,
-      options.fetchImpl,
-    )
+    const system = buildInterpretSystemPrompt(localNow)
+    const user = `<user_text>\n${text}\n</user_text>`
+    const raw =
+      provider.kind === 'workers_ai'
+        ? await callWorkersAi(env, system, user)
+        : await callOpenAiCompatible(env, system, user, options.fetchImpl)
     const result = finaliseAiInterpretation(raw, text, localNow)
     if (result) return { ...result, provider: provider.kind }
     const fallback = interpretWithRules(text, localNow)
