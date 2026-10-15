@@ -54,8 +54,24 @@ redirect to `/`). Unknown `/api/*` paths still return JSON `404`.
 
 ## Deploying
 
-Production deploys are manual and need approval. Nothing deploys from CI.
-Wrangler 4 needs Node.js 22 or newer.
+Production is deployed by **Cloudflare Workers Builds from this repository's
+`main` branch**. Merging a PR into `main` is the approval gate, so protect
+`main` (PR + passing CI required). GitHub Actions never deploys. Wrangler 4
+needs Node.js 22 or newer.
+
+Workers Builds settings (Workers & Pages → `pocket-goblin` → Settings → Build):
+
+| Setting                            | Value                                                 |
+| ---------------------------------- | ----------------------------------------------------- |
+| Git repository                     | `petabozanich6-hash/Poket-Goblin`                     |
+| Production branch                  | `main`                                                |
+| Build command                      | `npm ci && npm run build`                             |
+| Deploy command                     | `npx wrangler deploy --var ENVIRONMENT:production`    |
+| Root directory                     | `/`                                                   |
+| Build variable                     | `NODE_VERSION=22`                                     |
+| Builds for non-production branches | **Off** — preview versions would use production D1/R2 |
+
+Manual deploy (fallback, needs approval):
 
 ```bash
 npm ci
@@ -64,9 +80,16 @@ npm run deploy:dry-run   # builds and validates the bundle without uploading
 npm run deploy           # build + wrangler deploy --var ENVIRONMENT:production
 ```
 
-`npm run deploy` sets `ENVIRONMENT=production` at deploy time (Secure cookies,
-production rate limits). `wrangler.toml` keeps `ENVIRONMENT = "development"`
-so `wrangler dev` behaves as before.
+`wrangler.toml` sets `ENVIRONMENT = "production"`, so every deploy path gets
+Secure cookies and production rate limits even without the `--var` flag.
+`npm run dev` and `.dev.vars` set `ENVIRONMENT=development` locally.
+
+In production the Worker refuses every route except `/api/health` with `503`
+unless `AUTH_SECRET` is set and at least 32 characters long. Confirm the secret
+exists **before** deploying. Changing it logs every user out.
+
+Rollback: Workers & Pages → `pocket-goblin` → Deployments → Rollback. This
+restores code and config only; D1 and R2 are untouched.
 
 ### Before the first production deploy
 
@@ -78,12 +101,12 @@ so `wrangler dev` behaves as before.
    [D1_MIGRATIONS.md](D1_MIGRATIONS.md). The migrations are additive and never
    drop user data.
 3. **Secrets.** Set via `npx wrangler secret put <NAME>`, never in git:
-   - `AUTH_SECRET` (required — a long random string)
+   - `AUTH_SECRET` (required — 32+ random characters, e.g. `openssl rand -base64 48`)
    - Optional AI: `AI_PROVIDER`, `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`,
      `AI_DAILY_USER_LIMIT` — see `docs/INTELLIGENCE.md`
-4. **R2.** The `UPLOADS` binding expects the `pocket-goblin-uploads` bucket.
-   Do not create a remote bucket without approval; without it, deploy fails
-   on the binding.
+4. **R2.** The `UPLOADS` binding uses the existing `pocket-goblin-uploads`
+   bucket. `preview_bucket_name` (`pocket-goblin-uploads-preview`) is only used
+   by `wrangler dev --remote` and deliberately is not the production bucket.
 
 ## Verifying a deploy
 
@@ -92,6 +115,7 @@ curl -sI https://pocketgoblin.org/          # 200, text/html
 curl -sI https://pocketgoblin.org/login     # 200, text/html (SPA fallback)
 curl -s  https://pocketgoblin.org/api/health
 # {"service":"pocket-goblin","status":"ok","environment":"production"}
+curl -sI https://pocketgoblin.org/ | grep -i content-security-policy
 ```
 
 ## Local development (unchanged)

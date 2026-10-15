@@ -1,4 +1,5 @@
-export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024 // 8 MiB
+// 10 MiB, shown to users as "10 MB" (owner decision D5).
+export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 export type AllowedKind = 'pdf' | 'docx' | 'plain' | 'image' | 'unknown'
 
@@ -75,7 +76,7 @@ export function validateUpload(input: {
   if (input.bytes.byteLength > MAX_UPLOAD_BYTES) {
     return {
       ok: false,
-      error: `File is too large (max ${MAX_UPLOAD_BYTES / (1024 * 1024)} MiB)`,
+      error: `File is too large (max ${MAX_UPLOAD_BYTES / (1024 * 1024)} MB)`,
     }
   }
 

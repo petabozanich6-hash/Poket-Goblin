@@ -1,0 +1,11 @@
+# Security headers for static assets (the SPA and its files), applied by
+# Workers Static Assets. /api/* responses get theirs from the Worker
+# (worker/index.ts). HSTS is intentionally not set yet — see owner decision D4
+# in docs/COMMERCIAL_LAUNCH_ROADMAP.md.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; media-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), geolocation=(), payment=(), usb=(), microphone=(self)
+  Cross-Origin-Opener-Policy: same-origin

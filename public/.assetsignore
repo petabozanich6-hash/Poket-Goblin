@@ -1,0 +1,3 @@
+# Files in dist/ that must not be published as static assets.
+# Source maps stay local for debugging (vite build.sourcemap = hidden).
+*.map

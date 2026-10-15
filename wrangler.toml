@@ -18,21 +18,31 @@ directory = "./dist"
 not_found_handling = "single-page-application"
 run_worker_first = ["/api/*"]
 
-# Local D1 only for now — do not provision remote paid resources without permission.
+# Production D1 database. Schema changes go through the approval-gated
+# "D1 migrations (production)" workflow — see docs/D1_MIGRATIONS.md.
 [[d1_databases]]
 binding = "DB"
 database_name = "pocket-goblin"
 database_id = "91a90710-dbd7-4a0c-8c90-b97cd3c86d90"
 migrations_dir = "migrations"
 
-# Local R2 simulation via Miniflare — do not provision a remote paid bucket without approval.
+# Production R2 bucket for document uploads. `wrangler dev --local` uses a
+# Miniflare simulation. preview_bucket_name is only used by
+# `wrangler dev --remote`; it deliberately is NOT the production bucket.
 [[r2_buckets]]
 binding = "UPLOADS"
 bucket_name = "pocket-goblin-uploads"
 preview_bucket_name = "pocket-goblin-uploads-preview"
 
+# Production by default, so every deploy path (Workers Builds, `wrangler
+# deploy`) gets Secure cookies and production rate limits. Local development
+# overrides this with ENVIRONMENT=development in .dev.vars.
 [vars]
-ENVIRONMENT = "development"
+ENVIRONMENT = "production"
+
+# Workers Logs: request + console logs in the dashboard (no extra resource).
+[observability]
+enabled = true
 
 [dev]
 port = 8787

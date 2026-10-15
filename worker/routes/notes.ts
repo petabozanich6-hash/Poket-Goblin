@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 
 import type { Env } from '../env'
 import { newId } from '../lib/ids'
+import { firstUnownedLink, linkNotFound } from '../lib/ownership'
 import type { AuthUser } from '../lib/session'
 import { resolveCategoryId } from '../lib/tasks'
 import { asString } from '../lib/validate'
@@ -66,6 +67,16 @@ noteRoutes.post('/', async (c) => {
     typeof body?.categoryId === 'string' ? body.categoryId : null,
     typeof body?.categorySlug === 'string' ? body.categorySlug : null,
   )
+  const linkedTaskId =
+    typeof body?.linkedTaskId === 'string' ? body.linkedTaskId : null
+  const linkedEventId =
+    typeof body?.linkedEventId === 'string' ? body.linkedEventId : null
+  const unowned = await firstUnownedLink(c.env.DB, user.id, [
+    { kind: 'task', id: linkedTaskId },
+    { kind: 'event', id: linkedEventId },
+  ])
+  if (unowned) return c.json(linkNotFound(unowned), 404)
+
   const id = newId('note')
   await c.env.DB.prepare(
     `INSERT INTO notes (id, user_id, title, body, category_id, pinned, linked_task_id, linked_event_id)
@@ -78,8 +89,8 @@ noteRoutes.post('/', async (c) => {
       typeof body?.body === 'string' ? body.body.slice(0, 20000) : '',
       categoryId,
       body?.pinned ? 1 : 0,
-      typeof body?.linkedTaskId === 'string' ? body.linkedTaskId : null,
-      typeof body?.linkedEventId === 'string' ? body.linkedEventId : null,
+      linkedTaskId,
+      linkedEventId,
     )
     .run()
   const row = await c.env.DB.prepare(
@@ -121,6 +132,26 @@ noteRoutes.patch('/:id', async (c) => {
     )
   }
 
+  const linkedTaskId =
+    typeof body?.linkedTaskId === 'string'
+      ? body.linkedTaskId
+      : ((existing.linkedTaskId as string) ?? null)
+  const linkedEventId =
+    typeof body?.linkedEventId === 'string'
+      ? body.linkedEventId
+      : ((existing.linkedEventId as string) ?? null)
+  const unowned = await firstUnownedLink(c.env.DB, user.id, [
+    {
+      kind: 'task',
+      id: typeof body?.linkedTaskId === 'string' ? linkedTaskId : null,
+    },
+    {
+      kind: 'event',
+      id: typeof body?.linkedEventId === 'string' ? linkedEventId : null,
+    },
+  ])
+  if (unowned) return c.json(linkNotFound(unowned), 404)
+
   await c.env.DB.prepare(
     `UPDATE notes SET title = ?, body = ?, category_id = ?, pinned = ?,
       linked_task_id = ?, linked_event_id = ?,
@@ -140,12 +171,8 @@ noteRoutes.patch('/:id', async (c) => {
         : existing.pinned
           ? 1
           : 0,
-      typeof body?.linkedTaskId === 'string'
-        ? body.linkedTaskId
-        : ((existing.linkedTaskId as string) ?? null),
-      typeof body?.linkedEventId === 'string'
-        ? body.linkedEventId
-        : ((existing.linkedEventId as string) ?? null),
+      linkedTaskId,
+      linkedEventId,
       id,
       user.id,
     )
