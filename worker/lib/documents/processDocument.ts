@@ -13,6 +13,7 @@
 import { extractText } from '../../../shared/documents/binaryText'
 import {
   understandDocument,
+  withDeadlinePlan,
   type DocumentUnderstanding,
 } from '../../../shared/documents/understand'
 import { userLocalNow } from '../../../shared/intelligence/grounding'
@@ -157,6 +158,12 @@ export async function processDocumentForUser(
           'The AI reader had a problem, so the built-in goblin read it instead.',
         )
       }
+    }
+    if (understanding && extracted.text) {
+      understanding = withDeadlinePlan(understanding, extracted.text, {
+        reference: local,
+        monthFirst: options.monthFirst,
+      })
     }
     await recordAiEvent(
       env.DB,

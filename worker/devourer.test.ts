@@ -519,3 +519,66 @@ describe('untrusted content and AI', () => {
     })
   })
 })
+
+describe('deadline plans (any document with deadlines)', () => {
+  const inDays = (n: number) => {
+    const d = new Date(Date.now() + n * 86_400_000)
+    return `${d.getUTCDate()} ${d.toLocaleString('en', { month: 'long', timeZone: 'UTC' })} ${d.getUTCFullYear()}`
+  }
+
+  it('turns several deadlines into one plan that can be added in full', async () => {
+    const outline = [
+      'Project brief and schedule',
+      `Research proposal (40%) due ${inDays(40)}`,
+      `Progress meeting on ${inDays(50)}`,
+      `URGENT: return the signed safety form by ${inDays(1)}`,
+    ].join('\n')
+    const { status, body } = await upload(alice, outline, { name: 'brief.txt' })
+    expect(status).toBe(201)
+    expect(body.processing.summary).toMatch(/^I found 3 deadlines/)
+    const items = body.suggestions as Json[]
+    // Every planned item says which deadline it belongs to.
+    expect(items.every((s) => typeof s.group === 'string')).toBe(true)
+    const proposal = items.filter((s) => s.group === 'Research proposal')
+    expect(proposal.map((s) => s.type)).toEqual([
+      'appointment',
+      'task',
+      'task',
+      'task',
+      'task',
+      'task',
+    ])
+    const urgent = items.find((s) => s.urgent)
+    expect(urgent).toMatchObject({
+      title: 'Return the signed safety form straight away',
+      priority: 'high',
+    })
+
+    // Accepting keeps the urgency, and the due date lands in the calendar.
+    expect(
+      (await call(alice, `/api/review/${urgent!.id}/accept`, 'POST', {}))
+        .status,
+    ).toBe(200)
+    expect(
+      h.query(`SELECT title, priority FROM tasks WHERE user_id = ?`, alice.id),
+    ).toEqual([
+      {
+        title: 'Return the signed safety form straight away',
+        priority: 'high',
+      },
+    ])
+    const due = proposal[0]!
+    await call(alice, `/api/review/${due.id}/accept`, 'POST', {})
+    expect(
+      h.query(`SELECT title, all_day FROM events WHERE user_id = ?`, alice.id),
+    ).toEqual([{ title: 'Due: Research proposal', all_day: 1 }])
+  })
+
+  it('keeps a single bill as a simple payment task', async () => {
+    const { body } = await upload(alice, BILL)
+    expect((body.suggestions as Json[]).map((s) => s.title)).toEqual([
+      'Pay electricity bill',
+      'Electricity bill due 28 October 2030',
+    ])
+  })
+})

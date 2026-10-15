@@ -62,9 +62,12 @@ function errorText(err: unknown) {
 function SuggestionRow({
   suggestion,
   onDone,
+  compact = false,
 }: {
   suggestion: DocumentSuggestion
   onDone: (outcome: 'accepted' | 'skipped') => void
+  /** Inside a plan: the quote is shown once for the whole deadline. */
+  compact?: boolean
 }) {
   const meta = TYPE_META[suggestion.type] ?? TYPE_META.task
   const Icon = meta.icon
@@ -111,6 +114,9 @@ function SuggestionRow({
           {meta.label}
         </span>
         <strong>{suggestion.title}</strong>
+        {suggestion.urgent ? (
+          <span className={styles.urgentBadge}>Do first</span>
+        ) : null}
       </div>
       {suggestion.details ? (
         <p className={styles.muted}>{suggestion.details}</p>
@@ -155,7 +161,7 @@ function SuggestionRow({
           ) : null}
         </div>
       ) : null}
-      {suggestion.sourceExcerpt ? (
+      {suggestion.sourceExcerpt && !compact ? (
         <p className={styles.quote}>
           From the document: “{suggestion.sourceExcerpt}”
         </p>
@@ -189,6 +195,24 @@ function SuggestionRow({
   )
 }
 
+type PlanGroup = { label: string; items: DocumentSuggestion[] }
+
+/** Planned steps grouped by the deadline they lead up to, urgent first. */
+function planGroups(items: DocumentSuggestion[]): PlanGroup[] {
+  const groups = new Map<string, DocumentSuggestion[]>()
+  for (const s of items) {
+    if (!s.group) continue
+    groups.set(s.group, [...(groups.get(s.group) ?? []), s])
+  }
+  return [...groups.entries()]
+    .map(([label, list]) => ({ label, items: list }))
+    .sort(
+      (a, b) =>
+        Number(b.items.some((s) => s.urgent)) -
+        Number(a.items.some((s) => s.urgent)),
+    )
+}
+
 /** Review a devoured document, then finish (forget) or keep it. */
 export function DevourReview({
   result,
@@ -210,6 +234,10 @@ export function DevourReview({
   )
   const [devoured, setDevoured] = useState<{ saved: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [adding, setAdding] = useState<{ done: number; total: number } | null>(
+    null,
+  )
+  const [addedNote, setAddedNote] = useState<string | null>(null)
 
   const refresh = () =>
     Promise.all(
@@ -240,6 +268,44 @@ export function DevourReview({
     },
     onError: (err) => setError(errorText(err)),
   })
+
+  /** One tap: add every planned step and date, skipping ones already there. */
+  async function addWholePlan() {
+    const ready = open.filter((s) => !(needsDate(s) && !s.dueDate))
+    setError(null)
+    setAdding({ done: 0, total: ready.length })
+    let added = 0
+    let already = 0
+    for (const [i, s] of ready.entries()) {
+      try {
+        await acceptReviewItem(s.id, {
+          dueDate: s.dueDate,
+          startTime: s.startTime,
+        })
+        added += 1
+        setSaved((n) => n + 1)
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 409) {
+          // Already on the list (or already added): don't make a twin.
+          await dismissReviewItem(s.id).catch(() => undefined)
+          already += 1
+        } else {
+          setError(errorText(err))
+          break
+        }
+      }
+      setOpen((list) => list.filter((x) => x.id !== s.id))
+      setAdding({ done: i + 1, total: ready.length })
+    }
+    setAdding(null)
+    setAddedNote(
+      `Added ${added} to your tasks and calendar.${already ? ` ${already} ${already === 1 ? 'was' : 'were'} already there.` : ''}`,
+    )
+    await refresh()
+  }
+
+  const groups = planGroups(open)
+  const loose = open.filter((s) => !s.group)
 
   if (devoured) {
     return (
@@ -296,11 +362,62 @@ export function DevourReview({
         </ul>
       ) : null}
 
-      {open.length > 0 ? (
+      {addedNote ? (
+        <p className={styles.addedNote} role="status">
+          <Check size={16} aria-hidden /> {addedNote}
+        </p>
+      ) : null}
+
+      {groups.length > 0 ? (
+        <section className={styles.plan} aria-labelledby="plan-heading">
+          <div className={styles.planTop}>
+            <h3 id="plan-heading">Your plan</h3>
+            <Button
+              onClick={() => void addWholePlan()}
+              disabled={adding !== null}
+            >
+              <CalendarDays size={16} aria-hidden />
+              {adding
+                ? `Adding ${adding.done} of ${adding.total}…`
+                : `Add the whole plan (${open.length})`}
+            </Button>
+          </div>
+          <p className={styles.muted}>
+            Steps go on your task list, due dates go in your calendar. Skip
+            anything you don’t want first.
+          </p>
+          {groups.map((group) => (
+            <div key={group.label} className={styles.planGroup}>
+              <h4 className={styles.planHead}>{group.label}</h4>
+              {group.items[0]?.sourceExcerpt ? (
+                <p className={styles.quote}>
+                  From the document: “{group.items[0].sourceExcerpt}”
+                </p>
+              ) : null}
+              <ul className={styles.suggestions}>
+                {group.items.map((s) => (
+                  <SuggestionRow
+                    key={s.id}
+                    suggestion={s}
+                    compact
+                    onDone={(outcome) => {
+                      setOpen((list) => list.filter((x) => x.id !== s.id))
+                      if (outcome === 'accepted') setSaved((n) => n + 1)
+                      void refresh()
+                    }}
+                  />
+                ))}
+              </ul>
+            </div>
+          ))}
+        </section>
+      ) : null}
+
+      {loose.length > 0 ? (
         <>
           <p className={styles.muted}>Nothing is added until you say yes.</p>
           <ul className={styles.suggestions}>
-            {open.map((s) => (
+            {loose.map((s) => (
               <SuggestionRow
                 key={s.id}
                 suggestion={s}
@@ -313,7 +430,7 @@ export function DevourReview({
             ))}
           </ul>
         </>
-      ) : !unreadable ? (
+      ) : !unreadable && groups.length === 0 && !addedNote ? (
         <p className={styles.muted}>
           {saved > 0
             ? `Added ${saved} item${saved === 1 ? '' : 's'}.`

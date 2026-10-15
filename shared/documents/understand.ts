@@ -7,6 +7,7 @@
  * Never invents amounts, dates or times: everything comes from the text.
  */
 import type { Confidence } from '../types'
+import { planDeadlines } from './deadlines'
 import {
   addDays,
   dateAfterCue,
@@ -55,6 +56,13 @@ export type DocumentSuggestion = {
   missingInformation: string[]
   sourceExcerpt: string
   categorySlug: string | null
+  /** 'high' puts it at the top of the list ("do this straight away"). */
+  priority?: 'high' | 'normal'
+  urgent?: boolean
+  /** The deadline this belongs to, so a plan can be shown and added together. */
+  group?: string
+  /** "2/5": which step of the plan. */
+  step?: string
 }
 
 export type ExtractedFact = {
@@ -537,5 +545,50 @@ export function understandDocument(
     categorySlug,
     warnings,
     status: 'ready',
+  }
+}
+
+/**
+ * Swap in the deadline planner when a document has real deadlines to work
+ * towards (anything except a single bill or appointment, which the readers
+ * above already handle well), and always surface urgent parts.
+ */
+export function withDeadlinePlan<
+  U extends Pick<
+    DocumentUnderstanding,
+    'documentType' | 'summary' | 'suggestions' | 'warnings' | 'categorySlug'
+  >,
+>(understanding: U, text: string, options: UnderstandOptions = {}): U {
+  const plan = planDeadlines(text.replace(/\r/g, ''), {
+    reference: options.reference ?? new Date(),
+    monthFirst: options.monthFirst,
+    categorySlug: understanding.categorySlug,
+  })
+  if (!plan) return understanding
+  const simple = ['bill', 'appointment', 'medical'].includes(
+    understanding.documentType,
+  )
+  if (plan.deadlines.length >= 2 || (plan.deadlines.length === 1 && !simple)) {
+    return {
+      ...understanding,
+      summary: plan.summary,
+      suggestions: plan.suggestions,
+      warnings: [...understanding.warnings, ...plan.warnings],
+    }
+  }
+  const urgent = plan.suggestions.filter((s) => s.group === 'Urgent')
+  if (!urgent.length && !plan.deadlines.some((d) => d.urgent))
+    return understanding
+  return {
+    ...understanding,
+    summary: urgent.length
+      ? `${understanding.summary} Part of it is urgent, so I’ve put that on today.`
+      : `${understanding.summary} It’s marked urgent, so it’s at the top of your list.`,
+    suggestions: [
+      ...urgent,
+      ...understanding.suggestions.map((s) =>
+        s.type === 'task' ? { ...s, priority: 'high' as const } : s,
+      ),
+    ],
   }
 }

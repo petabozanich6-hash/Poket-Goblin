@@ -71,7 +71,7 @@ async function pendingSuggestions(
               payload_json as payloadJson, uncertain, status
        FROM review_items
        WHERE user_id = ? AND source_type = 'document' AND source_id = ?
-       ORDER BY created_at ASC`,
+       ORDER BY created_at ASC, rowid ASC`,
     )
     .bind(userId, documentId)
     .all<Row>()
@@ -100,6 +100,10 @@ async function pendingSuggestions(
         : [],
       sourceExcerpt:
         typeof payload.sourceExcerpt === 'string' ? payload.sourceExcerpt : '',
+      group: typeof payload.group === 'string' ? payload.group : null,
+      step: typeof payload.step === 'string' ? payload.step : null,
+      priority: payload.priority === 'high' ? 'high' : 'normal',
+      urgent: payload.urgent === true,
     }
   })
 }

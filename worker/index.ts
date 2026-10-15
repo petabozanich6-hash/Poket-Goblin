@@ -19,6 +19,7 @@ import { accountRoutes } from './routes/account'
 import { adminRoutes } from './routes/admin'
 import { authRoutes } from './routes/auth'
 import { captureRoutes } from './routes/captures'
+import { calendarRoutes, icsFeedRoutes } from './routes/calendar'
 import { categoryRoutes } from './routes/categories'
 import { connectionRoutes } from './routes/connections'
 import { dashboardRoutes } from './routes/dashboard'
@@ -87,12 +88,15 @@ app.use('*', async (c, next) => {
 
 app.route('/auth', authRoutes)
 app.route('/platform', platformRoutes)
+// Calendar apps can't sign in: the private link's token is the key.
+app.route('/ics', icsFeedRoutes)
 
 app.use('*', async (c, next) => {
   if (
     c.req.path.startsWith('/api/auth') ||
     c.req.path.startsWith('/api/platform') ||
     c.req.path === '/api/health' ||
+    c.req.path.startsWith('/api/ics/') ||
     c.req.path === '/api/connections/oauth/callback'
   ) {
     return next()
@@ -118,6 +122,7 @@ app.route('/tasks', taskRoutes)
 app.route('/captures', captureRoutes)
 app.route('/plan', planRoutes)
 app.route('/events', eventRoutes)
+app.route('/calendar', calendarRoutes)
 app.route('/reminders', reminderRoutes)
 app.route('/notes', noteRoutes)
 app.route('/shopping', shoppingRoutes)

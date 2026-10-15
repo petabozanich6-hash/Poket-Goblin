@@ -360,7 +360,7 @@ reviewRoutes.post('/:id/accept', async (c) => {
       await c.env.DB.prepare(
         `INSERT INTO tasks
         (id, user_id, category_id, title, notes, priority, due_date, capacity_cost)
-       VALUES (?, ?, ?, ?, ?, 'normal', ?, 2)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, 2)`,
       )
         .bind(
           createdId,
@@ -368,6 +368,8 @@ reviewRoutes.post('/:id/accept', async (c) => {
           categoryId,
           title,
           typeof payload.details === 'string' ? payload.details : '',
+          // "Do this straight away" parts of a document plan.
+          payload.priority === 'high' ? 'high' : 'normal',
           dueDate,
         )
         .run()

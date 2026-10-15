@@ -31,6 +31,11 @@ export type DocumentSuggestion = {
   startTime: string | null
   missingInformation: string[]
   sourceExcerpt: string
+  /** The deadline a planned step belongs to. */
+  group?: string | null
+  step?: string | null
+  priority?: 'high' | 'normal'
+  urgent?: boolean
 }
 
 export type DevourResponse = {
