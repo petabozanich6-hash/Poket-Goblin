@@ -51,7 +51,8 @@ function SettingSection<K extends Key>({
     setMessage(null)
     setError(null)
     try {
-      await hq.saveSetting(settingKey, draft, confirm)
+      const saved = await hq.saveSetting(settingKey, draft, confirm)
+      setDraft(saved.value)
       setReasons(null)
       setMessage('Saved.')
       await queryClient.invalidateQueries({ queryKey: ['hq', 'settings'] })
@@ -208,7 +209,6 @@ export function HqSettingsPage() {
       </p>
 
       <SettingSection
-        key={`announcement-${data.updatedAt.announcement ?? ''}`}
         settingKey="announcement"
         title="Announcement"
         lead="A short banner for every customer, signed in or not."
@@ -246,7 +246,6 @@ export function HqSettingsPage() {
       </SettingSection>
 
       <SettingSection
-        key={`maintenance-${data.updatedAt.maintenance ?? ''}`}
         settingKey="maintenance"
         title="Maintenance messaging"
         lead="Tells customers about planned work. It shows a message; it does not take the app offline."
@@ -271,7 +270,6 @@ export function HqSettingsPage() {
       </SettingSection>
 
       <SettingSection
-        key={`features-${data.updatedAt.features ?? ''}`}
         settingKey="features"
         title="Feature availability"
         lead="Switch whole features on or off for everyone."
@@ -299,7 +297,6 @@ export function HqSettingsPage() {
       </SettingSection>
 
       <SettingSection
-        key={`aiLimits-${data.updatedAt.aiLimits ?? ''}`}
         settingKey="aiLimits"
         title="AI usage safeguards"
         lead={`Goblin-intelligence requests per customer per day. Maximum ${limits.aiDailyMax}; raising any limit above ${limits.aiDailyHighImpact} needs confirmation. The Owner has a limit too.`}
@@ -330,7 +327,6 @@ export function HqSettingsPage() {
       </SettingSection>
 
       <SettingSection
-        key={`storageQuotas-${data.updatedAt.storageQuotas ?? ''}`}
         settingKey="storageQuotas"
         title="Storage limits"
         lead={`Document storage per customer, in MB. Maximum ${limits.storageMbMax} MB; raising any quota above ${limits.storageMbHighImpact} MB needs confirmation. Single files are capped at 10 MB.`}
