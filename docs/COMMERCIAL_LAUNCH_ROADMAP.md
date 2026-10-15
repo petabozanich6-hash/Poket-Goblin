@@ -209,7 +209,10 @@ schema changes or design decisions, and they do not cause the outage.
 
 ### Phase 1 status
 
-Implemented on branch `fix/phase1-deploy-and-security` (PR to `development`).
+**Merged and live** (PR #9, then a Workers Builds redeploy once Cloudflare
+was reconnected to this repository). Verified on pocketgoblin.org: `/`
+serves the SPA, the XSS and CORS fixes are live, security headers are set,
+and `AUTH_SECRET` is accepted.
 The owner approved §5 as listed. Where §5 depended on a decision, the
 recommendation was used:
 
@@ -219,7 +222,7 @@ recommendation was used:
   (`public/.assetsignore`).
 - **D4 (HSTS):** not set. It is still pending.
 
-Before this reaches production, D2 and D3 are still required.
+Branch protection on `main` (D8) is still recommended now that merges deploy.
 
 ---
 
@@ -343,11 +346,13 @@ Each phase gets its own branch and PR, approved before merge.
    Email Service or a third party), privacy policy, terms, cookie notice,
    GDPR rights flows.
 4. **Phase 4: Stripe subscriptions.** Checkout, Customer Portal, webhook
-   Worker route with signature verification, `subscriptions` and `entitlements`
-   tables (additive migration `0006`). No billing code exists today.
-5. **Phase 5: free/premium limits.** Generalise `ai_usage_daily` and the
-   upload cap into per-plan limits (AI calls, storage bytes, document count),
-   with a usage UI.
+   Worker route with signature verification. The data model now exists:
+   `user_entitlements` (migration `0006`, §11) with `source='stripe'`, status,
+   interval, currency and Stripe ids. The webhook writes only entitlements,
+   never roles.
+5. **Phase 5: free/premium limits.** Per-plan AI and storage limits exist and
+   are Owner-adjustable (§11). Still missing: free-tier feature gating,
+   upgrade prompts and a customer usage page.
 6. **Phase 6: AI routing.** Per-tier model selection on top of the existing
    `resolveProvider`/rule fallback, cost logging, failover.
 7. **Phase 7: document lifecycle.** Queue-based processing (replacing the
@@ -358,3 +363,219 @@ Each phase gets its own branch and PR, approved before merge.
 9. **Phase 9: launch testing.** Smokes and e2e in CI, per-route authz
    regression suite, load test of auth and upload, uptime monitoring, incident
    runbook.
+10. **Owner account and Goblin HQ.** Implemented, awaiting review (§11).
+
+---
+
+## 11. Owner account and Goblin HQ
+
+Status: implemented on two branches, **not merged, migrated, promoted or
+deployed**.
+
+| Branch              | Contents                                             | Merge order                            |
+| ------------------- | ---------------------------------------------------- | -------------------------------------- |
+| `feat/owner-schema` | Migration `0006` + a real-SQLite test harness        | 1st (no app change)                    |
+| `feat/owner-hq`     | Built on the schema branch: API, UI, workflow, tests | 3rd, after migration `0006` is applied |
+
+### Administrative roles
+
+- `roles` catalogue (seeded: `owner`) and `user_roles` (grant metadata,
+  `revoked_at`, one active grant per role per user). Ordinary customers have
+  no row.
+- `worker/lib/access.ts` maps roles to permissions (`admin.access`,
+  `metrics.read`, `customers.read`, `customers.suspend`,
+  `customers.sessions.revoke`, `subscriptions.read`, `settings.read`,
+  `settings.write`, `audit.read`). A future support role is one catalogue row
+  and one mapping entry.
+- **No endpoint can grant or change a role.** The only path is the
+  approval-gated promotion workflow. Roles are re-read from D1 on every
+  request and never cached in the cookie.
+
+### Entitlements
+
+- `user_entitlements`: `premium` (from Stripe, later) and `owner_premium`
+  (granted administratively, permanent).
+- `resolvePlan()` gives `owner_premium` to the Owner role whatever billing
+  says. `premium` counts while `active`, `trialing` or `past_due` and within
+  its period. `PLAN_SQL` is its SQL twin for aggregates; tests keep them
+  identical.
+- Premium never grants a role. An expired, cancelled or failed subscription
+  never removes Owner or Owner Premium.
+- There is no free-tier gating yet, so every customer still has every
+  feature and nothing changes for them. The Owner sees no payment or upgrade
+  prompt (none exist).
+- The Owner stays subject to safeguards: a per-plan AI daily limit (Owner
+  default 200), a per-plan storage quota (Owner default 20 GB), file
+  validation, data isolation and rate limits.
+
+### Goblin HQ API (`/api/admin/*`)
+
+Every request passes, in order:
+
+1. Session check: signed in, not suspended.
+2. Owner permission check: 404 for everyone else.
+3. CSRF check on changes: allow-listed `Origin`, `Sec-Fetch-Site: same-origin`
+   and the `X-Pocket-Goblin-Admin: 1` header.
+4. Per-user rate limits.
+5. Passkey step-up (15 minutes), except the step-up endpoints themselves.
+6. Per-route permission check, input validation and an audit record.
+
+| Endpoint                                                          | Purpose                                                                  |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `GET /security/status`                                            | Passkey count and step-up state                                          |
+| `POST /security/passkeys/register/options`, `…/verify`            | Add a passkey (the first one needs the password again)                   |
+| `POST /security/step-up/options`, `…/verify`, `…/end`             | Passkey step-up; lock HQ early                                           |
+| `GET /security/passkeys`, `DELETE /security/passkeys/:id`         | Manage passkeys (the last one can't be removed)                          |
+| `GET /security/sessions`, `POST /security/sessions/revoke-others` | Own sessions                                                             |
+| `GET /overview`                                                   | Customer, subscription, AI, storage and health metrics                   |
+| `GET /customers`, `GET /customers/:id`                            | Search and detail: metadata and counts only                              |
+| `POST /customers/:id/suspend`, `…/restore`, `…/sessions/revoke`   | Account actions; a reason is required, and suspend needs `SUSPEND` typed |
+| `GET /subscriptions`                                              | Entitlement records (empty until Stripe)                                 |
+| `GET /settings`, `PUT /settings/:key`                             | Platform settings                                                        |
+| `GET /audit`                                                      | Audit log                                                                |
+
+Public: `GET /api/platform/status` returns the announcement, the maintenance
+message and whether registration is open.
+
+### Metrics: what is real
+
+Exact D1 counts:
+
+- customers by plan, new, active and suspended
+- AI provider calls (`ai_usage_daily`), and feature and outcome from
+  `ai_events` (recorded from this release on)
+- document bytes and counts, processing failures
+- unhandled API errors (`app_errors`) and failed jobs
+
+Shown as **Not configured**: Stripe revenue, AI spending, and deployment
+history. "Active users" uses session activity recorded at most hourly, so it
+fills in from this release onward.
+
+### Customer privacy
+
+Admin queries select metadata only (email, name, dates, status, plan, counts,
+byte sizes). They never select titles, bodies, raw brain dumps, file names,
+extracted text or locations. There is no impersonation. A test plants content
+in a customer's tasks, notes, brain dumps and documents, and asserts that no
+admin response contains it. Support access to content would need its own
+consent-based design.
+
+### Platform settings
+
+These are stored in `platform_settings`, validated strictly, and every
+before/after value is audited. An empty table means the defaults, which are
+today's behaviour:
+
+- announcement and maintenance banners
+- registrations open or closed
+- document uploads on or off
+- paid-AI kill switch
+- AI limits per plan (maximum 500)
+- storage quotas per plan (maximum 50 GB)
+
+High-cost changes need a second confirmation:
+
+- raising an AI limit above 100
+- raising a storage quota above 5 GB
+- turning paid AI back on
+- closing registrations
+
+Secrets are never readable or writable here.
+
+### Owner security
+
+- **Passkeys (WebAuthn, phishing-resistant)** guard all of HQ. Challenges are
+  single-use, expire after five minutes and are bound to the session that
+  requested them.
+- Adding the first passkey needs the account password again. Adding more
+  needs a step-up.
+- Suspension revokes sessions and blocks sign-in. It is checked after the
+  password, so it is not an oracle. Owners can't be suspended.
+- Security events cover sign-ins, failures, suspension and step-ups.
+- Known limit: rate limits are still per isolate (Phase 2 makes them
+  durable).
+
+### Migration `0006`
+
+Additive only:
+
+- new tables
+- defaulted or nullable columns on `users` and `sessions`
+- one catalogue row (`roles` = `owner`)
+
+It contains no email address, grants nothing, and passes the D1 workflow's
+destructive-statement guard. A test applies it on top of populated
+`0001`–`0005` data and checks that users, sessions and tasks are unchanged.
+
+### Owner promotion
+
+See [OWNER_PROMOTION.md](OWNER_PROMOTION.md).
+
+- The workflow is "Owner promotion (production)". Preflight is read-only.
+- `apply` needs `PROMOTE` typed, must run from `main`, waits for the
+  `production-database` approval, and records a Time Travel bookmark first.
+- The account is identified by its internal user ID. The email on record
+  must match the `OWNER_EXPECTED_EMAIL` environment secret; only a masked
+  form is printed, because the repository is public.
+- It refuses if any Owner exists.
+- The guarded, parameterised `INSERT … SELECT` statements can't promote any
+  other account.
+- Password, email, sessions and data are untouched.
+
+### Production deployment procedure (safe order)
+
+1. Review and merge `feat/owner-schema` into `development`, then into
+   `main`. The deploy is a no-op for customers because no code changes.
+2. Actions → **D1 migrations (production)**: run `preflight`, check that only
+   `0006` is pending, then `apply` and approve. This reuses the existing
+   tokens; the migrate token is not rotated.
+3. Review and merge `feat/owner-hq` into `development`, then into `main`.
+   Workers Builds deploys it. The new code reads the `0006` columns, which is
+   why step 2 must come first.
+4. Add the `OWNER_EXPECTED_EMAIL` secret to both D1 environments. Then run
+   **Owner promotion (production)**: `preflight`, then `apply` and approve,
+   using the Account ID shown under Settings → Account.
+5. Sign in, open 👑 **Goblin HQ**, add two passkeys (for example a laptop and
+   a phone), and confirm.
+
+### Rollback and recovery
+
+- **Code:** Workers & Pages → `pocket-goblin` → Deployments → Rollback. The
+  old code ignores the new tables and columns, so this is safe after `0006`.
+- **Promotion:** revoke the role and end the entitlement with the SQL in
+  OWNER_PROMOTION.md. No data is lost.
+- **Lost passkeys:** delete the Owner's `webauthn_credentials` rows by hand,
+  then re-enrol (the password is asked again).
+- **Schema:** `0006` can stay in place under old code. Time Travel restore
+  rewinds all data and is for emergencies only.
+
+### Testing results (local)
+
+- Typecheck, lint and format all pass, and the build succeeds.
+- Unit and integration tests: **189 passed**. New suites run on real SQLite
+  with the real migrations:
+  - `admin.test.ts`: authorisation, CSRF, suspension, privacy, entitlements,
+    settings, audit and sessions
+  - `passkeys.test.ts`
+  - `access.test.ts`: plan logic, and that the TypeScript and SQL versions
+    agree
+  - `migrations.test.ts`
+  - `owner-promotion.test.mjs`
+- A mutation check confirmed the tests fail when the step-up or CSRF guards
+  are removed.
+- Playwright: **3 passed** against local `npm run dev` with the local D1,
+  including the real passkey enrolment and step-up (virtual authenticator)
+  and checks at desktop, tablet and phone sizes. The existing first-run
+  journey still passes.
+- Not run: anything against production.
+
+### Outstanding integration dependencies
+
+- **Stripe** (Phase 4): webhook writes to `user_entitlements`, revenue
+  reporting and billing actions (refunds, cancellations) via Stripe, and
+  `STRIPE_SECRET_KEY` as a Worker secret. Do not create duplicate products or
+  prices. Live payments need approval.
+- **AI cost reporting:** needs provider token prices or the provider's usage
+  API.
+- **Deployment history:** needs a read-only Cloudflare API token, if wanted.
+- **Durable rate limiting and Turnstile:** Phase 2.
