@@ -196,12 +196,12 @@ export function InboxPage() {
                       Dismiss
                     </Button>
                     {item.sourceType === 'document' && item.sourceId ? (
-                      <Link className={styles.tab} to="/vault">
+                      <Link className={styles.tab} to="/life/documents">
                         Open vault
                       </Link>
                     ) : null}
                     {item.sourceType === 'capture' ? (
-                      <Link className={styles.tab} to="/capture">
+                      <Link className={styles.tab} to="/tell">
                         Open dump
                       </Link>
                     ) : null}

@@ -8,18 +8,17 @@ import { api, ApiError } from '@/lib/api'
 
 import styles from './AuthPage.module.css'
 
-/** Read #token=… from the link and remove it from the address bar. */
+/** The single-use token from the link (#token=…; never sent to the server in the URL). */
 function useFragmentToken(): string {
-  const [token] = useState(() => {
-    const match = window.location.hash.match(/token=([A-Za-z0-9_-]+)/)
-    return match?.[1] ?? ''
-  })
-  useEffect(() => {
-    if (window.location.hash) {
-      window.history.replaceState(null, '', window.location.pathname)
-    }
-  }, [])
-  return token
+  const match = window.location.hash.match(/token=([A-Za-z0-9_-]+)/)
+  return match?.[1] ?? ''
+}
+
+/** Once a token has been used, take it out of the address bar and history. */
+function forgetFragment() {
+  if (window.location.hash) {
+    window.history.replaceState(null, '', window.location.pathname)
+  }
 }
 
 function errorText(err: unknown) {
@@ -123,6 +122,7 @@ export function ResetPasswordPage() {
     setError(null)
     try {
       await api.post('/auth/password/reset', { token, password })
+      forgetFragment()
       setDone(true)
     } catch (err) {
       setError(errorText(err))
@@ -131,7 +131,7 @@ export function ResetPasswordPage() {
     }
   }
 
-  if (!token) {
+  if (!token && !done) {
     return (
       <Shell title="Reset link missing">
         <p>
@@ -202,6 +202,7 @@ export function VerifyEmailPage() {
       .post('/auth/verify-email', { token })
       .then(() => setState('done'))
       .catch(() => setState('failed'))
+      .finally(forgetFragment)
   }, [token])
 
   return (

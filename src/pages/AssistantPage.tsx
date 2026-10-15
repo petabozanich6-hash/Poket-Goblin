@@ -102,17 +102,17 @@ export function AssistantPage() {
   function actionHref(action: AssistantAction): string | null {
     switch (action.kind) {
       case 'open_plan':
-        return '/plan'
+        return '/life/plan'
       case 'open_capture':
-        return '/capture'
+        return '/tell'
       case 'open_calendar':
-        return '/calendar'
+        return '/life/calendar'
       case 'open_tasks':
-        return '/tasks'
+        return '/life/tasks'
       case 'open_life':
         return '/life'
       case 'open_find':
-        return '/find'
+        return '/life/search'
       default:
         return null
     }

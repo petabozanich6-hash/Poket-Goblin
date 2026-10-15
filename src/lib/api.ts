@@ -16,6 +16,14 @@ export class ApiError extends Error {
   }
 }
 
+/** Pages that work signed out; never redirect away from them. */
+const PUBLIC_PAGES = new Set([
+  '/',
+  '/forgot-password',
+  '/reset-password',
+  '/verify-email',
+])
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, {
     ...init,
@@ -39,8 +47,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     if (
       sessionGone &&
       !path.startsWith('/auth/') &&
+      // The start-up "am I signed in?" check is not an expiry.
+      path !== '/me' &&
       typeof window !== 'undefined' &&
-      window.location.pathname !== '/'
+      !PUBLIC_PAGES.has(window.location.pathname)
     ) {
       window.dispatchEvent(new CustomEvent('pg:session-expired'))
     }

@@ -18,7 +18,7 @@ test('Just sort it: approve, skip, devour — the task stays, the file goes', as
   await page.getByRole('button', { name: /create account/i }).click()
   await expect(page).toHaveURL(/\/den/, { timeout: 20_000 })
 
-  await page.getByRole('link', { name: 'Vault' }).click()
+  await page.goto('/life/documents')
   await expect(
     page.getByRole('heading', { name: 'Feed the Document Devourer' }),
   ).toBeVisible()
@@ -70,11 +70,11 @@ test('Just sort it: approve, skip, devour — the task stays, the file goes', as
   ).toEqual([])
 
   // The approved task is in Tasks; the skipped reminder was never created.
-  await page.getByRole('link', { name: 'Tasks', exact: true }).click()
+  await page.goto('/life/tasks')
   await expect(page.getByText('Pay electricity bill')).toBeVisible()
 
   // Keep mode puts the file in the vault.
-  await page.getByRole('link', { name: 'Vault' }).click()
+  await page.goto('/life/documents')
   await page.getByLabel(/Keep this document/).check()
   await page.getByLabel(/Choose a bill, letter/).setInputFiles({
     name: 'insurance.txt',

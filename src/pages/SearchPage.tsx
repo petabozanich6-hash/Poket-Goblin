@@ -1,6 +1,6 @@
 import { useDeferredValue, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -9,7 +9,8 @@ import { searchAll } from '@/features/life/lifeApi'
 import styles from './Page.module.css'
 
 export function SearchPage() {
-  const [q, setQ] = useState('')
+  const [params] = useSearchParams()
+  const [q, setQ] = useState(params.get('q') ?? '')
   const deferred = useDeferredValue(q.trim())
 
   const searchQuery = useQuery({

@@ -15,10 +15,12 @@ import { DocumentsPage } from '@/pages/DocumentsPage'
 import { HomePage } from '@/pages/HomePage'
 import { InboxPage } from '@/pages/InboxPage'
 import { LifePage } from '@/pages/LifePage'
+import { MyLifeLayout, MyLifeOverview } from '@/pages/MyLifePage'
 import { PlanPage } from '@/pages/PlanPage'
 import { SearchPage } from '@/pages/SearchPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { TasksPage } from '@/pages/TasksPage'
+import { TellPage } from '@/pages/TellPage'
 import { HqCustomerPage } from '@/pages/hq/HqCustomerPage'
 import { HqCustomersPage } from '@/pages/hq/HqCustomersPage'
 import { HqLayout } from '@/pages/hq/HqLayout'
@@ -77,19 +79,54 @@ export function AppRouter() {
             </Protected>
           }
         >
+          {/* The four destinations. */}
           <Route path="/den" element={<HomePage />} />
-          <Route path="/capture" element={<CapturePage />} />
-          <Route path="/tasks" element={<TasksPage />} />
-          <Route path="/plan" element={<PlanPage />} />
-          <Route path="/calendar" element={<CalendarPage />} />
-          <Route path="/life" element={<LifePage />} />
-          <Route path="/shopping" element={<Navigate to="/life" replace />} />
-          <Route path="/notes" element={<Navigate to="/life" replace />} />
-          <Route path="/find" element={<SearchPage />} />
-          <Route path="/ask" element={<AssistantPage />} />
-          <Route path="/vault" element={<DocumentsPage />} />
-          <Route path="/inbox" element={<InboxPage />} />
+          <Route path="/tell" element={<TellPage />} />
+          <Route path="/life" element={<MyLifeLayout />}>
+            <Route index element={<MyLifeOverview />} />
+            <Route path="tasks" element={<TasksPage />} />
+            <Route path="calendar" element={<CalendarPage />} />
+            <Route path="lists" element={<LifePage />} />
+            <Route path="documents" element={<DocumentsPage />} />
+            <Route path="plan" element={<PlanPage />} />
+            <Route path="review" element={<InboxPage />} />
+            <Route path="search" element={<SearchPage />} />
+          </Route>
           <Route path="/settings" element={<SettingsPage />} />
+          {/* Still reachable from inside Tell the Goblin. */}
+          <Route path="/ask" element={<AssistantPage />} />
+          <Route path="/capture" element={<CapturePage />} />
+          {/* Old addresses keep working. */}
+          <Route path="/home" element={<Navigate to="/den" replace />} />
+          <Route
+            path="/tasks"
+            element={<Navigate to="/life/tasks" replace />}
+          />
+          <Route
+            path="/calendar"
+            element={<Navigate to="/life/calendar" replace />}
+          />
+          <Route
+            path="/shopping"
+            element={<Navigate to="/life/lists" replace />}
+          />
+          <Route
+            path="/notes"
+            element={<Navigate to="/life/lists" replace />}
+          />
+          <Route path="/plan" element={<Navigate to="/life/plan" replace />} />
+          <Route
+            path="/find"
+            element={<Navigate to="/life/search" replace />}
+          />
+          <Route
+            path="/vault"
+            element={<Navigate to="/life/documents" replace />}
+          />
+          <Route
+            path="/inbox"
+            element={<Navigate to="/life/review" replace />}
+          />
           <Route path="/hq" element={<HqLayout />}>
             <Route index element={<HqOverviewPage />} />
             <Route path="customers" element={<HqCustomersPage />} />

@@ -35,7 +35,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     function onExpired() {
       queryClient.clear()
-      if (window.location.pathname !== '/') {
+      if (
+        !['/', '/forgot-password', '/reset-password', '/verify-email'].includes(
+          window.location.pathname,
+        )
+      ) {
         window.location.assign('/')
       }
     }

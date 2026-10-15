@@ -64,7 +64,7 @@ export function DailyBriefingCard({ onRescue }: Props) {
             ) : null}
             <div className={styles.actions}>
               {briefing.focusTaskId ? (
-                <Link to="/tasks">
+                <Link to="/life/tasks">
                   <Button size="sm">Start with this</Button>
                 </Link>
               ) : null}
@@ -75,7 +75,7 @@ export function DailyBriefingCard({ onRescue }: Props) {
                 Rescue my day
               </Button>
               {briefing.pendingReview > 0 ? (
-                <Link to="/inbox">
+                <Link to="/life/review">
                   <Button size="sm" variant="ghost">
                     Open Inbox
                   </Button>

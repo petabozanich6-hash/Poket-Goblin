@@ -76,7 +76,7 @@ export function ContextualActions({ task }: Props) {
           >
             Add to today
           </Button>
-          <Link to="/vault">
+          <Link to="/life/documents">
             <Button size="sm" variant="ghost">
               Link document
             </Button>

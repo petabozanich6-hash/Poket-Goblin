@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Mic, MicOff } from 'lucide-react'
 
@@ -9,50 +9,26 @@ import { TextArea } from '@/components/ui/Input'
 import { ApiError } from '@/lib/api'
 
 import { createCapture } from './captureApi'
+import { useVoiceInput } from './useVoiceInput'
 import styles from './QuickCapture.module.css'
 
 type QuickCaptureProps = {
   onCaptured?: (capture: Capture) => void
 }
 
-type SpeechRecognitionLike = {
-  continuous: boolean
-  interimResults: boolean
-  lang: string
-  start: () => void
-  stop: () => void
-  onresult:
-    | ((event: {
-        resultIndex: number
-        results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }>
-      }) => void)
-    | null
-  onerror: ((event: { error: string }) => void) | null
-  onend: (() => void) | null
-}
-
-function getSpeechRecognition(): (new () => SpeechRecognitionLike) | null {
-  const w = window as unknown as {
-    SpeechRecognition?: new () => SpeechRecognitionLike
-    webkitSpeechRecognition?: new () => SpeechRecognitionLike
-  }
-  return w.SpeechRecognition || w.webkitSpeechRecognition || null
-}
-
 export function QuickCapture({ onCaptured }: QuickCaptureProps) {
   const [text, setText] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [listening, setListening] = useState(false)
-  const [voiceSupported, setVoiceSupported] = useState(false)
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
   const queryClient = useQueryClient()
-
-  useEffect(() => {
-    setVoiceSupported(Boolean(getSpeechRecognition()))
-    return () => {
-      recognitionRef.current?.stop()
-    }
-  }, [])
+  const voice = useVoiceInput(
+    (chunk) =>
+      setText((prev) =>
+        `${prev}${prev && !prev.endsWith(' ') ? ' ' : ''}${chunk}`.trim(),
+      ),
+    setError,
+  )
+  const listening = voice.listening
+  const voiceSupported = voice.supported
 
   const mutation = useMutation({
     mutationFn: createCapture,
@@ -76,54 +52,7 @@ export function QuickCapture({ onCaptured }: QuickCaptureProps) {
     mutation.mutate(text.trim())
   }
 
-  function toggleVoice() {
-    const Ctor = getSpeechRecognition()
-    if (!Ctor) {
-      setError(
-        'Voice capture is not supported in this browser. You can still type or paste.',
-      )
-      return
-    }
-
-    if (listening) {
-      recognitionRef.current?.stop()
-      setListening(false)
-      return
-    }
-
-    const recognition = new Ctor()
-    recognition.continuous = true
-    recognition.interimResults = true
-    recognition.lang = navigator.language || 'en-AU'
-    recognition.onresult = (event) => {
-      let finalChunk = ''
-      for (let i = event.resultIndex; i < event.results.length; i += 1) {
-        const result = event.results[i]
-        if (!result) continue
-        if (result.isFinal) finalChunk += result[0].transcript
-      }
-      if (finalChunk) {
-        setText((prev) =>
-          `${prev}${prev && !prev.endsWith(' ') ? ' ' : ''}${finalChunk}`.trim(),
-        )
-      }
-    }
-    recognition.onerror = (event) => {
-      setListening(false)
-      if (event.error === 'not-allowed') {
-        setError(
-          'Microphone permission was denied. Enable it to use voice dump.',
-        )
-      } else if (event.error !== 'aborted') {
-        setError(`Voice capture stopped (${event.error}).`)
-      }
-    }
-    recognition.onend = () => setListening(false)
-    recognitionRef.current = recognition
-    setError(null)
-    setListening(true)
-    recognition.start()
-  }
+  const toggleVoice = voice.toggle
 
   return (
     <form className={styles.form} onSubmit={onSubmit}>
