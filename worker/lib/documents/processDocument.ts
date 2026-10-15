@@ -11,7 +11,10 @@
  * - Temporary ("Just sort it") documents never have their text stored, and a
  *   failure deletes their original immediately.
  */
-import { extractText } from '../../../shared/documents/binaryText'
+import {
+  extractText,
+  scannedPageImage,
+} from '../../../shared/documents/binaryText'
 import {
   understandDocument,
   withDeadlinePlan,
@@ -19,7 +22,10 @@ import {
 } from '../../../shared/documents/understand'
 import { userLocalNow } from '../../../shared/intelligence/grounding'
 import type { Env } from '../../env'
-import { WorkersAiBlockedError } from '../intelligence/workersAi'
+import {
+  transcribeImageWithWorkersAi,
+  WorkersAiBlockedError,
+} from '../intelligence/workersAi'
 import { newId } from '../ids'
 import { resolveProvider } from '../intelligence/provider'
 import {
@@ -119,8 +125,39 @@ export async function processDocumentForUser(
       'ai' | 'ai_unavailable' | 'rules' | 'limit_reached' | 'disabled' =
       !gate.ok ? 'limit_reached' : policy.providerEnabled ? 'rules' : 'disabled'
 
+    // Photos and scanned pages: Workers AI writes out the text it sees, then
+    // it is read exactly like a PDF (planner, automatic adding and all).
+    let readFromImage = false
+    if (extracted.needsVision && aiReady && provider.kind === 'workers_ai') {
+      const image = doc.mimeType.startsWith('image/')
+        ? { bytes, mime: doc.mimeType }
+        : await scannedPageImage(bytes).then((b) =>
+            b ? { bytes: b, mime: 'image/jpeg' } : null,
+          )
+      if (image) {
+        let called = true
+        try {
+          const seen = await transcribeImageWithWorkersAi(
+            policy.env,
+            image.bytes,
+            image.mime,
+          )
+          if (seen.replace(/\s+/g, ' ').trim().length >= 20) {
+            extracted.text = seen
+            extracted.needsVision = false
+            readFromImage = true
+          }
+        } catch (error) {
+          called = !(error instanceof WorkersAiBlockedError)
+        }
+        if (called) await recordUsage(env.DB, userId, provider.kind)
+      }
+    }
+
     const canUseAi =
       aiReady &&
+      // One AI call per document: a photo has already had its turn.
+      !readFromImage &&
       (extracted.text.length > 0 ||
         (extracted.needsVision && provider.kind === 'openai_compatible'))
     if (canUseAi) {
@@ -168,6 +205,12 @@ export async function processDocumentForUser(
           'The AI reader had a problem, so the built-in goblin read it instead.',
         )
       }
+      if (readFromImage) {
+        outcome = 'ai'
+        understanding.warnings.push(
+          'I read this from a photo — check the dates against the original.',
+        )
+      }
     }
     if (understanding && extracted.text) {
       understanding = withDeadlinePlan(understanding, extracted.text, {
@@ -180,7 +223,7 @@ export async function processDocumentForUser(
       env.DB,
       userId,
       'document',
-      canUseAi ? provider.kind : 'rules',
+      canUseAi || readFromImage ? provider.kind : 'rules',
       outcome,
     )
 

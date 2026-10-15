@@ -726,3 +726,115 @@ describe('the Devourer acts first', () => {
     ).toEqual([{ title: 'Due: Assessment 1 Reflective essay' }])
   })
 })
+
+describe('photos and scans (Workers AI)', () => {
+  const fixture = (name: string) =>
+    readFileSync(
+      join(
+        dirname(fileURLToPath(import.meta.url)),
+        `../shared/documents/fixtures/${name}`,
+      ),
+    )
+  const photo = new Uint8Array(fixture('letter-photo.jpg'))
+  const transcript = fixture('letter-photo.txt').toString('utf8')
+
+  /** A pretend Workers AI: the vision model "sees" the letter. */
+  function workersAi(seen = transcript) {
+    const calls: { model: string; image?: string }[] = []
+    const AI = {
+      run: async (model: string, inputs: Json) => {
+        const image = inputs.messages?.[0]?.content?.find?.(
+          (c: Json) => c.type === 'image_url',
+        )?.image_url?.url
+        calls.push({ model, image })
+        if (model.includes('scout')) return { response: seen }
+        throw new Error('only the vision model should be called')
+      },
+    }
+    return {
+      calls,
+      env: { ...h.env, AI_PROVIDER: 'workers_ai', AI: AI as unknown as Ai },
+    }
+  }
+
+  it('reads a photo of a letter and adds what matters', async () => {
+    const ai = workersAi()
+    const { status, body } = await upload(alice, photo, {
+      name: 'IMG_2041.jpg',
+      type: 'image/jpeg',
+      env: ai.env,
+    })
+    expect(status).toBe(201)
+    // One AI call: the vision model, given the photo itself.
+    expect(ai.calls).toHaveLength(1)
+    expect(ai.calls[0]!.image).toMatch(/^data:image\/jpeg;base64,\/9j\//)
+    expect(body.processing).toMatchObject({ status: 'ready' })
+    expect(body.processing.summary).toMatch(/^I found 3 dates/)
+    expect(body.processing.warnings).toContain(
+      'I read this from a photo — check the dates against the original.',
+    )
+    expect(
+      h.query(
+        `SELECT title, all_day FROM events WHERE user_id = ? ORDER BY starts_at`,
+        alice.id,
+      ),
+    ).toEqual([
+      { title: 'Due: Sign and return the permission slip', all_day: 1 },
+      { title: 'Australian Museum visit', all_day: 0 },
+      { title: 'Parent-teacher interviews', all_day: 0 },
+    ])
+    const tasks = (
+      h.query(`SELECT title FROM tasks WHERE user_id = ?`, alice.id) as {
+        title: string
+      }[]
+    ).map((t) => t.title)
+    expect(tasks).toContain(
+      'Urgent: If your child has an asthma plan, return the updated medical form',
+    )
+    expect(tasks).toContain(
+      'Pack for Australian Museum visit: packed lunch, a hat and a water bottle',
+    )
+    expect(tasks).toContain('Book Parent-teacher interviews')
+  })
+
+  it('reads a scanned PDF by its page photo', async () => {
+    const ai = workersAi()
+    // A one-page "scan": the page is just the JPEG.
+    const parts = [
+      '%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n',
+      '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n',
+      '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>\nendobj\n',
+      `4 0 obj\n<< /Type /XObject /Subtype /Image /Width 1000 /Height 1300 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${photo.length} >>\nstream\n`,
+    ]
+    const content = 'q 595 0 0 842 0 0 cm /Im0 Do Q'
+    const pdf = Buffer.concat([
+      Buffer.from(parts.join(''), 'latin1'),
+      Buffer.from(photo),
+      Buffer.from(
+        `\nendstream\nendobj\n5 0 obj\n<< /Length ${content.length} >>\nstream\n${content}\nendstream\nendobj\n%%EOF\n`,
+        'latin1',
+      ),
+    ])
+    const { body } = await upload(alice, new Uint8Array(pdf), {
+      name: 'scan.pdf',
+      type: 'application/pdf',
+      env: ai.env,
+    })
+    expect(ai.calls).toHaveLength(1)
+    expect(ai.calls[0]!.image).toBe(
+      `data:image/jpeg;base64,${Buffer.from(photo).toString('base64')}`,
+    )
+    expect(body.processing.summary).toMatch(/^I found 3 dates/)
+  })
+
+  it('says so plainly when a photo has no readable text', async () => {
+    const ai = workersAi('')
+    const { body } = await upload(alice, photo, {
+      name: 'blurry.jpg',
+      type: 'image/jpeg',
+      env: ai.env,
+    })
+    expect(body.document.status).toBe('needs_ocr')
+    expect(h.query(`SELECT COUNT(*) as n FROM tasks`)).toEqual([{ n: 0 }])
+  })
+})

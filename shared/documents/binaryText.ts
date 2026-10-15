@@ -7,7 +7,7 @@
  * caller then reports that honestly (or uses a vision model if configured).
  */
 
-import { structuredPdfText } from './pdfText'
+import { firstPageImage, structuredPdfText } from './pdfText'
 
 const MAX_INFLATED = 8 * 1024 * 1024
 /** Across all streams of one PDF (fonts, pages, object streams). */
@@ -268,6 +268,23 @@ export async function extractPdfText(bytes: Uint8Array): Promise<string> {
   }
   const joined = tidy(texts.join('\n'))
   return looksLikeText(joined) ? joined.slice(0, MAX_TEXT) : ''
+}
+
+/** The first page's photo of a scanned PDF, as JPEG bytes (or null). */
+export async function scannedPageImage(
+  bytes: Uint8Array,
+): Promise<Uint8Array | null> {
+  try {
+    let budget = MAX_INFLATED_TOTAL
+    return await firstPageImage(bytes, async (d) => {
+      if (budget <= 0) return null
+      const out = await inflate(d, 'deflate')
+      budget -= out?.byteLength ?? 0
+      return out
+    })
+  } catch {
+    return null
+  }
 }
 
 /**

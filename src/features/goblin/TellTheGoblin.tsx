@@ -240,7 +240,11 @@ export function TellTheGoblin({ prominent = false }: { prominent?: boolean }) {
             disabled={send.isPending || (!text.trim() && !file)}
           >
             <Send size={16} aria-hidden />
-            {send.isPending ? 'Thinking…' : 'Give it to the Goblin'}
+            {send.isPending
+              ? send.variables?.attachment?.type.startsWith('image/')
+                ? 'Reading your photo — about 15 seconds…'
+                : 'Thinking…'
+              : 'Give it to the Goblin'}
           </Button>
         </div>
         {voice.listening ? (
