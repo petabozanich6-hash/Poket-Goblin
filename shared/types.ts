@@ -196,6 +196,8 @@ export type UserSettings = {
   planningApproach: PlanningApproach
   goblinFrequency: GoblinFrequency
   completedQuestCount: number
+  /** 'auto': safe, reversible actions happen straight away (with Undo). */
+  goblinAutonomy: 'auto' | 'ask'
 }
 
 export type Achievement = {

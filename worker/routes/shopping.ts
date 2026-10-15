@@ -25,32 +25,48 @@ async function loadList(db: D1Database, userId: string, listId: string) {
     }>()
   if (!list) return null
 
+  // Active items only: bought or removed things are put away.
   const items = await db
     .prepare(
       `SELECT id, list_id as listId, name, quantity, notes, checked, sort_order as sortOrder,
-              created_at as createdAt, updated_at as updatedAt
-       FROM shopping_items WHERE list_id = ? AND user_id = ?
-       ORDER BY checked ASC, sort_order ASC, created_at ASC`,
+              checked_at as checkedAt, created_at as createdAt, updated_at as updatedAt
+       FROM shopping_items
+       WHERE list_id = ? AND user_id = ? AND checked = 0 AND removed_at IS NULL
+       ORDER BY sort_order ASC, created_at ASC`,
     )
     .bind(listId, userId)
     .all()
+  // Recently bought, newest first, for the collapsible history and Undo.
+  const bought = await db
+    .prepare(
+      `SELECT id, list_id as listId, name, quantity, notes, checked, sort_order as sortOrder,
+              checked_at as checkedAt, created_at as createdAt, updated_at as updatedAt
+       FROM shopping_items
+       WHERE list_id = ? AND user_id = ? AND checked = 1 AND removed_at IS NULL
+       ORDER BY COALESCE(checked_at, updated_at) DESC LIMIT 30`,
+    )
+    .bind(listId, userId)
+    .all()
+  const mapItem = (item: Record<string, unknown>) => ({
+    id: item.id as string,
+    listId: item.listId as string,
+    name: item.name as string,
+    quantity: (item.quantity as string) ?? '',
+    notes: (item.notes as string) ?? '',
+    checked: Boolean(item.checked),
+    checkedAt: (item.checkedAt as string) ?? null,
+    sortOrder: item.sortOrder as number,
+    createdAt: item.createdAt as string,
+    updatedAt: item.updatedAt as string,
+  })
 
   return {
     id: list.id,
     name: list.name,
     isDefault: Boolean(list.isDefault),
     createdAt: list.createdAt,
-    items: (items.results ?? []).map((item) => ({
-      id: item.id as string,
-      listId: item.listId as string,
-      name: item.name as string,
-      quantity: (item.quantity as string) ?? '',
-      notes: (item.notes as string) ?? '',
-      checked: Boolean(item.checked),
-      sortOrder: item.sortOrder as number,
-      createdAt: item.createdAt as string,
-      updatedAt: item.updatedAt as string,
-    })),
+    items: (items.results ?? []).map(mapItem),
+    completedItems: (bought.results ?? []).map(mapItem),
   }
 }
 
@@ -143,9 +159,18 @@ shoppingRoutes.patch('/items/:id', async (c) => {
     unknown
   > | null
 
+  const nextChecked =
+    typeof body?.checked === 'boolean'
+      ? body.checked
+        ? 1
+        : 0
+      : existing.checked
+
   await c.env.DB.prepare(
     `UPDATE shopping_items SET
       name = ?, quantity = ?, notes = ?, checked = ?, sort_order = ?,
+      checked_at = CASE WHEN ? = 1 AND checked = 0 THEN strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+                        WHEN ? = 0 THEN NULL ELSE checked_at END,
       updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
      WHERE id = ? AND user_id = ?`,
   )
@@ -163,6 +188,8 @@ shoppingRoutes.patch('/items/:id', async (c) => {
           : 0
         : existing.checked,
       typeof body?.sortOrder === 'number' ? body.sortOrder : existing.sortOrder,
+      nextChecked,
+      nextChecked,
       id,
       user.id,
     )

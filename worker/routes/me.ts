@@ -109,6 +109,11 @@ meRoutes.patch('/settings', async (c) => {
   ) {
     return c.json({ error: 'Invalid goblin frequency' }, 400)
   }
+  const goblinAutonomy =
+    body?.goblinAutonomy === 'ask' || body?.goblinAutonomy === 'auto'
+      ? body.goblinAutonomy
+      : null
+
   if (quietHoursStart && parseHm(quietHoursStart) === null) {
     return c.json({ error: 'Invalid quietHoursStart' }, 400)
   }
@@ -131,6 +136,7 @@ meRoutes.patch('/settings', async (c) => {
     reducedMotion: reducedMotion ?? current.reducedMotion,
     planningApproach: planningApproach ?? current.planningApproach,
     goblinFrequency: goblinFrequency ?? current.goblinFrequency,
+    goblinAutonomy: goblinAutonomy ?? current.goblinAutonomy,
   }
 
   await c.env.DB.prepare(
@@ -139,7 +145,7 @@ meRoutes.patch('/settings', async (c) => {
          quiet_hours_enabled = ?, quiet_hours_start = ?, quiet_hours_end = ?,
          nudge_frequency = ?, daily_briefing_enabled = ?,
          evening_checkin_enabled = ?, reduced_motion = ?,
-         planning_approach = ?, goblin_frequency = ?,
+         planning_approach = ?, goblin_frequency = ?, goblin_autonomy = ?,
          updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
      WHERE user_id = ?`,
   )
@@ -156,6 +162,7 @@ meRoutes.patch('/settings', async (c) => {
       next.reducedMotion ? 1 : 0,
       next.planningApproach,
       next.goblinFrequency,
+      next.goblinAutonomy,
       user.id,
     )
     .run()

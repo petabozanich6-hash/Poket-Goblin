@@ -30,7 +30,7 @@ export async function loadOpenItemIndex(
     db
       .prepare(
         `SELECT id, name as title FROM shopping_items
-         WHERE user_id = ? AND checked = 0
+         WHERE user_id = ? AND checked = 0 AND removed_at IS NULL
          ORDER BY created_at DESC LIMIT 500`,
       )
       .bind(userId)

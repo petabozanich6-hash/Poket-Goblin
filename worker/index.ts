@@ -23,6 +23,7 @@ import { categoryRoutes } from './routes/categories'
 import { connectionRoutes } from './routes/connections'
 import { dashboardRoutes } from './routes/dashboard'
 import { documentRoutes } from './routes/documents'
+import { goblinRoutes } from './routes/goblin'
 import { eventRoutes } from './routes/events'
 import { historyRoutes } from './routes/history'
 import { intelligenceRoutes } from './routes/intelligence'
@@ -111,6 +112,7 @@ app.use('*', async (c, next) => {
 
 app.route('/me', meRoutes)
 app.route('/account', accountRoutes)
+app.route('/goblin', goblinRoutes)
 app.route('/categories', categoryRoutes)
 app.route('/tasks', taskRoutes)
 app.route('/captures', captureRoutes)
