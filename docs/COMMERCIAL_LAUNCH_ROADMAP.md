@@ -665,3 +665,30 @@ columns).
 - PDFs using unusual font encodings may extract no text, so they take the
   photo path.
 - Free-plan document access rules are part of the Phase 5 entitlement work.
+
+---
+
+## 13. Launch essentials (`feat/launch-essentials`)
+
+Status: implemented and pushed. **Not merged.** Migration `0008` is **not
+applied** in production.
+
+| Area                                         | Status                                                                                        |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Password reset, email verification           | Implemented and tested. Delivery needs pocketgoblin.org onboarded to Cloudflare Email Sending |
+| Change password, data export, account delete | Implemented and tested                                                                        |
+| Four-destination navigation                  | Implemented and tested (desktop sidebar, phone tab bar, old links redirect)                   |
+| Calm Home with empty state                   | Implemented and tested                                                                        |
+| Tell the Goblin (universal capture)          | Implemented and tested; reuses the existing engines                                           |
+| My Life hub with search                      | Implemented and tested                                                                        |
+| Legal                                        | Drafts in `docs/legal/` for professional review; not published                                |
+| Stripe billing and free-tier limits          | **Not started.** Needs Stripe test-mode keys                                                  |
+| Owner promotion                              | Preflight passed (read-only, 2026-10-15). **Not applied**                                     |
+
+### Safe production order
+
+1. Apply migration `0008` (additive; old code ignores it).
+2. Merge `feat/launch-essentials`. Workers Builds deploys it.
+3. Onboard pocketgoblin.org to Email Sending, so reset and verification
+   emails go out.
+4. Owner promotion, then passkey enrolment in Goblin HQ.

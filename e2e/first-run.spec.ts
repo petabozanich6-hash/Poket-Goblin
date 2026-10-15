@@ -16,19 +16,22 @@ test.describe('Pocket Goblin first-run journey', () => {
     await page.getByRole('button', { name: /create account/i }).click()
 
     await expect(page).toHaveURL(/\/den/, { timeout: 20_000 })
-    await expect(page.getByRole('heading', { name: /the den/i })).toBeVisible()
 
-    await page.getByRole('button', { name: /open quick capture/i }).click()
-    await page.getByLabel('Brain dump').fill('Buy milk tomorrow')
-    await page.getByRole('button', { name: /give it to the goblin/i }).click()
+    // Journey J: an empty account gets one calm message, not empty cards.
+    await expect(page.getByText('All quiet in the cave. 👹')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Today' })).toHaveCount(0)
 
-    await page.getByRole('link', { name: 'Dump', exact: true }).click()
+    // Journey A: capture on Home, approve in place, find it in My Life.
+    await page.getByLabel('What’s on your mind?').fill('Buy milk tomorrow')
+    await page.getByRole('button', { name: 'Give it to the Goblin' }).click()
     const keep = page.getByRole('button', { name: /^keep$/i }).first()
     await expect(keep).toBeVisible({ timeout: 15_000 })
     await keep.click()
 
-    await page.getByRole('link', { name: 'Find' }).click()
-    await page.getByLabel('Search').fill('milk')
+    await page.getByRole('link', { name: 'My Life' }).first().click()
+    await page.getByLabel('Search everything').fill('milk')
+    await page.getByLabel('Search everything').press('Enter')
+    await expect(page).toHaveURL(/\/life\/search\?q=milk/)
     await expect(page.getByText(/milk/i).first()).toBeVisible({
       timeout: 10_000,
     })

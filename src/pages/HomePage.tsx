@@ -1,155 +1,248 @@
 import { useQuery } from '@tanstack/react-query'
+import { Bell, CalendarDays, Inbox } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 
-import { CAPACITY_LABELS } from '@shared/types'
+import type { CalendarEvent, Task } from '@shared/types'
 
 import { GoblinMascot } from '@/components/goblin/GoblinMascot'
-import { Card } from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/features/auth/useAuth'
-import { DailyBriefingCard } from '@/features/magical/DailyBriefingCard'
+import { TellTheGoblin } from '@/features/goblin/TellTheGoblin'
+import { fetchDenSummary } from '@/features/life/lifeApi'
 import { RescuePanel } from '@/features/magical/RescuePanel'
 import { fetchPriorities } from '@/features/magical/magicalApi'
-import { fetchDenSummary } from '@/features/life/lifeApi'
+import { useOverwhelm } from '@/features/magical/useOverwhelm'
 import { fetchTodayPlan } from '@/features/plan/planApi'
 import { TaskList } from '@/features/tasks/TaskList'
 
 import styles from './HomePage.module.css'
 
-function formatToday() {
-  return new Intl.DateTimeFormat(undefined, {
-    weekday: 'long',
+function greeting(now = new Date()) {
+  const h = now.getHours()
+  return h < 5 ? 'Hello' : h < 12 ? 'Morning' : h < 18 ? 'Afternoon' : 'Evening'
+}
+
+function sameLocalDay(iso: string, day = new Date()) {
+  const d = new Date(iso)
+  return (
+    d.getFullYear() === day.getFullYear() &&
+    d.getMonth() === day.getMonth() &&
+    d.getDate() === day.getDate()
+  )
+}
+
+function timeOf(event: CalendarEvent) {
+  return event.allDay
+    ? 'All day'
+    : new Date(event.startsAt).toLocaleTimeString(undefined, {
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+}
+
+function dayOf(iso: string) {
+  return new Date(iso).toLocaleDateString(undefined, {
+    weekday: 'short',
     day: 'numeric',
-    month: 'long',
-  }).format(new Date())
+    month: 'short',
+  })
+}
+
+/** Up to `limit` tasks: today's plan first, then the suggested order, no repeats. */
+function focusTasks(plan: Task[], ranked: Task[], limit = 3): Task[] {
+  const seen = new Set<string>()
+  const out: Task[] = []
+  for (const task of [...plan, ...ranked]) {
+    if (task.status !== 'open' || seen.has(task.id)) continue
+    seen.add(task.id)
+    out.push(task)
+    if (out.length === limit) break
+  }
+  return out
 }
 
 export function HomePage() {
-  const { user, settings } = useAuth()
+  const { user } = useAuth()
+  const overwhelm = useOverwhelm()
   const [params] = useSearchParams()
   const [rescueOpen, setRescueOpen] = useState(params.get('rescue') === '1')
 
-  const planQuery = useQuery({
+  const plan = useQuery({
     queryKey: ['plan', 'today'],
     queryFn: fetchTodayPlan,
   })
-  const denQuery = useQuery({
-    queryKey: ['den-summary'],
-    queryFn: fetchDenSummary,
-  })
+  const den = useQuery({ queryKey: ['den-summary'], queryFn: fetchDenSummary })
   const priorities = useQuery({
     queryKey: ['priorities'],
     queryFn: fetchPriorities,
   })
 
-  const summary = denQuery.data?.summary
-  const reasonMap = Object.fromEntries(
+  const loading = plan.isLoading || den.isLoading || priorities.isLoading
+  const summary = den.data?.summary
+  const ranked = (priorities.data?.items ?? []).map((item) => item.task)
+  const reasons = Object.fromEntries(
     (priorities.data?.items ?? []).map((item) => [item.task.id, item.reasons]),
   )
+  const tasks = focusTasks(plan.data?.plan.tasks ?? [], ranked)
+  const events = summary?.upcomingEvents ?? []
+  const todayEvents = events.filter((e) => sameLocalDay(e.startsAt))
+  const laterEvents = events
+    .filter((e) => !sameLocalDay(e.startsAt))
+    .slice(0, 3)
+  const reminders = summary?.dueReminders ?? []
+  const waiting =
+    // Every suggestion (brain dump or document) has one review item.
+    summary?.pendingReview ?? 0
+  const openTasks = ranked.length
+
+  const hasToday =
+    tasks.length + todayEvents.length + reminders.length + waiting > 0
+  const quiet = !loading && !hasToday && laterEvents.length === 0
 
   return (
     <div className={styles.page}>
-      <header className={styles.welcome}>
-        <div className={styles.welcomeCopy}>
-          <p className={styles.kicker}>{formatToday()}</p>
-          <h1>The Den</h1>
-          <p className={styles.sub}>
-            {user?.displayName
-              ? `Welcome back, ${user.displayName}.`
-              : 'Welcome back.'}{' '}
-            Here&apos;s what needs a gentle look today.
+      <header className={styles.greeting}>
+        <GoblinMascot
+          size={72}
+          alt=""
+          loading="eager"
+          className={styles.mascot}
+        />
+        <div>
+          <h1>
+            {greeting()}
+            {user?.displayName ? `, ${user.displayName}` : ''}!{' '}
+            <span aria-hidden>👹</span>
+          </h1>
+          <p className={styles.date}>
+            {new Intl.DateTimeFormat(undefined, {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+            }).format(new Date())}
           </p>
-          <p className={styles.capacity}>
-            Capacity:{' '}
-            <strong>
-              {CAPACITY_LABELS[settings?.capacityMode ?? 'steady']}
-            </strong>
-            {' · '}
-            <Link to="/plan">Adjust</Link>
-            {summary && summary.pendingReview > 0 ? (
-              <>
-                {' · '}
-                <Link to="/inbox">{summary.pendingReview} in Inbox</Link>
-              </>
-            ) : null}
-            {' · '}
-            <Link to="/capture">Quick capture</Link>
-          </p>
-        </div>
-        <div className={styles.welcomeMascot} aria-hidden={false}>
-          <GoblinMascot size={148} loading="eager" />
         </div>
       </header>
 
-      <DailyBriefingCard onRescue={() => setRescueOpen(true)} />
+      {quiet ? (
+        <section className={styles.quiet} aria-label="All quiet">
+          <p className={styles.quietTitle}>All quiet in the cave. 👹</p>
+          <p>Nothing urgent needs your attention.</p>
+          <p className={styles.muted}>
+            Got something on your mind? Give it to the Goblin.
+          </p>
+        </section>
+      ) : null}
+
+      <TellTheGoblin prominent />
+
+      {hasToday ? (
+        <section className={styles.panel} aria-labelledby="today-heading">
+          <div className={styles.panelHead}>
+            <h2 id="today-heading">Today</h2>
+            {openTasks >= 4 ? (
+              <div className={styles.helpers}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => overwhelm.enter()}
+                >
+                  I’m overwhelmed
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setRescueOpen(true)}
+                >
+                  Sort my day
+                </Button>
+              </div>
+            ) : tasks.length > 0 ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => overwhelm.enter()}
+              >
+                Help me get started
+              </Button>
+            ) : null}
+          </div>
+
+          {waiting > 0 ? (
+            <Link to="/tell#waiting" className={styles.decision}>
+              <Inbox size={18} aria-hidden />
+              <span>
+                <strong>{waiting}</strong> suggestion{waiting === 1 ? '' : 's'}{' '}
+                waiting for your OK
+              </span>
+            </Link>
+          ) : null}
+
+          {todayEvents.length > 0 ? (
+            <ul className={styles.items} aria-label="Today’s appointments">
+              {todayEvents.map((event) => (
+                <li key={event.id} className={styles.item}>
+                  <CalendarDays size={18} aria-hidden />
+                  <span className={styles.itemText}>
+                    <strong>{event.title}</strong>
+                    <span className={styles.muted}> · {timeOf(event)}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
+          {reminders.length > 0 ? (
+            <ul className={styles.items} aria-label="Reminders due">
+              {reminders.slice(0, 4).map((reminder) => (
+                <li key={reminder.id} className={styles.item}>
+                  <Bell size={18} aria-hidden />
+                  <span className={styles.itemText}>
+                    <strong>{reminder.title}</strong>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
+          {tasks.length > 0 ? (
+            <TaskList tasks={tasks} showPriorityReason reasonsById={reasons} />
+          ) : null}
+
+          {openTasks > tasks.length ? (
+            <p className={styles.more}>
+              <Link to="/life/tasks">See all {openTasks} tasks</Link>
+            </p>
+          ) : null}
+        </section>
+      ) : null}
+
+      {laterEvents.length > 0 ? (
+        <section className={styles.panel} aria-labelledby="coming-heading">
+          <h2 id="coming-heading">Coming up</h2>
+          <ul className={styles.items}>
+            {laterEvents.map((event) => (
+              <li key={event.id} className={styles.item}>
+                <CalendarDays size={18} aria-hidden />
+                <span className={styles.itemText}>
+                  <strong>{event.title}</strong>
+                  <span className={styles.muted}>
+                    {' '}
+                    · {dayOf(event.startsAt)}
+                    {event.allDay ? '' : `, ${timeOf(event)}`}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className={styles.more}>
+            <Link to="/life/calendar">Open calendar</Link>
+          </p>
+        </section>
+      ) : null}
 
       <RescuePanel open={rescueOpen} onClose={() => setRescueOpen(false)} />
-
-      <div className={styles.grid}>
-        <Card>
-          <h2>Today&apos;s focus</h2>
-          <TaskList
-            tasks={planQuery.data?.plan.tasks ?? []}
-            emptyMessage="No plan yet — visit Plan, or use Rescue my day."
-            showPriorityReason
-            reasonsById={reasonMap}
-          />
-        </Card>
-
-        <Card>
-          <h2>Suggested order</h2>
-          <p className={styles.cardHint}>
-            You can override anytime — this is a gentle suggestion, not a
-            verdict.
-          </p>
-          <TaskList
-            tasks={(priorities.data?.items ?? [])
-              .slice(0, 5)
-              .map((item) => item.task)}
-            emptyMessage="No open tasks to rank."
-            showPriorityReason
-            reasonsById={reasonMap}
-          />
-        </Card>
-      </div>
-
-      <div className={styles.grid}>
-        <Card>
-          <h2>Coming up</h2>
-          {(summary?.upcomingEvents.length ?? 0) === 0 ? (
-            <p className={styles.cardHint}>
-              No appointments in the next week.{' '}
-              <Link to="/calendar">Open calendar</Link>
-            </p>
-          ) : (
-            <ul className={styles.awaitList}>
-              {summary?.upcomingEvents.map((event) => (
-                <li key={event.id}>
-                  <strong>{event.title}</strong>
-                  <div>{new Date(event.startsAt).toLocaleString()}</div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-
-        <Card>
-          <h2>Due reminders</h2>
-          {(summary?.dueReminders.length ?? 0) === 0 ? (
-            <p className={styles.cardHint}>
-              Nothing due right now. <Link to="/life">Life shelves</Link>
-            </p>
-          ) : (
-            <ul className={styles.awaitList}>
-              {summary?.dueReminders.map((reminder) => (
-                <li key={reminder.id}>
-                  <strong>{reminder.title}</strong>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      </div>
     </div>
   )
 }

@@ -236,8 +236,8 @@ export function DocumentsPage() {
           </ul>
         )}
         <p className={styles.sub} style={{ marginTop: '1rem' }}>
-          Suggestions from kept documents also wait in the{' '}
-          <Link to="/inbox">Inbox</Link>.
+          Suggestions from kept documents also wait under{' '}
+          <Link to="/life/review">Suggestions</Link>.
         </p>
       </Card>
     </div>

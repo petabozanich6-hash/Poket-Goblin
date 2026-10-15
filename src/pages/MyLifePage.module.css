@@ -1,0 +1,157 @@
+.layout {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.eyebrow {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  max-width: 26rem;
+  min-width: min(100%, 16rem);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-bg-elevated);
+  color: var(--color-ink-muted);
+}
+
+.search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  padding: 0.65rem 0;
+  font: inherit;
+}
+
+.search input:focus {
+  outline: none;
+}
+
+.search:focus-within {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.sections {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: var(--space-1);
+  scrollbar-width: thin;
+}
+
+.section {
+  flex: none;
+  text-decoration: none;
+  border: 1px solid var(--color-border);
+  color: var(--color-ink-muted);
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  font-weight: 700;
+  font-size: 0.92rem;
+  white-space: nowrap;
+}
+
+.section:hover {
+  background: var(--color-bg-muted);
+  color: var(--color-ink);
+}
+
+.active {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+  border-color: transparent;
+}
+
+.overview {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: var(--space-3);
+}
+
+.tile {
+  display: grid;
+  gap: 0.15rem;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.tile:hover {
+  border-color: var(--color-accent);
+}
+
+.tileValue {
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  font-weight: 700;
+}
+
+.tileLabel {
+  font-weight: 700;
+  color: var(--color-ink-muted);
+  font-size: 0.9rem;
+}
+
+.tileHint {
+  font-size: 0.8rem;
+  color: var(--color-ink-faint);
+}
+
+.empty {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--color-accent-soft);
+}
+
+.empty h1 {
+  font-size: 1.4rem;
+}
+
+.empty a {
+  color: var(--color-accent-strong);
+  font-weight: 700;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

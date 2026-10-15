@@ -9,8 +9,15 @@ export type Access = {
   isOwner: boolean
 }
 
+export type AccountStatus = { emailVerified: boolean; emailConfigured: boolean }
+
 export function fetchMe() {
-  return api.get<{ user: User; settings: UserSettings; access: Access }>('/me')
+  return api.get<{
+    user: User
+    settings: UserSettings
+    access: Access
+    account: AccountStatus
+  }>('/me')
 }
 
 export function registerAccount(input: {

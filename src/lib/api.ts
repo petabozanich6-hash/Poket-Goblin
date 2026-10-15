@@ -16,6 +16,14 @@ export class ApiError extends Error {
   }
 }
 
+/** Pages that work signed out; never redirect away from them. */
+const PUBLIC_PAGES = new Set([
+  '/',
+  '/forgot-password',
+  '/reset-password',
+  '/verify-email',
+])
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, {
     ...init,
@@ -39,8 +47,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     if (
       sessionGone &&
       !path.startsWith('/auth/') &&
+      // The start-up "am I signed in?" check is not an expiry.
+      path !== '/me' &&
       typeof window !== 'undefined' &&
-      window.location.pathname !== '/'
+      !PUBLIC_PAGES.has(window.location.pathname)
     ) {
       window.dispatchEvent(new CustomEvent('pg:session-expired'))
     }
@@ -70,6 +80,8 @@ export const api = {
       body: body !== undefined ? JSON.stringify(body) : undefined,
     }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  delete_with_body: <T>(path: string, body: unknown) =>
+    request<T>(path, { method: 'DELETE', body: JSON.stringify(body) }),
   /**
    * Goblin HQ calls. The header is required by the server for administrative
    * changes (with the Origin check it blocks cross-site requests).

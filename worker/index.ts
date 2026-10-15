@@ -15,6 +15,7 @@ import {
   type AuthUser,
   type SessionInfo,
 } from './lib/session'
+import { accountRoutes } from './routes/account'
 import { adminRoutes } from './routes/admin'
 import { authRoutes } from './routes/auth'
 import { captureRoutes } from './routes/captures'
@@ -109,6 +110,7 @@ app.use('*', async (c, next) => {
 })
 
 app.route('/me', meRoutes)
+app.route('/account', accountRoutes)
 app.route('/categories', categoryRoutes)
 app.route('/tasks', taskRoutes)
 app.route('/captures', captureRoutes)

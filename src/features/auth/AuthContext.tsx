@@ -35,7 +35,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     function onExpired() {
       queryClient.clear()
-      if (window.location.pathname !== '/') {
+      if (
+        !['/', '/forgot-password', '/reset-password', '/verify-email'].includes(
+          window.location.pathname,
+        )
+      ) {
         window.location.assign('/')
       }
     }
@@ -76,6 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: meQuery.data?.user ?? null,
       settings: meQuery.data?.settings ?? null,
       access: meQuery.data?.access ?? null,
+      account: meQuery.data?.account ?? null,
       isLoading: !bootstrapped || meQuery.isLoading,
       isAuthenticated: Boolean(meQuery.data?.user),
       login: async (input) => {

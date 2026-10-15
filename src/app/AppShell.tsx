@@ -1,24 +1,16 @@
 import {
-  Brain,
   Crown,
-  CalendarDays,
-  FileText,
   Home,
-  Inbox,
-  ListTodo,
-  LogOut,
   Layers,
-  MessageCircle,
-  Search,
+  LogOut,
+  MessageCircleHeart,
   Settings,
-  Sparkles,
 } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router'
 import { useEffect } from 'react'
 
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/features/auth/useAuth'
-import { FloatingCapture } from '@/features/magical/FloatingCapture'
 import { NudgeTray } from '@/features/magical/NudgeTray'
 import { OverwhelmMode } from '@/features/magical/OverwhelmMode'
 import { OverwhelmProvider } from '@/features/magical/OverwhelmContext'
@@ -26,34 +18,40 @@ import { PlatformBanner } from '@/features/platform/PlatformBanner'
 
 import styles from './AppShell.module.css'
 
-const primaryLinks = [
-  { to: '/den', label: 'Den', icon: Home, end: true },
-  { to: '/capture', label: 'Dump', icon: Brain },
-  { to: '/tasks', label: 'Tasks', icon: ListTodo },
-  { to: '/calendar', label: 'Calendar', icon: CalendarDays },
-  { to: '/life', label: 'Life', icon: Layers },
-  { to: '/plan', label: 'Plan', icon: Sparkles },
+type NavItem = {
+  to: string
+  label: string
+  short: string
+  icon: typeof Home
+  end?: boolean
+}
+
+/** The four places a person ever needs. Everything else lives inside them. */
+const destinations: NavItem[] = [
+  { to: '/den', label: 'Home', short: 'Home', icon: Home, end: true },
+  {
+    to: '/tell',
+    label: 'Tell the Goblin',
+    short: 'Tell',
+    icon: MessageCircleHeart,
+  },
+  { to: '/life', label: 'My Life', short: 'My Life', icon: Layers },
+  { to: '/settings', label: 'Settings', short: 'Settings', icon: Settings },
 ]
 
-const secondaryLinks = [
-  { to: '/find', label: 'Find', icon: Search },
-  { to: '/ask', label: 'Ask', icon: MessageCircle },
-  { to: '/vault', label: 'Vault', icon: FileText },
-  { to: '/inbox', label: 'Inbox', icon: Inbox },
-  { to: '/settings', label: 'Settings', icon: Settings },
-]
+const ownerDestination: NavItem = {
+  to: '/hq',
+  label: 'Goblin HQ',
+  short: 'HQ',
+  icon: Crown,
+}
 
 function NavItems({
   links,
-  quiet = false,
+  compact = false,
 }: {
-  links: Array<{
-    to: string
-    label: string
-    icon: typeof Home
-    end?: boolean
-  }>
-  quiet?: boolean
+  links: NavItem[]
+  compact?: boolean
 }) {
   return (
     <>
@@ -66,16 +64,16 @@ function NavItems({
             end={link.end}
             className={({ isActive }) =>
               [
-                styles.navLink,
-                quiet ? styles.navQuiet : '',
+                compact ? styles.tabLink : styles.navLink,
+                link.to === '/hq' ? styles.navOwner : '',
                 isActive ? styles.active : '',
               ]
                 .filter(Boolean)
                 .join(' ')
             }
           >
-            <Icon size={18} aria-hidden />
-            {link.label}
+            <Icon size={compact ? 22 : 18} aria-hidden />
+            <span>{compact ? link.short : link.label}</span>
           </NavLink>
         )
       })}
@@ -120,46 +118,31 @@ export function AppShell() {
         </header>
 
         <div className={styles.body}>
-          <nav className={styles.nav} aria-label="Primary">
-            <NavItems links={primaryLinks} />
-            <p className={styles.navGroup} id="more-shelves">
-              More
-            </p>
-            <div aria-labelledby="more-shelves">
-              <NavItems links={secondaryLinks} quiet />
-            </div>
-            {/* Display only: Goblin HQ authorises every request on the server. */}
-            {access?.isOwner ? (
-              <>
-                <p className={styles.navGroup} id="owner-shelves">
-                  Owner
-                </p>
-                <div aria-labelledby="owner-shelves">
-                  <NavLink
-                    to="/hq"
-                    className={({ isActive }) =>
-                      [
-                        styles.navLink,
-                        styles.navOwner,
-                        isActive ? styles.active : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' ')
-                    }
-                  >
-                    <Crown size={18} aria-hidden />
-                    Goblin HQ
-                  </NavLink>
-                </div>
-              </>
-            ) : null}
+          {/* Display only: Goblin HQ authorises every request on the server. */}
+          <nav className={styles.nav} aria-label="Main">
+            <NavItems
+              links={
+                access?.isOwner
+                  ? [...destinations, ownerDestination]
+                  : destinations
+              }
+            />
           </nav>
           <main className={styles.main} id="main" tabIndex={-1}>
             <PlatformBanner />
             <Outlet />
           </main>
         </div>
-        <FloatingCapture />
+        <nav className={styles.tabBar} aria-label="Main">
+          <NavItems
+            links={
+              access?.isOwner
+                ? [...destinations, ownerDestination]
+                : destinations
+            }
+            compact
+          />
+        </nav>
         <OverwhelmMode />
       </div>
     </OverwhelmProvider>

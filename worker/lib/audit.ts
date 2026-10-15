@@ -42,6 +42,11 @@ export type SecurityEventType =
   | 'step_up_success'
   | 'step_up_failed'
   | 'reauth_failed'
+  | 'password_reset_requested'
+  | 'password_reset'
+  | 'password_changed'
+  | 'email_verified'
+  | 'data_exported'
 
 /** Per-account security metadata. Failures here never break the request. */
 export async function recordSecurityEvent(

@@ -114,13 +114,6 @@
   color: var(--color-accent-strong);
 }
 
-.navQuiet {
-  font-weight: 600;
-  opacity: 0.92;
-  padding-top: 0.55rem;
-  padding-bottom: 0.55rem;
-}
-
 .navOwner {
   border: 1px dashed color-mix(in srgb, var(--color-warm) 55%, transparent);
 }
@@ -151,28 +144,61 @@
   outline-offset: 2px;
 }
 
+.tabBar {
+  display: none;
+}
+
 @media (max-width: 800px) {
   .topbar {
-    align-items: flex-start;
-    flex-direction: column;
+    padding: var(--space-3) var(--space-4);
   }
 
   .body {
     grid-template-columns: 1fr;
     padding: var(--space-4);
+    /* Room for the bottom tab bar. */
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
   }
 
   .nav {
-    position: static;
-    flex-direction: row;
-    overflow-x: auto;
+    display: none;
   }
 
-  .navLink {
-    white-space: nowrap;
-  }
-
+  .userChip,
   .brandTag {
     display: none;
+  }
+
+  .tabBar {
+    display: flex;
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 20;
+    justify-content: space-around;
+    gap: var(--space-1);
+    padding: var(--space-2) var(--space-2)
+      calc(var(--space-2) + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--color-border);
+    background: color-mix(in srgb, var(--color-bg-elevated) 94%, transparent);
+    backdrop-filter: blur(8px);
+  }
+
+  .tabLink {
+    flex: 1;
+    display: grid;
+    justify-items: center;
+    gap: 0.15rem;
+    min-height: 3.25rem;
+    padding: 0.35rem 0.25rem;
+    border-radius: var(--radius-md);
+    color: var(--color-ink-muted);
+    text-decoration: none;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .tabLink.active {
+    background: var(--color-accent-soft);
+    color: var(--color-accent-strong);
   }
 }

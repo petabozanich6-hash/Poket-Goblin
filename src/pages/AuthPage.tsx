@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Navigate } from 'react-router'
+import { Link, Navigate } from 'react-router'
 
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -107,7 +107,11 @@ export function AuthPage() {
             required
           />
 
-          {error ? <p className={styles.error}>{error}</p> : null}
+          {error ? (
+            <p className={styles.error} role="alert">
+              {error}
+            </p>
+          ) : null}
 
           <Button type="submit" disabled={busy}>
             {busy
@@ -117,6 +121,12 @@ export function AuthPage() {
                 : 'Create account'}
           </Button>
         </form>
+
+        {mode === 'login' ? (
+          <p className={styles.switch}>
+            <Link to="/forgot-password">Forgot your password?</Link>
+          </p>
+        ) : null}
 
         <p className={styles.switch}>
           {mode === 'login' ? (

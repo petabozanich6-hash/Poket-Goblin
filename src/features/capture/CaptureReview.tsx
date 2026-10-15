@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
+import { BUILTIN_CATEGORY_LABELS } from '@shared/categories'
 import type { Capture, CaptureItemKind } from '@shared/types'
 
 import { Button } from '@/components/ui/Button'
@@ -96,7 +97,9 @@ export function CaptureReview({ capture }: CaptureReviewProps) {
               <p className={styles.title}>{item.title}</p>
               <p className={styles.meta}>
                 {item.kind}
-                {item.categorySlug ? ` · ${item.categorySlug}` : ''}
+                {item.categorySlug
+                  ? ` · ${BUILTIN_CATEGORY_LABELS[item.categorySlug] ?? item.categorySlug}`
+                  : ''}
                 {item.dueDate ? ` · ${item.dueDate}` : ' · no date guessed'}
                 {item.startTime ? ` · ${item.startTime}` : ''}
                 {item.recurrenceFrequency
