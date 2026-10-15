@@ -42,6 +42,14 @@ test('Just sort it: approve, skip, devour — the task stays, the file goes', as
     fullPage: true,
   })
 
+  // The Goblin acts first: both are added straight away, with Undo.
+  await expect(
+    page.getByText(/Added 2 things to your tasks and calendar\./),
+  ).toBeVisible()
+  await page.getByRole('button', { name: 'Undo', exact: true }).click()
+  await expect(page.getByText(/Added 2 things/)).toHaveCount(0)
+
+  // After Undo, pick by hand: keep the task, skip the reminder.
   const task = page.locator('li').filter({ hasText: 'Pay electricity bill' })
   await task.getByRole('button', { name: 'Yes, add it' }).click()
   await expect(task).toHaveCount(0)

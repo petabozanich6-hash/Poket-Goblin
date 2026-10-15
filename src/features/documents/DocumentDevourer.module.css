@@ -251,3 +251,35 @@
   align-items: center;
   font-weight: 600;
 }
+
+.autoAdded {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-soft);
+}
+
+.autoAdded .addedNote {
+  margin: 0;
+}
+
+.addedList {
+  flex-basis: 100%;
+  font-size: 0.9rem;
+}
+
+.addedList summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.addedList ul {
+  margin: var(--space-2) 0 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.25rem;
+}

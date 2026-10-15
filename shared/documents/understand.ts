@@ -63,6 +63,8 @@ export type DocumentSuggestion = {
   group?: string
   /** "2/5": which step of the plan. */
   step?: string
+  /** 'ai' when a model suggested it: never added without the person's OK. */
+  origin?: 'ai' | 'rules'
 }
 
 export type ExtractedFact = {

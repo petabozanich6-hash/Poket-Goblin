@@ -49,6 +49,8 @@ export type DevourResponse = {
   }
   duplicate?: boolean
   message?: string
+  /** What the Devourer added on its own (confident items only). */
+  autoAdded?: { added: number; already: number }
 }
 
 /** True when the reader's locale writes numeric dates month-first (e.g. US). */
@@ -91,6 +93,13 @@ export function fetchSortingDocuments() {
 export function finishDevouring(id: string) {
   return api.post<{ devoured: boolean; saved: number }>(
     `/documents/${id}/finish`,
+    {},
+  )
+}
+
+export function undoAutoAdded(id: string) {
+  return api.post<{ undone: number; suggestions: DocumentSuggestion[] }>(
+    `/documents/${id}/undo-auto`,
     {},
   )
 }

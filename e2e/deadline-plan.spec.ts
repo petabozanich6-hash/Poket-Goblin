@@ -54,17 +54,14 @@ test('panic button, plan from a document, and phone calendar', async ({
   })
   await page.getByRole('button', { name: 'Feed it to the goblin' }).click()
   await expect(page.getByText(/^I found 2 deadlines/)).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Your plan' })).toBeVisible()
-  await expect(page.getByText('Do first')).toBeVisible()
+  // Everything certain is added straight away; nothing to approve.
+  await expect(
+    page.getByText(/Added 8 things to your tasks and calendar\./),
+  ).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Your plan' })).toHaveCount(0)
   await page.screenshot({
     path: 'test-results/plan-review.png',
     fullPage: true,
-  })
-  await page.getByRole('button', { name: /Add the whole plan/ }).click()
-  await expect(
-    page.getByText(/Added 8 to your tasks and calendar\./),
-  ).toBeVisible({
-    timeout: 20_000,
   })
 
   // The urgent part is at the top of Home, today.

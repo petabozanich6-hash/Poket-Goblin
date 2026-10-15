@@ -5,8 +5,9 @@
  *   a vision-capable AI provider; without one the goblin says so plainly.
  * - AI is used when configured, enabled and under the user's daily limit;
  *   otherwise (or if it fails or returns junk) the deterministic reader runs.
- * - Nothing is written to tasks/reminders/calendar here: suggestions wait in
- *   review_items until the user approves them.
+ * - Nothing is written to tasks/reminders/calendar here: suggestions go to
+ *   review_items. Afterwards the upload route adds the confident, rule-based
+ *   ones straight away (lib/documents/autoAdd.ts, with Undo); the rest wait.
  * - Temporary ("Just sort it") documents never have their text stored, and a
  *   failure deletes their original immediately.
  */
@@ -135,7 +136,16 @@ export async function processDocumentForUser(
         )
         const validated = validateDocumentAi(raw, extracted.text || null, local)
         if (validated) {
-          understanding = { ...validated, facts: [] }
+          // AI suggestions always wait for the person's OK (never auto-added):
+          // the document is untrusted and could be steering the model.
+          understanding = {
+            ...validated,
+            suggestions: validated.suggestions.map((s) => ({
+              ...s,
+              origin: 'ai' as const,
+            })),
+            facts: [],
+          }
           mode = 'ai'
           outcome = 'ai'
         } else {

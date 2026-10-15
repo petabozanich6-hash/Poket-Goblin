@@ -4,8 +4,8 @@
  * Safety model:
  * - Document content is untrusted data. It is fenced, the system prompt says
  *   instructions inside it must be ignored, and it can only ever produce
- *   *suggestions* — the model has no tools and the app writes nothing until
- *   the user approves each suggestion.
+ *   *suggestions* — the model has no tools, and AI suggestions are never
+ *   added automatically: each waits for the person's yes.
  * - Output is validated against a strict schema: allowed suggestion types
  *   only, bounded lengths and counts, real calendar dates. For text
  *   documents a date must appear in the document itself (grounding);
@@ -187,6 +187,23 @@ export function validateDocumentAi(
   }
 }
 
+/** Workers AI refuses inputs over 16,000 bytes; leave headroom. */
+const WORKERS_AI_INPUT_BYTES = 15_500
+
+/** The longest start of `text` that fits in `maxBytes` of UTF-8. */
+export function fitBytes(text: string, maxBytes: number): string {
+  const encoder = new TextEncoder()
+  if (encoder.encode(text).length <= maxBytes) return text
+  let lo = 0
+  let hi = text.length
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2)
+    if (encoder.encode(text.slice(0, mid)).length <= maxBytes) lo = mid
+    else hi = mid - 1
+  }
+  return text.slice(0, lo)
+}
+
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>
 
 function toBase64(bytes: Uint8Array): string {
@@ -207,10 +224,11 @@ export async function callDocumentAi(
   if (resolveProvider(env).kind === 'workers_ai') {
     if (!('text' in input))
       throw new Error('Workers AI text model cannot read images')
+    const system = documentSystemPrompt(today)
     return callWorkersAi(
       env,
-      documentSystemPrompt(today),
-      `<document>\n${input.text.slice(0, MAX_PROMPT_TEXT)}\n</document>`,
+      system,
+      `<document>\n${fitBytes(input.text.slice(0, MAX_PROMPT_TEXT), WORKERS_AI_INPUT_BYTES - new TextEncoder().encode(system).length - 64)}\n</document>`,
     )
   }
   const base = (env.AI_BASE_URL ?? 'https://api.openai.com/v1').replace(
