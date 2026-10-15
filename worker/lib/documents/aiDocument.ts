@@ -12,6 +12,7 @@
  *   otherwise it is dropped and the suggestion marked uncertain.
  * - Minimal data: at most MAX_PROMPT_TEXT characters of text, or one image.
  */
+import { BUILTIN_CATEGORY_LABELS } from '../../../shared/categories'
 import { findDates } from '../../../shared/documents/dates'
 import {
   DOCUMENT_TYPES,
@@ -39,23 +40,12 @@ const CATEGORY_FOR: Record<DocumentType, string | null> = {
   medical: 'health',
   education: 'work_study',
   employment: 'work_study',
-  government: 'admin',
+  government: 'personal',
   insurance: 'money',
-  form: 'admin',
+  form: 'personal',
   general: null,
 }
-const CATEGORIES = new Set([
-  'home',
-  'money',
-  'health',
-  'family',
-  'work_study',
-  'appointments',
-  'shopping',
-  'personal',
-  'admin',
-  'other',
-])
+const CATEGORIES = new Set(Object.keys(BUILTIN_CATEGORY_LABELS))
 
 export function documentSystemPrompt(today: string): string {
   return `You are Pocket Goblin's document reader. You help a person who finds paperwork overwhelming.
@@ -73,7 +63,7 @@ Return JSON only:
    "title": short and actionable, "details": short,
    "dueDate": YYYY-MM-DD or null, "startTime": HH:mm or null,
    "confidence": low|medium|high, "missingInformation": [strings],
-   "categorySlug": home|money|health|family|work_study|appointments|shopping|personal|admin|other|null,
+   "categorySlug": home|money|health|family|work_study|appointments|shopping|personal|other|null,
    "sourceReference": the exact short phrase from the document this comes from}]}
 
 Rules: at most ${MAX_SUGGESTIONS} suggestions. Use only dates and times actually written in the document.

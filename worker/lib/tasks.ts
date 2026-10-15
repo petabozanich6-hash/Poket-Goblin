@@ -1,3 +1,7 @@
+import {
+  canonicalCategorySlug,
+  CATEGORY_NAME_SQL,
+} from '../../shared/categories'
 import type { Task, TaskPriority, TaskStatus } from '../../shared/types'
 
 type TaskRow = {
@@ -25,7 +29,7 @@ const TASK_SELECT = `
   SELECT t.id,
          t.category_id as categoryId,
          c.slug as categorySlug,
-         c.name as categoryName,
+         ${CATEGORY_NAME_SQL} as categoryName,
          t.title,
          t.notes,
          t.status,
@@ -122,6 +126,7 @@ export async function resolveCategoryId(
       .first<{ id: string }>()
     return row?.id ?? null
   }
+  categorySlug = canonicalCategorySlug(categorySlug)
   if (categorySlug) {
     const custom = await db
       .prepare(

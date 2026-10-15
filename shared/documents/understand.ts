@@ -112,9 +112,9 @@ const CATEGORY_FOR: Record<DocumentType, string | null> = {
   medical: 'health',
   education: 'work_study',
   employment: 'work_study',
-  government: 'admin',
+  government: 'personal',
   insurance: 'money',
-  form: 'admin',
+  form: 'personal',
   general: null,
 }
 
