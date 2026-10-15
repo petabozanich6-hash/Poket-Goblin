@@ -1,0 +1,100 @@
+import { expect, test, type Page } from '@playwright/test'
+
+/**
+ * The action-taking Goblin in a real browser (local D1 only):
+ * no Keep/Skip for clear requests, completion puts things away, Undo works.
+ */
+const stamp = Date.now()
+
+async function register(page: Page, email: string) {
+  await page.goto('/')
+  await page.getByRole('tab', { name: 'Register' }).click()
+  await page
+    .getByLabel('What should the goblin call you?')
+    .fill('Action Goblin')
+  await page.getByLabel('Email').fill(email)
+  await page.getByLabel('Password').fill('ActionPass!9')
+  await page.getByRole('button', { name: /create account/i }).click()
+  await expect(page).toHaveURL(/\/den/, { timeout: 20_000 })
+}
+
+async function tell(page: Page, text: string) {
+  await page.getByLabel('What’s on your mind?').fill(text)
+  await page.getByRole('button', { name: 'Give it to the Goblin' }).click()
+}
+
+test('milk: added, bought and put away in two sentences and zero approvals', async ({
+  page,
+}) => {
+  await register(page, `milk_${stamp}@example.com`)
+  let clicks = 0
+  page.on('request', (r) => {
+    if (
+      r.method() === 'POST' &&
+      /\/api\/(review|captures\/.+\/items)/.test(r.url())
+    )
+      clicks += 1
+  })
+
+  await tell(page, 'I need milk')
+  await expect(
+    page.getByText('Milk added to your shopping list.'),
+  ).toBeVisible()
+  await tell(page, "I've bought the milk")
+  await expect(page.getByText('Milk crossed off your list! 👹')).toBeVisible()
+  expect(clicks).toBe(0)
+
+  await page.goto('/life/lists')
+  await expect(
+    page.getByRole('list', { name: 'Still to buy' }).getByText('Milk'),
+  ).toHaveCount(0)
+  await page.getByText(/Bought recently/).click()
+  await expect(
+    page.getByRole('list', { name: 'Bought recently' }).getByText('Milk'),
+  ).toBeVisible()
+})
+
+test('Undo really undoes', async ({ page }) => {
+  await register(page, `undo_${stamp}@example.com`)
+  await tell(page, 'I need eggs')
+  await expect(
+    page.getByText('Eggs added to your shopping list.'),
+  ).toBeVisible()
+  await page.getByRole('button', { name: 'Undo' }).click()
+  await expect(page.getByText('Undone.')).toBeVisible()
+  await page.goto('/life/lists')
+  await expect(page.getByText('Nothing left to buy. 👹')).toBeVisible()
+})
+
+test('mixed sentence and a question about the list', async ({ page }) => {
+  await register(page, `mixed_${stamp}@example.com`)
+  await tell(page, 'I need milk')
+  await expect(
+    page.getByText('Milk added to your shopping list.'),
+  ).toBeVisible()
+  await tell(
+    page,
+    "I've bought the milk, but I still need bread, and remind me to call Mum tomorrow.",
+  )
+  await expect(page.getByText('Milk crossed off your list! 👹')).toBeVisible()
+  await expect(
+    page.getByText('Bread added to your shopping list.'),
+  ).toBeVisible()
+  await expect(page.getByText(/I’ll remind you to call mum/i)).toBeVisible()
+  await tell(page, 'Did I buy milk?')
+  await expect(page.getByText(/^Yes! You crossed Milk off/)).toBeVisible()
+})
+
+test('appointment moves ask first', async ({ page }) => {
+  await register(page, `appt_${stamp}@example.com`)
+  await tell(page, 'I have a dentist appointment on Friday at 3pm')
+  await expect(
+    page.getByText(/Added “Dentist appointment” to your calendar/),
+  ).toBeVisible()
+  await tell(page, 'Move my dentist appointment to Monday')
+  await expect(
+    page.getByText(/Shall I: move “Dentist appointment”/),
+  ).toBeVisible()
+  await page.getByRole('button', { name: 'Yes', exact: true }).click()
+  await expect(page.getByText(/^Done — move/)).toBeVisible()
+})

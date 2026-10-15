@@ -39,6 +39,12 @@ preview_bucket_name = "pocket-goblin-uploads-preview"
 # overrides this with ENVIRONMENT=development in .dev.vars.
 [vars]
 ENVIRONMENT = "production"
+# Workers AI, exactly as activated in the Cloudflare dashboard on
+# 2026-10-15. Kept here so automatic deploys from main don't remove them
+# (deploys replace dashboard-only variables). Local dev uses .dev.vars.
+AI_PROVIDER = "workers_ai"
+AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fp8"
+AI_DAILY_GLOBAL_LIMIT = "5"
 
 # Workers Logs: request + console logs in the dashboard (no extra resource).
 [observability]
@@ -58,7 +64,8 @@ crons = ["17 * * * *"]
 [dev]
 port = 8787
 
-# Workers AI activation: see docs/WORKERS_AI.md. Uncomment only in the
-# approved deployment configuration; local inference also uses remote GPUs.
-# [ai]
-# binding = "AI"
+# Workers AI binding (active in production since 2026-10-15; see
+# docs/WORKERS_AI.md). `npm run dev` keeps AI off locally via
+# --var AI_PROVIDER:none, so local runs never call remote GPUs.
+[ai]
+binding = "AI"

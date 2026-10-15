@@ -692,3 +692,37 @@ applied** in production.
 3. Onboard pocketgoblin.org to Email Sending, so reset and verification
    emails go out.
 4. Owner promotion, then passkey enrolment in Goblin HQ.
+
+---
+
+## 14. The action-taking Goblin (`feat/action-goblin`)
+
+Status: implemented and pushed; **not merged**. Migration `0010` is **not
+applied** in production.
+
+| Area                    | Status                                   | Evidence                                                                                                             |
+| ----------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Shopping completion     | PASS (local)                             | Bought items leave the active list; "Bought recently" history with Put back; `goblin.test.ts`, e2e                   |
+| Context-aware actions   | PASS (local)                             | create, complete, update, cancel, move, query and not_yet against the user's own records; 50 phrase and engine tests |
+| Automatic safe actions  | PASS (local)                             | Milk added and crossed off with zero approval clicks (e2e). Undo is real and single use                              |
+| Housekeeping            | PASS (local)                             | Removed items are soft-deleted and hidden everywhere; completed tasks and reminders leave active views               |
+| Workers AI              | Active in production; UNVERIFIED quality | 3 Workers AI brain-dump sorts recorded on 2026-10-15; global cap 5/day; config now in `wrangler.toml`                |
+| Calendar and email sync | NOT STARTED                              | Needs Google Cloud and Microsoft Entra app registrations and approved OAuth scopes                                   |
+| Stripe                  | NOT STARTED                              | Needs Stripe test-mode keys                                                                                          |
+| Email branding          | NOT STARTED                              | Current emails are functional but plain                                                                              |
+
+How it fits together:
+
+- The deterministic language layer (`shared/goblin/language.ts`) and
+  record matching (`shared/goblin/match.ts`) decide the action, and
+  `worker/lib/goblin/act.ts` performs it, logging each change in
+  `goblin_actions` with its before and after state.
+- Appointment moves and cancellations always ask first.
+- Anything not understood still goes to the existing brain-dump review
+  (which uses Workers AI when it's available).
+
+### Safe production order
+
+1. Apply migration `0010` (additive).
+2. Merge `feat/action-goblin`. The deploy keeps the AI settings, because
+   `wrangler.toml` now matches the dashboard.

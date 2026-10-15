@@ -46,7 +46,7 @@ dashboardRoutes.get('/den', async (c) => {
     `SELECT id, list_id as listId, name, quantity, notes, checked,
             sort_order as sortOrder, created_at as createdAt, updated_at as updatedAt
      FROM shopping_items
-     WHERE user_id = ? AND checked = 0
+     WHERE user_id = ? AND checked = 0 AND removed_at IS NULL
      ORDER BY sort_order ASC LIMIT 5`,
   )
     .bind(user.id)

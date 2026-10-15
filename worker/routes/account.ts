@@ -53,6 +53,7 @@ export const EXPORTED_TABLES: Record<string, { omit?: string[] }> = {
   ai_usage_daily: {},
   ai_request_limits: {},
   ai_events: {},
+  goblin_actions: {},
   search_history: {},
   achievements: {},
 }

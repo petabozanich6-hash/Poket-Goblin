@@ -113,6 +113,26 @@ export function SettingsPage() {
       </Card>
 
       <Card>
+        <h2>How the Goblin helps</h2>
+        <label className={styles.checkField}>
+          <input
+            type="checkbox"
+            checked={settings.goblinAutonomy === 'ask'}
+            onChange={(e) =>
+              void patch({ goblinAutonomy: e.target.checked ? 'ask' : 'auto' })
+            }
+            disabled={saving}
+          />
+          Ask me before the Goblin changes anything
+        </label>
+        <p className={styles.sub}>
+          Off (recommended): simple, clear things — like adding milk or ticking
+          off a task — happen straight away, and you can always Undo.
+          Appointment changes always ask first.
+        </p>
+      </Card>
+
+      <Card>
         <h2>Capacity default</h2>
         <div className={styles.tabs}>
           {(['goblin', 'steady', 'quest'] as CapacityMode[]).map((mode) => (

@@ -171,29 +171,50 @@ export function LifePage() {
             />
             <Button type="submit">Add</Button>
           </form>
-          <ul className={styles.stack}>
+          <ul className={styles.stack} aria-label="Still to buy">
             {(defaultList?.items ?? []).map((item) => (
               <li key={item.id} className={styles.listRow}>
                 <label className={styles.checkField}>
                   <input
                     type="checkbox"
-                    checked={item.checked}
-                    onChange={(e) =>
-                      toggleItem.mutate({
-                        id: item.id,
-                        checked: e.target.checked,
-                      })
+                    checked={false}
+                    onChange={() =>
+                      toggleItem.mutate({ id: item.id, checked: true })
                     }
                   />
-                  <span className={item.checked ? styles.doneText : undefined}>
+                  <span>
                     {item.name}
+                    {item.quantity ? ` · ${item.quantity}` : ''}
                   </span>
                 </label>
               </li>
             ))}
           </ul>
           {(defaultList?.items.length ?? 0) === 0 ? (
-            <p className={styles.sub}>Your grocery list is empty — luxury.</p>
+            <p className={styles.sub}>Nothing left to buy. 👹</p>
+          ) : null}
+          {(defaultList?.completedItems?.length ?? 0) > 0 ? (
+            <details className={styles.stackTight}>
+              <summary>
+                Bought recently ({defaultList?.completedItems?.length})
+              </summary>
+              <ul className={styles.stack} aria-label="Bought recently">
+                {defaultList?.completedItems?.map((item) => (
+                  <li key={item.id} className={styles.listRow}>
+                    <span className={styles.doneText}>{item.name}</span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        toggleItem.mutate({ id: item.id, checked: false })
+                      }
+                    >
+                      Put back
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </details>
           ) : null}
         </Card>
       ) : null}

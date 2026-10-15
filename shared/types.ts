@@ -101,7 +101,10 @@ export type ShoppingList = {
   name: string
   isDefault: boolean
   createdAt: string
+  /** Active items only. */
   items: ShoppingItem[]
+  /** Recently bought, newest first (put away, not deleted). */
+  completedItems?: ShoppingItem[]
 }
 
 export type ShoppingItem = {
@@ -111,6 +114,7 @@ export type ShoppingItem = {
   quantity: string
   notes: string
   checked: boolean
+  checkedAt?: string | null
   sortOrder: number
   createdAt: string
   updatedAt: string
@@ -196,6 +200,8 @@ export type UserSettings = {
   planningApproach: PlanningApproach
   goblinFrequency: GoblinFrequency
   completedQuestCount: number
+  /** 'auto': safe, reversible actions happen straight away (with Undo). */
+  goblinAutonomy: 'auto' | 'ask'
 }
 
 export type Achievement = {

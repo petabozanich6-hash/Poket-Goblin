@@ -70,7 +70,7 @@ export async function loadGroundedContext(
   const shopping = await db
     .prepare(
       `SELECT name as title FROM shopping_items
-       WHERE user_id = ? AND checked = 0
+       WHERE user_id = ? AND checked = 0 AND removed_at IS NULL
        ORDER BY updated_at DESC LIMIT 10`,
     )
     .bind(userId)

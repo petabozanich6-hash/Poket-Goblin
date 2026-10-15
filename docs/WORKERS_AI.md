@@ -1,6 +1,12 @@
 # Cloudflare-hosted AI for Pocket Goblin
 
-Status: implemented for review, **not activated or deployed**. Production is
+Status: **active in production since 2026-10-15** (enabled in the Cloudflare
+dashboard: `AI` binding, `AI_PROVIDER=workers_ai`, the model below, and
+`AI_DAILY_GLOBAL_LIMIT=5`). Those settings are now also in `wrangler.toml`, so
+automatic deploys from `main` keep them. Local `npm run dev` passes
+`AI_PROVIDER=none`, so no remote inference happens locally.
+
+Previous status: implemented for review, **not activated or deployed**. Production is
 built automatically from `main`; do not merge this change until deployment is
 approved. No production migration, binding change or live inference is part of
 preparing this change.

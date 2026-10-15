@@ -81,7 +81,7 @@ searchRoutes.get('/', async (c) => {
 
   const shopping = await c.env.DB.prepare(
     `SELECT id, name FROM shopping_items
-     WHERE user_id = ? AND name LIKE ?
+     WHERE user_id = ? AND removed_at IS NULL AND name LIKE ?
      ORDER BY updated_at DESC LIMIT 8`,
   )
     .bind(user.id, like)

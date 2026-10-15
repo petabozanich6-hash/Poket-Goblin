@@ -3,7 +3,6 @@ import { Mic, MicOff, Paperclip, Send, X } from 'lucide-react'
 import { useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { Link } from 'react-router'
 
-import { detectIntent } from '@shared/intent'
 import type { AssistantReply } from '@shared/intelligence/types'
 import type { Capture } from '@shared/types'
 
@@ -21,9 +20,12 @@ import { RescuePanel } from '@/features/magical/RescuePanel'
 import { useOverwhelm } from '@/features/magical/useOverwhelm'
 import { ApiError } from '@/lib/api'
 
+import { ActionResults } from './ActionResults'
+import { goblinAct, GOBLIN_QUERY_KEYS, type GoblinResult } from './goblinApi'
 import styles from './TellTheGoblin.module.css'
 
 type ResultBody =
+  | { kind: 'actions'; said: string; results: GoblinResult[] }
   | { kind: 'capture'; capture: Capture }
   | { kind: 'answer'; question: string; reply: AssistantReply }
   | { kind: 'overwhelm' }
@@ -76,9 +78,9 @@ export function TellTheGoblin({ prominent = false }: { prominent?: boolean }) {
       [
         'captures',
         'review',
-        'den-summary',
         'documents',
         'sorting-documents',
+        ...GOBLIN_QUERY_KEYS,
       ].map((key) => queryClient.invalidateQueries({ queryKey: [key] })),
     )
 
@@ -98,14 +100,18 @@ export function TellTheGoblin({ prominent = false }: { prominent?: boolean }) {
         add({ kind: 'document', devour })
       }
       if (!words) return
-      const intent = detectIntent(words)
-      if (intent === 'overwhelm') {
-        add({ kind: 'overwhelm' })
-      } else if (intent === 'question') {
-        const { reply } = await askAssistant(words)
-        add({ kind: 'answer', question: words, reply })
-      } else {
-        const { capture } = await createCapture(words)
+      // 1. The Goblin acts on what it can against the user's own records.
+      const acted = await goblinAct(words)
+      if (acted.results.length)
+        add({ kind: 'actions', said: words, results: acted.results })
+      // 2. Everything else goes to the existing engines.
+      if (acted.overwhelm) add({ kind: 'overwhelm' })
+      for (const question of acted.questions) {
+        const { reply } = await askAssistant(question)
+        add({ kind: 'answer', question, reply })
+      }
+      if (acted.capture.length) {
+        const { capture } = await createCapture(acted.capture.join(' '))
         add({ kind: 'capture', capture })
       }
     },
@@ -252,13 +258,18 @@ export function TellTheGoblin({ prominent = false }: { prominent?: boolean }) {
       <div aria-live="polite" className={styles.results}>
         {results.map((result) => (
           <div key={result.id} className={styles.result}>
-            {result.kind === 'capture' ? (
+            {result.kind === 'actions' ? (
+              <>
+                <p className={styles.question}>“{result.said}”</p>
+                <ActionResults results={result.results} />
+              </>
+            ) : result.kind === 'capture' ? (
               <>
                 <p className={styles.goblinSays}>
                   <span aria-hidden>👹 </span>
                   {live(result.capture).items.length === 0
                     ? 'Got it — saved so nothing gets lost.'
-                    : `Here’s what I found. Keep what’s right — nothing is added until you do.`}
+                    : `I wasn’t sure about these — keep what’s right.`}
                 </p>
                 <CaptureReview capture={live(result.capture)} />
               </>

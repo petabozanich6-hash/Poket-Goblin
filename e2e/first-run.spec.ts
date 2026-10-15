@@ -24,9 +24,10 @@ test.describe('Pocket Goblin first-run journey', () => {
     // Journey A: capture on Home, approve in place, find it in My Life.
     await page.getByLabel('What’s on your mind?').fill('Buy milk tomorrow')
     await page.getByRole('button', { name: 'Give it to the Goblin' }).click()
-    const keep = page.getByRole('button', { name: /^keep$/i }).first()
-    await expect(keep).toBeVisible({ timeout: 15_000 })
-    await keep.click()
+    // A plain request just happens — no Keep/Skip step.
+    await expect(
+      page.getByText('Milk added to your shopping list.'),
+    ).toBeVisible({ timeout: 15_000 })
 
     await page.getByRole('link', { name: 'My Life' }).first().click()
     await page.getByLabel('Search everything').fill('milk')
