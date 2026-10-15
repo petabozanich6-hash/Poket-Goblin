@@ -19,11 +19,15 @@ export type Env = {
   GOOGLE_OAUTH_CLIENT_SECRET?: string
   MICROSOFT_OAUTH_CLIENT_ID?: string
   MICROSOFT_OAUTH_CLIENT_SECRET?: string
-  /**
-   * Stripe integration point (not implemented yet). Its presence only flips
-   * Goblin HQ from "Stripe is not connected" to "arrives with integration".
-   */
+  /** Stripe secret key (Worker secret). Test keys (sk_test_…) until launch. */
   STRIPE_SECRET_KEY?: string
+  /** Signing secret of the Stripe webhook endpoint (Worker secret). */
+  STRIPE_WEBHOOK_SECRET?: string
+  /** Price ids of the Premium product, made once in Stripe (vars). */
+  STRIPE_PRICE_MONTHLY?: string
+  STRIPE_PRICE_YEARLY?: string
+  /** Must be "true" before live keys are used: real charges need approval. */
+  STRIPE_LIVE_ENABLED?: string
   /** Cloudflare Email Service binding for account emails (optional). */
   EMAIL?: SendEmail
 }
