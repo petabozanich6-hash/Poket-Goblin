@@ -1,0 +1,153 @@
+# One-time promotion of an EXISTING account to Owner (Goblin HQ).
+#
+# - Manual only (workflow_dispatch). Never runs on push, PR or a schedule.
+# - Preflight is read-only and the default.
+# - apply: must run from main, needs confirm = PROMOTE, and waits for approval
+#   on the `production-database` environment before anything is written.
+# - The account is identified by its internal user id. The email on record
+#   must match the OWNER_EXPECTED_EMAIL environment secret; the email is never
+#   printed (this repository is public), only a masked form.
+# - Refuses if any Owner already exists. Never changes passwords, email,
+#   sessions or customer data.
+#
+# Setup and procedure: docs/OWNER_PROMOTION.md
+name: Owner promotion (production)
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'preflight = read-only check. apply = promote (needs approval).'
+        required: true
+        default: preflight
+        type: choice
+        options: [preflight, apply]
+      user_id:
+        description: 'Internal account id, shown in Pocket Goblin under Settings → Account (user_…)'
+        required: true
+        type: string
+      confirm:
+        description: 'For apply only: type PROMOTE'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: owner-promotion-production
+  cancel-in-progress: false
+
+env:
+  D1_DATABASE_NAME: pocket-goblin
+  WRANGLER_SEND_METRICS: 'false'
+
+jobs:
+  preflight:
+    name: Preflight (read-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production-database-readonly
+    outputs:
+      already_done: ${{ steps.check.outputs.already_done }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check inputs
+        env:
+          ACTION: ${{ inputs.action }}
+          CONFIRM: ${{ inputs.confirm }}
+          USER_ID: ${{ inputs.user_id }}
+          REF: ${{ github.ref }}
+        run: |
+          if ! echo "$USER_ID" | grep -Eq '^user_[0-9a-f]{32}$'; then
+            echo "::error title=Bad user id::user_id must be user_ followed by 32 hex characters. Nothing was changed."
+            exit 1
+          fi
+          if [ "$ACTION" = "apply" ]; then
+            if [ "$REF" != "refs/heads/main" ]; then
+              echo "::error title=Wrong branch::apply must be started from main (got $REF). Nothing was changed."
+              exit 1
+            fi
+            if [ "$CONFIRM" != "PROMOTE" ]; then
+              echo "::error title=Not confirmed::Type PROMOTE in confirm to apply. Nothing was changed."
+              exit 1
+            fi
+          fi
+
+      - name: Check Cloudflare credentials (values never shown)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_D1_READ_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CREDENTIAL_LABEL: CLOUDFLARE_D1_READ_TOKEN
+        run: node scripts/cf-credentials-check.mjs
+
+      - name: Read the account and check eligibility
+        id: check
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_D1_READ_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          OWNER_USER_ID: ${{ inputs.user_id }}
+          OWNER_EXPECTED_EMAIL: ${{ secrets.OWNER_EXPECTED_EMAIL }}
+        run: node scripts/owner-promotion.mjs preflight
+
+  apply:
+    name: Promote (approval required)
+    needs: preflight
+    if: inputs.action == 'apply' && needs.preflight.outputs.already_done != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Pauses here until a required reviewer approves the run.
+    environment: production-database
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_D1_MIGRATE_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      OWNER_USER_ID: ${{ inputs.user_id }}
+      OWNER_EXPECTED_EMAIL: ${{ secrets.OWNER_EXPECTED_EMAIL }}
+    steps:
+      - name: Checkout (same commit as preflight)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Check Cloudflare credentials (values never shown)
+        env:
+          CREDENTIAL_LABEL: CLOUDFLARE_D1_MIGRATE_TOKEN
+        run: node scripts/cf-credentials-check.mjs
+
+      - name: Install pinned Wrangler
+        run: npm ci --no-audit --no-fund
+
+      - name: Record restore point (Time Travel bookmark)
+        run: |
+          set -o pipefail
+          export CLOUDFLARE_API_TOKEN="${CLOUDFLARE_API_TOKEN//[[:space:]]/}" CLOUDFLARE_ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID//[[:space:]]/}"
+          npx wrangler d1 time-travel info "$D1_DATABASE_NAME" --json | tee bookmark.json
+          BOOKMARK=$(node -e "const j=JSON.parse(require('fs').readFileSync('bookmark.json','utf8'));const b=j.bookmark??j.result?.bookmark??'';process.stdout.write(/^[\\w-]+$/.test(b)?b:'')")
+          if [ -z "$BOOKMARK" ]; then
+            echo "::error title=No restore point::Could not read a Time Travel bookmark. Not promoting without one."
+            exit 1
+          fi
+          echo "### Restore point before promotion: \`$BOOKMARK\`" >> "$GITHUB_STEP_SUMMARY"
+
+      # Re-reads and re-checks everything, then writes with guarded,
+      # parameterised statements.
+      - name: Promote
+        run: node scripts/owner-promotion.mjs apply
+
+      - name: Verify
+        run: node scripts/owner-promotion.mjs verify
