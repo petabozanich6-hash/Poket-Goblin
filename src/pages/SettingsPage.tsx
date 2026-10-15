@@ -12,6 +12,11 @@ import { CAPACITY_HINTS, CAPACITY_LABELS } from '@shared/types'
 
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import {
+  ChangePassword,
+  EmailStatus,
+  YourData,
+} from '@/features/account/AccountControls'
 import { useAuth } from '@/features/auth/useAuth'
 import { fetchAchievements } from '@/features/magical/magicalApi'
 import { applyTheme } from '@/lib/theme'
@@ -19,7 +24,7 @@ import { applyTheme } from '@/lib/theme'
 import styles from './Page.module.css'
 
 export function SettingsPage() {
-  const { user, access, settings, saveSettings } = useAuth()
+  const { user, access, account, settings, saveSettings } = useAuth()
   const [copied, setCopied] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -94,6 +99,17 @@ export function SettingsPage() {
           Support may ask for this ID. It is not a password and gives no access
           on its own.
         </p>
+        <p className={styles.sub}>{user?.email}</p>
+        <EmailStatus
+          verified={Boolean(account?.emailVerified)}
+          configured={Boolean(account?.emailConfigured)}
+        />
+        <ChangePassword />
+      </Card>
+
+      <Card>
+        <h2>Your data</h2>
+        <YourData isOwner={Boolean(access?.isOwner)} />
       </Card>
 
       <Card>

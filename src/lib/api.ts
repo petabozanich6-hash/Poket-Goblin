@@ -70,6 +70,8 @@ export const api = {
       body: body !== undefined ? JSON.stringify(body) : undefined,
     }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  delete_with_body: <T>(path: string, body: unknown) =>
+    request<T>(path, { method: 'DELETE', body: JSON.stringify(body) }),
   /**
    * Goblin HQ calls. The header is required by the server for administrative
    * changes (with the Origin check it blocks cross-site requests).

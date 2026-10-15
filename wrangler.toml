@@ -44,6 +44,12 @@ ENVIRONMENT = "production"
 [observability]
 enabled = true
 
+# Account emails (password reset, email verification) via Cloudflare Email
+# Service. Sending needs pocketgoblin.org onboarded to Email Sending (owner
+# action). Until then the app reports email as not configured.
+[[send_email]]
+name = "EMAIL"
+
 # Hourly housekeeping: deletes abandoned "Just sort it" documents (originals
 # older than 24 h) and unfinished uploads. Cron Triggers are free.
 [triggers]

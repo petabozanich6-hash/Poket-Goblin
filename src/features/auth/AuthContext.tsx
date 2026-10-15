@@ -76,6 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: meQuery.data?.user ?? null,
       settings: meQuery.data?.settings ?? null,
       access: meQuery.data?.access ?? null,
+      account: meQuery.data?.account ?? null,
       isLoading: !bootstrapped || meQuery.isLoading,
       isAuthenticated: Boolean(meQuery.data?.user),
       login: async (input) => {

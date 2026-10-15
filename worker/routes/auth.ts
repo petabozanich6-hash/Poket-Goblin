@@ -1,7 +1,9 @@
 import { Hono } from 'hono'
 
 import type { Env } from '../env'
+import { appBaseUrl, consumeToken, issueToken } from '../lib/accountTokens'
 import { recordSecurityEvent } from '../lib/audit'
+import { accountEmail, sendEmail } from '../lib/email'
 import { newId } from '../lib/ids'
 import { hashPassword, verifyPassword } from '../lib/passwords'
 import { loadPlatformSettings } from '../lib/platformSettings'
@@ -93,6 +95,7 @@ authRoutes.post('/register', async (c) => {
 
   const session = await createSession(c.env.DB, c.env, id)
   setSessionCookie(c, session.token, session.expiresAt)
+  await sendVerificationEmail(c.env, id, emailRaw, displayName, c.req.url)
 
   return c.json(
     {
@@ -176,5 +179,172 @@ authRoutes.post('/login', async (c) => {
 authRoutes.post('/logout', async (c) => {
   await destroySession(c.env.DB, c.env, c.req.header('Cookie'))
   clearSessionCookie(c)
+  return c.json({ ok: true })
+})
+
+// ------------------------------------------------------------ account email
+
+export async function sendVerificationEmail(
+  env: Env,
+  userId: string,
+  email: string,
+  displayName: string,
+  requestUrl: string,
+) {
+  if (!env.EMAIL) return
+  const token = await issueToken(env, userId, 'email_verify')
+  await sendEmail(
+    env,
+    accountEmail({
+      to: email,
+      subject: 'Confirm your Pocket Goblin email',
+      greeting: `Hi ${displayName},`,
+      lines: [
+        'Please confirm this is your email address, so the goblin can help you get back in if you ever forget your password.',
+      ],
+      // Fragment, not query string: the token never reaches server logs.
+      action: {
+        label: 'Confirm my email',
+        url: `${appBaseUrl(env, requestUrl)}/verify-email#token=${token}`,
+      },
+      footer:
+        'If you didn’t create a Pocket Goblin account, you can ignore this email.',
+    }),
+  )
+}
+
+const GENERIC_RESET_REPLY = {
+  ok: true,
+  message:
+    'If an account uses that email, a reset link is on its way. It works for 30 minutes.',
+}
+
+/**
+ * Forgotten password. Always answers the same way, whether or not the email
+ * has an account (no enumeration). Rate-limited per IP and per address.
+ */
+authRoutes.post('/password/forgot', async (c) => {
+  const ipLimit = checkRateLimit(`forgot:${clientKey(c)}`, 10, 15 * 60_000)
+  const body = (await c.req.json().catch(() => null)) as Record<
+    string,
+    unknown
+  > | null
+  const email = asString(body?.email, 254)?.toLowerCase()
+  if (!email || !isEmail(email)) {
+    return c.json({ error: 'Enter the email you signed up with.' }, 400)
+  }
+  const emailLimit = checkRateLimit(`forgot-email:${email}`, 3, 60 * 60_000)
+  if (!ipLimit.ok) {
+    return c.json(
+      { error: 'Too many requests. Please try again shortly.' },
+      429,
+    )
+  }
+  if (!emailLimit.ok) return c.json(GENERIC_RESET_REPLY)
+
+  const user = await c.env.DB.prepare(
+    `SELECT id, email, display_name as displayName, status FROM users WHERE email = ?`,
+  )
+    .bind(email)
+    .first<{ id: string; email: string; displayName: string; status: string }>()
+  if (user && user.status === 'active') {
+    const token = await issueToken(c.env, user.id, 'password_reset')
+    const result = await sendEmail(
+      c.env,
+      accountEmail({
+        to: user.email,
+        subject: 'Reset your Pocket Goblin password',
+        greeting: `Hi ${user.displayName},`,
+        lines: [
+          'Someone (hopefully you) asked to reset your Pocket Goblin password.',
+          'The link works once and expires in 30 minutes.',
+        ],
+        action: {
+          label: 'Choose a new password',
+          url: `${appBaseUrl(c.env, c.req.url)}/reset-password#token=${token}`,
+        },
+        footer:
+          'If you didn’t ask for this, ignore this email — your password stays the same.',
+      }),
+    )
+    await recordSecurityEvent(
+      c.env.DB,
+      user.id,
+      'password_reset_requested',
+      result.sent ? 'email sent' : `email not sent (${result.reason})`,
+    )
+  }
+  return c.json(GENERIC_RESET_REPLY)
+})
+
+/** Set a new password with a single-use reset token; signs out everywhere. */
+authRoutes.post('/password/reset', async (c) => {
+  const limit = checkRateLimit(`reset:${clientKey(c)}`, 20, 15 * 60_000)
+  if (!limit.ok) {
+    return c.json(
+      { error: 'Too many attempts. Please try again shortly.' },
+      429,
+    )
+  }
+  const body = (await c.req.json().catch(() => null)) as Record<
+    string,
+    unknown
+  > | null
+  const token = typeof body?.token === 'string' ? body.token : ''
+  const password = typeof body?.password === 'string' ? body.password : ''
+  if (password.length < 8 || password.length > 200) {
+    return c.json({ error: 'Choose a password of at least 8 characters.' }, 400)
+  }
+  const userId = await consumeToken(c.env, token, 'password_reset')
+  if (!userId) {
+    return c.json(
+      {
+        error:
+          'That reset link has expired or was already used. Ask for a new one.',
+      },
+      400,
+    )
+  }
+  const hash = await hashPassword(password)
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `UPDATE users SET password_hash = ?, password_changed_at = ?,
+         email_verified_at = COALESCE(email_verified_at, ?)
+       WHERE id = ? AND status = 'active'`,
+    ).bind(hash, new Date().toISOString(), new Date().toISOString(), userId),
+    // Every existing session ends: whoever had the old password is out.
+    c.env.DB.prepare(`DELETE FROM sessions WHERE user_id = ?`).bind(userId),
+    c.env.DB.prepare(
+      `DELETE FROM account_tokens WHERE user_id = ? AND purpose = 'password_reset'`,
+    ).bind(userId),
+  ])
+  await recordSecurityEvent(c.env.DB, userId, 'password_reset')
+  return c.json({ ok: true })
+})
+
+/** Confirm an email address from the link in the verification email. */
+authRoutes.post('/verify-email', async (c) => {
+  const limit = checkRateLimit(`verify:${clientKey(c)}`, 30, 15 * 60_000)
+  if (!limit.ok) {
+    return c.json(
+      { error: 'Too many attempts. Please try again shortly.' },
+      429,
+    )
+  }
+  const body = (await c.req.json().catch(() => null)) as Record<
+    string,
+    unknown
+  > | null
+  const token = typeof body?.token === 'string' ? body.token : ''
+  const userId = await consumeToken(c.env, token, 'email_verify')
+  if (!userId) {
+    return c.json({ error: 'That link has expired or was already used.' }, 400)
+  }
+  await c.env.DB.prepare(
+    `UPDATE users SET email_verified_at = COALESCE(email_verified_at, ?) WHERE id = ?`,
+  )
+    .bind(new Date().toISOString(), userId)
+    .run()
+  await recordSecurityEvent(c.env.DB, userId, 'email_verified')
   return c.json({ ok: true })
 })

@@ -20,4 +20,6 @@ export type Env = {
    * Goblin HQ from "Stripe is not connected" to "arrives with integration".
    */
   STRIPE_SECRET_KEY?: string
+  /** Cloudflare Email Service binding for account emails (optional). */
+  EMAIL?: SendEmail
 }

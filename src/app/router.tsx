@@ -3,6 +3,11 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 
 import { useAuth } from '@/features/auth/useAuth'
 import { AssistantPage } from '@/pages/AssistantPage'
+import {
+  ForgotPasswordPage,
+  ResetPasswordPage,
+  VerifyEmailPage,
+} from '@/pages/AccountRecoveryPages'
 import { AuthPage } from '@/pages/AuthPage'
 import { CalendarPage } from '@/pages/CalendarPage'
 import { CapturePage } from '@/pages/CapturePage'
@@ -62,6 +67,9 @@ export function AppRouter() {
           }
         />
         <Route path="/welcome" element={<Navigate to="/" replace />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route
           element={
             <Protected>

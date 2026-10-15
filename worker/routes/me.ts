@@ -20,9 +20,14 @@ export const meRoutes = new Hono<{ Bindings: Env; Variables: Vars }>()
 
 meRoutes.get('/', async (c) => {
   const user = c.get('user')
-  const [settings, access] = await Promise.all([
+  const [settings, access, account] = await Promise.all([
     loadSettings(c.env.DB, user.id),
     loadAccess(c.env.DB, user.id),
+    c.env.DB.prepare(
+      `SELECT email_verified_at as emailVerifiedAt FROM users WHERE id = ?`,
+    )
+      .bind(user.id)
+      .first<{ emailVerifiedAt: string | null }>(),
   ])
   return c.json({
     user,
@@ -32,6 +37,10 @@ meRoutes.get('/', async (c) => {
       plan: access.plan,
       planLabel: PLAN_LABELS[access.plan],
       isOwner: access.isOwner,
+    },
+    account: {
+      emailVerified: Boolean(account?.emailVerifiedAt),
+      emailConfigured: Boolean(c.env.EMAIL),
     },
   })
 })
