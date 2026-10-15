@@ -14,6 +14,12 @@ import { PlanPage } from '@/pages/PlanPage'
 import { SearchPage } from '@/pages/SearchPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { TasksPage } from '@/pages/TasksPage'
+import { HqCustomerPage } from '@/pages/hq/HqCustomerPage'
+import { HqCustomersPage } from '@/pages/hq/HqCustomersPage'
+import { HqLayout } from '@/pages/hq/HqLayout'
+import { HqOverviewPage } from '@/pages/hq/HqOverviewPage'
+import { HqSecurityPage } from '@/pages/hq/HqSecurityPage'
+import { HqSettingsPage } from '@/pages/hq/HqSettingsPage'
 
 import { AppShell } from './AppShell'
 
@@ -76,6 +82,13 @@ export function AppRouter() {
           <Route path="/vault" element={<DocumentsPage />} />
           <Route path="/inbox" element={<InboxPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/hq" element={<HqLayout />}>
+            <Route index element={<HqOverviewPage />} />
+            <Route path="customers" element={<HqCustomersPage />} />
+            <Route path="customers/:id" element={<HqCustomerPage />} />
+            <Route path="settings" element={<HqSettingsPage />} />
+            <Route path="security" element={<HqSecurityPage />} />
+          </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

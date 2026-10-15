@@ -121,6 +121,10 @@
   padding-bottom: 0.55rem;
 }
 
+.navOwner {
+  border: 1px dashed color-mix(in srgb, var(--color-warm) 55%, transparent);
+}
+
 .navGroup {
   margin: var(--space-3) 0 var(--space-1);
   padding: 0 0.9rem;
@@ -133,6 +137,9 @@
 
 .main {
   min-width: 0;
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
 }
 
 .main:focus {

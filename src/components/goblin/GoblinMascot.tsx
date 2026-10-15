@@ -1,6 +1,6 @@
 import styles from './GoblinMascot.module.css'
 
-/** Official Pocket Goblin mascot — use only in the Den welcome area. */
+/** Official Pocket Goblin mascot — Den welcome area and the Goblin HQ header only. */
 const MASCOT_SRC = '/assets/branding/goblin-mascot.webp'
 const MASCOT_FALLBACK = '/assets/branding/goblin-mascot.png'
 

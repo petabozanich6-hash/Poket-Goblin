@@ -1,0 +1,22 @@
+.stack {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.warning {
+  background: var(--color-warm-soft);
+  color: var(--color-ink);
+}

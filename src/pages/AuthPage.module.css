@@ -2,6 +2,8 @@
   min-height: 100dvh;
   display: grid;
   place-items: center;
+  align-content: center;
+  gap: var(--space-4);
   padding: var(--space-5);
 }
 
