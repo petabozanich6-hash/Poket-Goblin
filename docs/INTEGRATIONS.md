@@ -2,13 +2,18 @@
 
 ## Document vault
 
+- **Document Devourer:** "Just sort it" (default) deletes the original after
+  review (24 h maximum). "Keep this document" saves it. See
+  [DOCUMENT_PRIVACY.md](DOCUMENT_PRIVACY.md).
 - Metadata in D1 (`documents`, `document_extractions`, `record_links`)
-- Bytes in private object storage via `UPLOADS` R2 binding
+- Bytes in private object storage via `UPLOADS` R2 binding (`tmp/` prefix for
+  temporary originals)
 - Local Miniflare R2 (no remote paid bucket required)
 - Memory fallback only when the binding is absent (tests)
 - Server-side magic-byte validation · 10 MB limit (10 MiB)
 - Processing: upload → store → extract → interpret → review items
-- OCR: abstracted as `needs_ocr` status — **not configured** until approved
+- Reads text, Word (.docx) and PDFs. Photos and scans need a vision-capable AI
+  provider; without one they report `needs_ocr` honestly.
 
 ## Unified inbox
 

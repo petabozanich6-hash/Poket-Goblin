@@ -579,3 +579,87 @@ See [OWNER_PROMOTION.md](OWNER_PROMOTION.md).
   API.
 - **Deployment history:** needs a read-only Cloudflare API token, if wanted.
 - **Durable rate limiting and Turnstile:** Phase 2.
+
+---
+
+## 12. Document Devourer
+
+Status: implemented on `feat/document-devourer`, which is stacked on
+`feat/owner-hq`. **Not merged, migrated or deployed.**
+
+Flow: upload → understand → suggest → user approves → save approved items →
+delete the original.
+
+### What changed
+
+- **Migration `0007`** (additive): `documents.retention` (existing rows become
+  `keep`), `expires_at`, `document_type`, `goblin_summary`, plus indexes.
+- **Just sort it** (default): the original sits under `tmp/` for at most
+  24 h, and no text is stored. Finish, cancel, failure or expiry forgets the
+  file, suggestions, extractions, links and the record. Approved items stay.
+  You can switch to **Keep this document** at any point.
+- **Lifecycle:** the record is written before the file is stored. An hourly
+  Cron Trigger (`17 * * * *`, free) and an opportunistic sweep on each upload
+  forget anything expired.
+- **Reading:**
+  - text files, Word (.docx, built-in unzip), and compressed PDFs, with an
+    8 MB inflate cap against decompression bombs
+  - photos and scans only through a vision-capable AI provider
+- **Understanding:**
+  - recognises bills, appointments, medical, school/study, work, official,
+    insurance and forms
+  - worldwide date reading: ambiguous numeric dates are flagged and guessed
+    from the reader's locale
+  - a goblin summary plus suggested tasks, reminders and calendar entries
+  - never pays or submits anything
+- **AI** (optional): the document is fenced as untrusted data, output is
+  validated and grounded in the document, and failure falls back to the
+  built-in reader.
+- **Limits:** 10 MB per file. Kept allowance: free 100 MB, Premium 1 GB,
+  Owner 5 GB; only kept files count. At most 10 waiting reviews; a daily
+  processing cap per plan.
+- **Interface:** Documents page with the mode choice, an approve or skip
+  review, "👹 DOCUMENT DEVOURED!", a list of reviews still in progress, and
+  kept-allowance usage.
+- **Goblin HQ** counts kept storage only and shows temporary documents in
+  review.
+
+Privacy and AI-provider retention, stated without overclaiming:
+[DOCUMENT_PRIVACY.md](DOCUMENT_PRIVACY.md).
+
+### Tests
+
+- 232 unit and integration tests in total, including:
+  - `devourer.test.ts` (20 tests): deletion after finish, cancel, failure and
+    expiry; skipped suggestions create nothing; approved items survive;
+    cross-user isolation; kept documents downloadable until deleted; limits;
+    prompt injection through rules and AI; AI fallback; photos with and
+    without a vision model
+  - date and understanding tests
+  - Word and PDF extraction tests, including the decompression-bomb guard
+- A mutation check confirmed the deletion tests fail if originals aren't
+  removed.
+- Playwright: 4 passing, including the full Devourer journey in a real
+  browser.
+
+### Deployment order (replaces the order in §11)
+
+Migration `0007` was also added to `feat/owner-schema`, so a single schema PR
+carries both `0006` and `0007`:
+
+1. Merge `feat/owner-schema` to `main`. This contains schema only, so customers
+   see no change.
+2. Run the **D1 migrations (production)** workflow: `preflight`, which should
+   show `0006` and `0007` pending, then `apply` with approval.
+3. Merge `feat/owner-hq`, then `feat/document-devourer`, to `main`. Workers
+   Builds deploys them, and the cron trigger is created by that deploy.
+4. Run the Owner promotion (§11), then optionally add the R2 `tmp/` lifecycle
+   rule.
+
+### Remaining document work
+
+- HEIC photos (iPhone): the browser usually converts them, but they aren't
+  accepted directly.
+- PDFs using unusual font encodings may extract no text, so they take the
+  photo path.
+- Free-plan document access rules are part of the Phase 5 entitlement work.
