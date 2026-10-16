@@ -480,12 +480,20 @@ function subjectOf(plan: Plan): string | undefined {
 }
 
 async function quotaForPlan(db: D1Database, userId: string, plan: Plan) {
-  if (plan.kind === 'task_insert' ||
-      (plan.kind === 'task_update' && plan.before.status !== 'open' && plan.after.status === 'open')) {
+  if (
+    plan.kind === 'task_insert' ||
+    (plan.kind === 'task_update' &&
+      plan.before.status !== 'open' &&
+      plan.after.status === 'open')
+  ) {
     return freeQuota(db, userId, 'tasks')
   }
-  if (plan.kind === 'reminder_insert' ||
-      (plan.kind === 'reminder_update' && !['pending', 'snoozed'].includes(plan.before.status) && ['pending', 'snoozed'].includes(plan.after.status))) {
+  if (
+    plan.kind === 'reminder_insert' ||
+    (plan.kind === 'reminder_update' &&
+      !['pending', 'snoozed'].includes(plan.before.status) &&
+      ['pending', 'snoozed'].includes(plan.after.status))
+  ) {
     return freeQuota(db, userId, 'reminders')
   }
   return null
