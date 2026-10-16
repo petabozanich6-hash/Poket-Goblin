@@ -256,7 +256,7 @@ describe('Just sort it (default)', () => {
     expect(h.query(`SELECT COUNT(*) as n FROM tasks`)).toEqual([{ n: 1 }])
   })
 
-  it('reads the same file again when nothing came of it last time', async () => {
+  it('reuses a successfully processed file even when suggestions were dismissed', async () => {
     await askFirst(alice)
     const first = await upload(alice, BILL)
     // Pretend the first read was poor: its suggestions were all skipped.
@@ -266,10 +266,13 @@ describe('Just sort it (default)', () => {
     const again = await upload(alice, BILL)
     expect(again.body).toMatchObject({
       duplicate: true,
-      message: 'You’ve given me this one before, so I read it again.',
-      processing: { status: 'ready' },
-      autoAdded: { added: 2 },
+      document: { status: 'ready' },
     })
+    expect(again.body.processing).toBeUndefined()
+    expect(h.query(
+      'SELECT request_count AS n FROM ai_request_limits WHERE scope = ?',
+      `document-month:${alice.id}`,
+    )).toEqual([{ n: 1 }])
     expect(h.query(`SELECT COUNT(*) as n FROM documents`)).toEqual([{ n: 1 }])
   })
 
