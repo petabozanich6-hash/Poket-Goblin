@@ -11,6 +11,7 @@
  * - Temporary ("Just sort it") documents never have their text stored, and a
  *   failure deletes their original immediately.
  */
+import { isStudyPathwayGroup } from '../../../shared/documents/studyPathwayGroups'
 import {
   extractText,
   scannedPageImage,
@@ -294,9 +295,7 @@ export async function processDocumentForUser(
         understanding.documentType === 'education' &&
         suggestion.type === 'task' &&
         typeof suggestion.group === 'string' &&
-        /^(?:week\s+\d+\b|.*\b(?:assessment|assignment|essay|exam|research project|study plan)\b)/i.test(
-          suggestion.group,
-        )
+        isStudyPathwayGroup(suggestion.group)
           ? { ...suggestion, requiresReview: true }
           : suggestion
       statements.push(
