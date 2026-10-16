@@ -95,7 +95,7 @@ authRoutes.post('/register', async (c) => {
   const id = newId('user')
   const passwordHash = await hashPassword(password)
   if (verificationRequired) {
-    // Additive migration 0016 must be applied before enabling the flag.
+    // Additive migration 0017 must be applied before enabling the flag.
     await c.env.DB.prepare(
       `INSERT INTO users (id, email, password_hash, display_name, email_verification_required_at)
        VALUES (?, ?, ?, ?, ?)`,
@@ -201,7 +201,7 @@ authRoutes.post('/login', async (c) => {
 
   // Previously gated users remain protected when new signups are ungated.
   // This fallback is only for pre-migration legacy accounts: deployment of
-  // migration 0016 and activation of the flag are separate owner approvals.
+  // migration 0017 and activation of the flag are separate owner approvals.
   let pending: {
     email_verification_required_at: string | null
     email_verified_at: string | null
@@ -227,7 +227,7 @@ authRoutes.post('/login', async (c) => {
         503,
       )
     }
-    // No gated user could have been created before migration 0016.
+    // No gated user could have been created before migration 0017.
   }
   if (pending?.email_verification_required_at && !pending.email_verified_at) {
     return c.json(

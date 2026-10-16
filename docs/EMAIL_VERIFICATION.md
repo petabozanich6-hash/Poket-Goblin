@@ -1,12 +1,12 @@
 # Pocket Goblin email verification
 
-**Default: OFF.** Enable it only after mail delivery and migration 0016
+**Default: OFF.** Enable it only after mail delivery and migration 0017
 are ready. Use the Cloudflare Worker variable
 `EMAIL_VERIFICATION_REQUIRED = "true"`.
 
 ## Before enabling
 
-1. Back up production D1 and apply `0016_verification_gate.sql` using the
+1. Back up production D1 and apply `0017_verification_gate.sql` using the
    approval-gated production migrations workflow.
 2. Confirm that the Cloudflare `EMAIL` binding can send mail from
    `no-reply@pocketgoblin.org` to a real external inbox.
