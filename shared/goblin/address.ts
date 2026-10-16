@@ -68,11 +68,35 @@ function namePattern(name: string): string {
 function stripLeadingName(
   text: string,
   names: string[],
+  possessive = false,
 ): { rest: string; matched: boolean } {
   for (const name of names) {
-    const re = new RegExp(`^${namePattern(name)}\\b[\\s,!.:;?-]*`, 'i')
+    // After "my"/"the" the name must stand alone ("my Goblin, …"), so
+    // "my goblin figurine is on the shelf" is not someone talking to it.
+    const re = new RegExp(
+      `^${namePattern(name)}${possessive ? '(?=\\s*(?:[,!.:;?-]|$))' : '\\b'}[\\s,!.:;?-]*`,
+      'i',
+    )
     const m = text.match(re)
     if (m) return { rest: text.slice(m[0].length), matched: true }
+  }
+  return { rest: text, matched: false }
+}
+
+/** Skip honorifics ("good sir Mr", "esteemed Lord") looking for a name. */
+function findName(
+  text: string,
+  names: string[],
+): { rest: string; matched: boolean } {
+  let probe = text
+  let possessive = false
+  for (let i = 0; i < 6; i += 1) {
+    const named = stripLeadingName(probe, names, possessive)
+    if (named.matched) return named
+    const h = probe.match(HONORIFIC)
+    if (!h || h[0].length === 0) break
+    if (/^(?:my|our|the)\b/i.test(h[0])) possessive = true
+    probe = probe.slice(h[0].length)
   }
   return { rest: text, matched: false }
 }
@@ -103,15 +127,7 @@ export function normaliseAddress(
     if (greet && greet[0].length < text.length) text = text.slice(greet[0].length)
 
     // Honorifics only count when they lead up to a name.
-    let probe = text
-    let honorifics = 0
-    while (honorifics < 5) {
-      const h = probe.match(HONORIFIC)
-      if (!h || h[0].length === 0) break
-      probe = probe.slice(h[0].length)
-      honorifics += 1
-    }
-    const named = stripLeadingName(probe, known)
+    const named = findName(text, known)
     if (named.matched && named.rest.trim()) {
       text = named.rest
       addressed = true
@@ -164,10 +180,5 @@ export function startsWithAddress(
     if (!greet || greet[0].length === 0) break
     text = text.slice(greet[0].length)
   }
-  for (let i = 0; i < 5; i += 1) {
-    const h = text.match(HONORIFIC)
-    if (!h || h[0].length === 0) break
-    text = text.slice(h[0].length)
-  }
-  return stripLeadingName(text, known).matched
+  return findName(text, known).matched
 }

@@ -95,6 +95,7 @@ const UNITS =
 
 function clean(text: string): string {
   return text
+    .replace(/[’‘]/g, "'")
     .replace(/[.!?]+$/, '')
     .replace(
       /^(?:oh|ok|okay|so|um|well|also|and|but|then|plus|actually|just|oh and)[,\s]+/i,
@@ -171,6 +172,12 @@ export function splitClauses(text: string): string[] {
           `\\s*(?:,\\s*(?:but|and|then)?|\\s+but|\\s+and(?:\\s+then)?|\\s+then)\\s+(?=${starters})`,
           'i',
         ),
+      ),
+    )
+    // "…, and the washing needs doing": a new subject with its own verb.
+    .flatMap((clause) =>
+      clause.split(
+        /\s*,\s*(?:and\s+|then\s+)?(?=(?:the|my|our)\s+[\w']+(?:\s+[\w']+)?\s+(?:needs?|is|are|has|have|wants?)\b)/i,
       ),
     )
     .map((c) => c.trim())

@@ -23,7 +23,6 @@ import {
 } from '../../../shared/goblin/conversation'
 import { normaliseAddress } from '../../../shared/goblin/address'
 import { parseOperation, splitClauses } from '../../../shared/goblin/language'
-import type { GoblinProfile } from '../../../shared/goblin/profile'
 import { styleReply, type ReplyPart, type ReplyTopic } from '../../../shared/goblin/voiceStyle'
 import { localDateTimeToIso } from '../datetime'
 import { newId } from '../ids'
@@ -306,7 +305,10 @@ async function overdueTasks(ctx: Ctx, turn: Turn) {
   turn.parts.push({
     tone: 'info',
     topic: 'none',
-    brief: `${plural(tasks.length, 'thing')} slipped past ${tasks.length === 1 ? 'its' : 'their'} date — still here when you’re ready.`,
+    brief:
+      tasks.length <= 3
+        ? `Overdue: ${joinNames(tasks.map((t) => t.title))}. Still here when you’re ready.`
+        : `${plural(tasks.length, 'thing')} slipped past their dates — still here when you’re ready.`,
     text: `${plural(tasks.length, 'thing')} slipped past ${tasks.length === 1 ? 'its' : 'their'} date: ${joinNames(tasks.map((t) => t.title))}. Still here when you’re ready.`,
   })
   turn.answers.push({

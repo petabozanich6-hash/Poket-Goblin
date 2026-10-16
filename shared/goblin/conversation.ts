@@ -49,16 +49,6 @@ function addDays(d: Date, n: number): Date {
   return next
 }
 
-const DAY_NAMES = [
-  'sunday',
-  'monday',
-  'tuesday',
-  'wednesday',
-  'thursday',
-  'friday',
-  'saturday',
-]
-
 function partOf(lower: string): DayPart | undefined {
   if (/\b(tonight|evening)\b/.test(lower)) return 'evening'
   if (/\bafternoon\b/.test(lower)) return 'afternoon'
@@ -273,7 +263,7 @@ const GROCERY_HINTS = new Set(
 )
 
 const NOT_AN_ITEM =
-  /^(?:it|that|this|them|those|these|yes|no|ok|okay|hello|hi|hey|thanks|thank you|today|tomorrow|tonight|now|later|help|what|why|how|when|where|who|stop|cancel|nothing|never ?mind)$/
+  /^(?:actually|also|and|so|well|um+|uh+|oh|right|then|anyway|wait|hmm+|sorry|oops|please|thanks|cheers|mate|yeah|nah|it|that|this|them|those|these|yes|no|ok|okay|hello|hi|hey|thanks|thank you|today|tomorrow|tonight|now|later|help|what|why|how|when|where|who|stop|cancel|nothing|never ?mind)$/
 
 /**
  * A bare noun phrase with no request around it ("Milk.", "Oat milk",
