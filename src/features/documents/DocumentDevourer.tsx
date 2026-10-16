@@ -23,6 +23,7 @@ import {
 } from '@/features/explore/exploreApi'
 import { ApiError } from '@/lib/api'
 
+import { isStudyPathwayGroup } from '../../../shared/documents/studyPathwayGroups'
 import { StudyPathwayPreviewPanel } from './StudyPathwayPreviewPanel'
 import styles from './DocumentDevourer.module.css'
 
@@ -329,9 +330,7 @@ export function DevourReview({
   const hasStudyPathway =
     doc.documentType === 'education' &&
     groups.some((group) =>
-      /^(?:week\s+\d+\b|.*\b(?:assessment|assignment|essay|exam|research project|study plan)\b)/i.test(
-        group.label,
-      ),
+      isStudyPathwayGroup(group.label),
     )
   const loose = open.filter((s) => !s.group)
 
