@@ -26,7 +26,10 @@ export async function loadStudyWorkload(
          FROM user_settings WHERE user_id = ?`,
       )
       .bind(userId)
-      .first<{ capacityMode: CapacityMode; planningApproach: PlanningApproach }>(),
+      .first<{
+        capacityMode: CapacityMode
+        planningApproach: PlanningApproach
+      }>(),
     db
       .prepare(
         `SELECT due_date as day FROM tasks
