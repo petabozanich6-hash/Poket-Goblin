@@ -13,6 +13,7 @@ import {
 
 export type PathwayPreview = PathwayResult & {
   estimates: Array<{ stepId: string; minutes: number; inferred: true }>
+  deadlines: Array<{ stepId: string; deadline: string }>
   unschedulable: DocumentSuggestion[]
 }
 
@@ -85,6 +86,7 @@ export function previewDocumentPathway(
   })
   return {
     ...result,
+    deadlines: steps.map((step) => ({ stepId: step.id, deadline: step.deadline })),
     estimates: steps.map((step) => ({
       stepId: step.id,
       minutes: step.minutes,
