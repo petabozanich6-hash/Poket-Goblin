@@ -70,7 +70,7 @@ export function InboxPage() {
         <div>
           <h1>Inbox</h1>
           <p className={styles.sub}>
-            One calm review shelf for dumps and documents — without the clutter.
+            Review suggestions from your thoughts and documents.
           </p>
         </div>
       </header>
@@ -175,7 +175,6 @@ export function InboxPage() {
           </ul>
         )}
       </Card>
-
     </div>
   )
 }
