@@ -8,7 +8,11 @@ export type Env = {
   AI?: Ai
   AI_DAILY_GLOBAL_LIMIT?: string
   /** Internal request context, set only by loadAiPolicy; never dashboard vars. */
-  aiRequest?: { userId: string; dailyLimit: number }
+  aiRequest?: {
+    userId: string
+    dailyLimit: number
+    plan?: 'free' | 'premium' | 'owner_premium'
+  }
   AI_PROVIDER?: string
   AI_API_KEY?: string
   AI_BASE_URL?: string
@@ -28,6 +32,8 @@ export type Env = {
   STRIPE_PRICE_YEARLY?: string
   /** Must be "true" before live keys are used: real charges need approval. */
   STRIPE_LIVE_ENABLED?: string
+  /** Opt-in after Cloudflare email sending is verified; legacy users stay unchanged. */
+  EMAIL_VERIFICATION_REQUIRED?: string
   /** Cloudflare Email Service binding for account emails (optional). */
   EMAIL?: SendEmail
 }

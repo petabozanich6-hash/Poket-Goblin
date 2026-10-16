@@ -43,6 +43,14 @@ describe('resolveProvider', () => {
     ).toBe(false)
   })
 
+  it('fails closed for external AI in production, even with credentials', () => {
+    const env = { ...aiEnv, ENVIRONMENT: 'production' } as Env
+    expect(resolveProvider(env)).toMatchObject({
+      kind: 'rules',
+      configured: false,
+    })
+  })
+
   it('uses AI when provider and key are set', () => {
     expect(resolveProvider(aiEnv)).toMatchObject({
       kind: 'openai_compatible',

@@ -181,6 +181,109 @@ describe('email verification', () => {
   })
 })
 
+describe('opt-in verified email registration gate', () => {
+  it('refuses gated registration without writing if email is not configured', async () => {
+    const plain = createHarness({ EMAIL_VERIFICATION_REQUIRED: 'true' })
+    const res = await plain.request('/api/auth/register', {
+      body: {
+        email: 'pending@example.com',
+        password: 'correct horse battery',
+        displayName: 'Pending',
+      },
+    })
+    expect(res.status).toBe(503)
+    expect(
+      plain.query(
+        "SELECT email FROM users WHERE email = 'pending@example.com'",
+      ),
+    ).toHaveLength(0)
+  })
+
+  it('sends email but denies access until the proof link is used', async () => {
+    h.env.EMAIL_VERIFICATION_REQUIRED = 'true'
+    const res = await h.request('/api/auth/register', {
+      body: {
+        email: 'new-verification@example.com',
+        password: 'correct horse battery',
+        displayName: 'New User',
+      },
+    })
+    expect(res.status).toBe(201)
+    expect(res.headers.get('set-cookie')).toBeNull()
+    const reply = await json(res)
+    expect(reply).toMatchObject({ verificationRequired: true, emailSent: true })
+    const unverifiedLogin = await h.login('new-verification@example.com')
+    expect(unverifiedLogin.status).toBe(403)
+    expect(await json(unverifiedLogin)).toMatchObject({
+      code: 'email_verification_required',
+    })
+    expect((await h.request('/api/me')).status).toBe(401)
+    // Stopping the rollout for other signups must not bypass this pending user.
+    h.env.EMAIL_VERIFICATION_REQUIRED = 'false'
+    expect((await h.login('new-verification@example.com')).status).toBe(403)
+    h.env.EMAIL_VERIFICATION_REQUIRED = 'true'
+    const verifyToken = lastToken('verify-email')
+    const verified = await h.request('/api/auth/verify-email', {
+      body: { token: verifyToken },
+    })
+    expect(verified.status).toBe(200)
+    expect((await h.login('new-verification@example.com')).status).toBe(200)
+    expect(
+      (
+        await h.request('/api/auth/verify-email', {
+          body: { token: verifyToken },
+        })
+      ).status,
+    ).toBe(400)
+  })
+
+  it('keeps legacy login working before migration, but fails closed if gate is enabled', async () => {
+    const original = h.env.DB
+    h.env.DB = {
+      ...original,
+      prepare(sql: string) {
+        if (sql.includes('SELECT email_verification_required_at')) {
+          throw new Error(
+            'D1_ERROR: no such column: email_verification_required_at',
+          )
+        }
+        return original.prepare(sql)
+      },
+    } as D1Database
+    expect(
+      (await h.login('alice@example.com', 'original password')).status,
+    ).toBe(200)
+    h.env.EMAIL_VERIFICATION_REQUIRED = 'true'
+    expect(
+      (await h.login('alice@example.com', 'original password')).status,
+    ).toBe(503)
+  })
+
+  it('resends safely and preserves legacy accounts', async () => {
+    h.env.EMAIL_VERIFICATION_REQUIRED = 'true'
+    const legacy = await h.login('alice@example.com', 'original password')
+    expect(legacy.status).toBe(200)
+    await h.request('/api/auth/register', {
+      body: {
+        email: 'waiting@example.com',
+        password: 'correct horse battery',
+        displayName: 'Waiting',
+      },
+    })
+    const before = sent.length
+    const known = await h.request('/api/auth/verify-email/resend', {
+      body: { email: 'waiting@example.com' },
+    })
+    const unknown = await h.request('/api/auth/verify-email/resend', {
+      body: { email: 'nonexistent@example.com' },
+    })
+    expect(known.status).toBe(200)
+    expect(unknown.status).toBe(200)
+    expect(await json(known)).toEqual(await json(unknown))
+    expect(sent.length).toBe(before + 1)
+  })
+})
+
 describe('change password', () => {
   it('needs the current password and signs out other sessions', async () => {
     const other = cookieFrom(
@@ -346,5 +449,94 @@ describe('account deletion', () => {
       body: { confirm: 'DELETE', password: 'correct horse battery' },
     })
     expect(paying.status).toBe(409)
+
+    // Once it's set to end at period end it can't charge again: deleting is allowed.
+    h.run(
+      `UPDATE user_entitlements SET cancel_at_period_end = 1 WHERE id = 'e1'`,
+    )
+    const ending = await h.request('/api/account', {
+      method: 'DELETE',
+      cookie: bob.cookie,
+      body: { confirm: 'DELETE', password: 'correct horse battery' },
+    })
+    expect(ending.status).toBe(200)
+  })
+})
+
+describe('account email safety and branding', () => {
+  it('a password change cancels outstanding reset links and sends a notice', async () => {
+    await h.request('/api/auth/password/forgot', {
+      body: { email: 'alice@example.com' },
+    })
+    const stale = lastToken('reset-password')
+    const change = await h.request('/api/account/password', {
+      cookie: alice.cookie,
+      body: {
+        currentPassword: 'original password',
+        newPassword: 'brand new password',
+      },
+    })
+    expect(change.status).toBe(200)
+    expect(sent.at(-1)?.subject).toBe('Your Pocket Goblin password was changed')
+    const reuse = await h.request('/api/auth/password/reset', {
+      body: { token: stale, password: 'attacker password' },
+    })
+    expect(reuse.status).toBe(400)
+    expect(
+      (await h.login('alice@example.com', 'brand new password')).status,
+    ).toBe(200)
+  })
+
+  it('a reset sends a notice too', async () => {
+    await h.request('/api/auth/password/forgot', {
+      body: { email: 'alice@example.com' },
+    })
+    await h.request('/api/auth/password/reset', {
+      body: {
+        token: lastToken('reset-password'),
+        password: 'another password',
+      },
+    })
+    expect(sent.at(-1)?.text).toMatch(/was just reset/)
+  })
+
+  it('emails are branded, mobile-friendly, with a plain-text twin and a raw link', async () => {
+    await h.request('/api/auth/password/forgot', {
+      body: { email: 'alice@example.com' },
+    })
+    const mail = sent.at(-1)!
+    expect(mail.html).toContain('<meta name="viewport"')
+    expect(mail.html).toContain('<html lang="en">')
+    expect(mail.html).toContain('https://pocketgoblin.org/icons/icon-192.png')
+    expect(mail.html).toContain('copy this link into your browser')
+    expect(mail.text).toMatch(/Choose a new password: http/)
+    expect(mail.text).not.toContain('<')
+  })
+
+  it('signed-in resend: says when already confirmed, and when sending fails', async () => {
+    h.run(
+      `UPDATE users SET email_verified_at = '2026-01-01T00:00:00Z' WHERE id = ?`,
+      alice.id,
+    )
+    const done = await h.request('/api/account/verify-email/resend', {
+      cookie: alice.cookie,
+      body: {},
+    })
+    expect(await json(done)).toMatchObject({ alreadyVerified: true })
+
+    const failing = createHarness({
+      EMAIL: {
+        send: vi.fn(async () => {
+          throw Object.assign(new Error('nope'), { code: 'E_DELIVERY' })
+        }),
+      } as unknown as SendEmail,
+    })
+    const bob = await failing.register('bob@example.com')
+    const res = await failing.request('/api/account/verify-email/resend', {
+      cookie: bob.cookie,
+      body: {},
+    })
+    expect(res.status).toBe(502)
+    expect(String((await json(res)).error)).toMatch(/couldn’t be sent/)
   })
 })

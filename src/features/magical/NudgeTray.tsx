@@ -99,8 +99,8 @@ export function NudgeTray() {
             </ul>
           )}
           <p className={styles.modeNote}>
-            In-app only — no push or email unless you configure and opt in
-            later.
+            In-app only, while Pocket Goblin is open. For alerts when it’s
+            closed, add your Goblin calendar to your phone (Calendar page).
           </p>
         </div>
       ) : null}

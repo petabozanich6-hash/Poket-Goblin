@@ -3,11 +3,17 @@ import { Hono } from 'hono'
 import type { Env } from '../env'
 import { appBaseUrl, consumeToken, issueToken } from '../lib/accountTokens'
 import { recordSecurityEvent } from '../lib/audit'
-import { accountEmail, sendEmail } from '../lib/email'
+import { accountEmail, passwordChangedEmail, sendEmail } from '../lib/email'
 import { newId } from '../lib/ids'
 import { hashPassword, verifyPassword } from '../lib/passwords'
 import { loadPlatformSettings } from '../lib/platformSettings'
-import { checkRateLimit } from '../lib/rateLimit'
+import {
+  checkDurableLimit,
+  clearDurable,
+  durableCount,
+  waitMessage,
+  type LimitResult,
+} from '../lib/rateLimit'
 import {
   clearSessionCookie,
   createSession,
@@ -29,19 +35,37 @@ function clientKey(c: { req: { header: (n: string) => string | undefined } }) {
   )
 }
 
+const MINUTE = 60_000
+/**
+ * Failed sign-ins before sign-in pauses for 15 minutes: per account from
+ * one network (stops guessing), and a much higher cap per account from
+ * everywhere (stops distributed guessing). Keying the low cap on the
+ * network means a stranger can't lock someone else out of their account.
+ */
+const LOGIN_FAILS_PER_EMAIL_AND_IP = 10
+const LOGIN_FAILS_PER_EMAIL = 100
+
+function tooMany(
+  c: { json: (b: unknown, s: 429, h: Record<string, string>) => Response },
+  result: Extract<LimitResult, { ok: false }>,
+  what: string,
+) {
+  return c.json(
+    { error: `${what} ${waitMessage(result.retryAfterSec)}` },
+    429,
+    { 'Retry-After': String(result.retryAfterSec) },
+  )
+}
+
 authRoutes.post('/register', async (c) => {
   const registerCap = c.env.ENVIRONMENT === 'production' ? 8 : 60
-  const limit = checkRateLimit(
+  const limit = await checkDurableLimit(
+    c.env.DB,
     `register:${clientKey(c)}`,
     registerCap,
-    15 * 60_000,
+    15 * MINUTE,
   )
-  if (!limit.ok) {
-    return c.json(
-      { error: 'Too many registration attempts. Please try again shortly.' },
-      429,
-    )
-  }
+  if (!limit.ok) return tooMany(c, limit, 'Too many registration attempts.')
 
   const platform = await loadPlatformSettings(c.env.DB, c.env)
   if (!platform.features.registrationsOpen) {
@@ -61,13 +85,31 @@ authRoutes.post('/register', async (c) => {
   const password = typeof body?.password === 'string' ? body.password : ''
   const displayName = asString(body?.displayName, 80)
 
-  if (!emailRaw || !isEmail(emailRaw) || !displayName || password.length < 8) {
+  if (
+    !emailRaw ||
+    !isEmail(emailRaw) ||
+    !displayName ||
+    password.length < 8 ||
+    password.length > 200
+  ) {
     return c.json(
       {
         error:
-          'Provide a valid email, display name, and password (8+ characters)',
+          'Provide a valid email, display name, and password (8–200 characters)',
       },
       400,
+    )
+  }
+
+  // Rollout is explicit: never start gating registrations unless sending is configured.
+  const verificationRequired = c.env.EMAIL_VERIFICATION_REQUIRED === 'true'
+  if (verificationRequired && !c.env.EMAIL) {
+    return c.json(
+      {
+        error:
+          'Registration is temporarily unavailable. Please try again later.',
+      },
+      503,
     )
   }
 
@@ -82,17 +124,47 @@ authRoutes.post('/register', async (c) => {
 
   const id = newId('user')
   const passwordHash = await hashPassword(password)
-  await c.env.DB.prepare(
-    `INSERT INTO users (id, email, password_hash, display_name)
-     VALUES (?, ?, ?, ?)`,
-  )
-    .bind(id, emailRaw, passwordHash, displayName)
-    .run()
+  // Additive migration 0017 must be applied before enabling the flag.
+  const insertUser = verificationRequired
+    ? c.env.DB.prepare(
+        `INSERT INTO users (id, email, password_hash, display_name, email_verification_required_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      ).bind(id, emailRaw, passwordHash, displayName, new Date().toISOString())
+    : c.env.DB.prepare(
+        `INSERT INTO users (id, email, password_hash, display_name)
+         VALUES (?, ?, ?, ?)`,
+      ).bind(id, emailRaw, passwordHash, displayName)
+  try {
+    // Both rows or neither: no half-made accounts.
+    await c.env.DB.batch([
+      insertUser,
+      c.env.DB.prepare(`INSERT INTO user_settings (user_id) VALUES (?)`).bind(
+        id,
+      ),
+    ])
+  } catch (error) {
+    // Two sign-ups racing for the same email: the second gets the same
+    // answer as if it had arrived later, never a 500 or a duplicate.
+    if (/UNIQUE/i.test(String(error)))
+      return c.json({ error: 'An account with that email already exists' }, 409)
+    throw error
+  }
 
-  await c.env.DB.prepare(`INSERT INTO user_settings (user_id) VALUES (?)`)
-    .bind(id)
-    .run()
-
+  if (verificationRequired) {
+    // Unverified accounts have NO usable session. Email service errors are
+    // recoverable via public, rate-limited resend rather than granting access.
+    const sent = await sendVerificationEmail(
+      c.env,
+      id,
+      emailRaw,
+      displayName,
+      c.req.url,
+    )
+    return c.json(
+      { verificationRequired: true, emailSent: sent, email: emailRaw },
+      201,
+    )
+  }
   const session = await createSession(c.env.DB, c.env, id)
   setSessionCookie(c, session.token, session.expiresAt)
   await sendVerificationEmail(c.env, id, emailRaw, displayName, c.req.url)
@@ -112,13 +184,13 @@ authRoutes.post('/register', async (c) => {
 
 authRoutes.post('/login', async (c) => {
   const loginCap = c.env.ENVIRONMENT === 'production' ? 20 : 120
-  const limit = checkRateLimit(`login:${clientKey(c)}`, loginCap, 15 * 60_000)
-  if (!limit.ok) {
-    return c.json(
-      { error: 'Too many login attempts. Please try again shortly.' },
-      429,
-    )
-  }
+  const limit = await checkDurableLimit(
+    c.env.DB,
+    `login:${clientKey(c)}`,
+    loginCap,
+    15 * MINUTE,
+  )
+  if (!limit.ok) return tooMany(c, limit, 'Too many sign-in attempts.')
 
   const body = (await c.req.json().catch(() => null)) as Record<
     string,
@@ -127,8 +199,28 @@ authRoutes.post('/login', async (c) => {
   const emailRaw = asString(body?.email, 254)?.toLowerCase()
   const password = typeof body?.password === 'string' ? body.password : ''
 
-  if (!emailRaw || !isEmail(emailRaw) || !password) {
+  if (!emailRaw || !isEmail(emailRaw) || !password || password.length > 200) {
     return c.json({ error: 'Invalid login details' }, 400)
+  }
+
+  // Many wrong passwords for one account: pause sign-in for a while (the
+  // same answer whether or not the account exists).
+  const failKey = `login-fail:${emailRaw}`
+  const failHereKey = `login-fail:${emailRaw}:${clientKey(c)}`
+  if (
+    (await durableCount(c.env.DB, failHereKey, 15 * MINUTE)) >=
+      LOGIN_FAILS_PER_EMAIL_AND_IP ||
+    (await durableCount(c.env.DB, failKey, 15 * MINUTE)) >=
+      LOGIN_FAILS_PER_EMAIL
+  ) {
+    return c.json(
+      {
+        error:
+          'Too many wrong passwords for this account. Try again in about 15 minutes, or reset your password.',
+      },
+      429,
+      { 'Retry-After': '900' },
+    )
   }
 
   const user = await c.env.DB.prepare(
@@ -147,8 +239,18 @@ authRoutes.post('/login', async (c) => {
     }>()
 
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
-    // Count failed attempts against a tighter per-email bucket too
-    checkRateLimit(`login-fail:${emailRaw}`, 10, 15 * 60_000)
+    await checkDurableLimit(
+      c.env.DB,
+      failHereKey,
+      LOGIN_FAILS_PER_EMAIL_AND_IP,
+      15 * MINUTE,
+    )
+    await checkDurableLimit(
+      c.env.DB,
+      failKey,
+      LOGIN_FAILS_PER_EMAIL,
+      15 * MINUTE,
+    )
     if (user) await recordSecurityEvent(c.env.DB, user.id, 'login_failed')
     return c.json({ error: 'Email or password is incorrect' }, 401)
   }
@@ -157,11 +259,55 @@ authRoutes.post('/login', async (c) => {
   if (user.status !== 'active') {
     await recordSecurityEvent(c.env.DB, user.id, 'login_blocked_suspended')
     return c.json(
-      { error: 'This account is suspended.', code: 'account_suspended' },
+      {
+        error:
+          'This account is suspended. If you think that’s a mistake, write to support@pocketgoblin.org.',
+        code: 'account_suspended',
+      },
       403,
     )
   }
 
+  // Previously gated users remain protected when new signups are ungated.
+  // This fallback is only for pre-migration legacy accounts: deployment of
+  // migration 0017 and activation of the flag are separate owner approvals.
+  let pending: {
+    email_verification_required_at: string | null
+    email_verified_at: string | null
+  } | null = null
+  try {
+    pending = await c.env.DB.prepare(
+      'SELECT email_verification_required_at, email_verified_at FROM users WHERE id = ?',
+    )
+      .bind(user.id)
+      .first<{
+        email_verification_required_at: string | null
+        email_verified_at: string | null
+      }>()
+  } catch (error) {
+    const missingColumn =
+      /no such column: email_verification_required_at/i.test(String(error))
+    if (!missingColumn || c.env.EMAIL_VERIFICATION_REQUIRED === 'true') {
+      return c.json(
+        {
+          error:
+            'Email verification is temporarily unavailable. Please try again.',
+        },
+        503,
+      )
+    }
+    // No gated user could have been created before migration 0017.
+  }
+  if (pending?.email_verification_required_at && !pending.email_verified_at) {
+    return c.json(
+      {
+        error: 'Please confirm your email before signing in.',
+        code: 'email_verification_required',
+      },
+      403,
+    )
+  }
+  await clearDurable(c.env.DB, failHereKey)
   const session = await createSession(c.env.DB, c.env, user.id)
   setSessionCookie(c, session.token, session.expiresAt)
   await recordSecurityEvent(c.env.DB, user.id, 'login_success')
@@ -191,9 +337,9 @@ export async function sendVerificationEmail(
   displayName: string,
   requestUrl: string,
 ) {
-  if (!env.EMAIL) return
+  if (!env.EMAIL) return false
   const token = await issueToken(env, userId, 'email_verify')
-  await sendEmail(
+  const result = await sendEmail(
     env,
     accountEmail({
       to: email,
@@ -211,6 +357,7 @@ export async function sendVerificationEmail(
         'If you didn’t create a Pocket Goblin account, you can ignore this email.',
     }),
   )
+  return result.sent
 }
 
 const GENERIC_RESET_REPLY = {
@@ -224,7 +371,12 @@ const GENERIC_RESET_REPLY = {
  * has an account (no enumeration). Rate-limited per IP and per address.
  */
 authRoutes.post('/password/forgot', async (c) => {
-  const ipLimit = checkRateLimit(`forgot:${clientKey(c)}`, 10, 15 * 60_000)
+  const ipLimit = await checkDurableLimit(
+    c.env.DB,
+    `forgot:${clientKey(c)}`,
+    10,
+    15 * MINUTE,
+  )
   const body = (await c.req.json().catch(() => null)) as Record<
     string,
     unknown
@@ -233,13 +385,13 @@ authRoutes.post('/password/forgot', async (c) => {
   if (!email || !isEmail(email)) {
     return c.json({ error: 'Enter the email you signed up with.' }, 400)
   }
-  const emailLimit = checkRateLimit(`forgot-email:${email}`, 3, 60 * 60_000)
-  if (!ipLimit.ok) {
-    return c.json(
-      { error: 'Too many requests. Please try again shortly.' },
-      429,
-    )
-  }
+  if (!ipLimit.ok) return tooMany(c, ipLimit, 'Too many requests.')
+  const emailLimit = await checkDurableLimit(
+    c.env.DB,
+    `forgot-email:${email}`,
+    3,
+    60 * MINUTE,
+  )
   if (!emailLimit.ok) return c.json(GENERIC_RESET_REPLY)
 
   const user = await c.env.DB.prepare(
@@ -279,13 +431,13 @@ authRoutes.post('/password/forgot', async (c) => {
 
 /** Set a new password with a single-use reset token; signs out everywhere. */
 authRoutes.post('/password/reset', async (c) => {
-  const limit = checkRateLimit(`reset:${clientKey(c)}`, 20, 15 * 60_000)
-  if (!limit.ok) {
-    return c.json(
-      { error: 'Too many attempts. Please try again shortly.' },
-      429,
-    )
-  }
+  const limit = await checkDurableLimit(
+    c.env.DB,
+    `reset:${clientKey(c)}`,
+    20,
+    15 * MINUTE,
+  )
+  if (!limit.ok) return tooMany(c, limit, 'Too many attempts.')
   const body = (await c.req.json().catch(() => null)) as Record<
     string,
     unknown
@@ -319,18 +471,37 @@ authRoutes.post('/password/reset', async (c) => {
     ).bind(userId),
   ])
   await recordSecurityEvent(c.env.DB, userId, 'password_reset')
+  const who = await c.env.DB.prepare(
+    `SELECT email, display_name AS displayName FROM users WHERE id = ? AND status = 'active'`,
+  )
+    .bind(userId)
+    .first<{ email: string; displayName: string }>()
+  if (who) {
+    // A fresh password means a fresh start for sign-in limits.
+    await clearDurable(c.env.DB, `login-fail:${who.email}`)
+  }
+  if (who)
+    await sendEmail(
+      c.env,
+      passwordChangedEmail({
+        to: who.email,
+        displayName: who.displayName,
+        how: 'reset',
+        forgotUrl: `${appBaseUrl(c.env, c.req.url)}/forgot-password`,
+      }),
+    )
   return c.json({ ok: true })
 })
 
 /** Confirm an email address from the link in the verification email. */
 authRoutes.post('/verify-email', async (c) => {
-  const limit = checkRateLimit(`verify:${clientKey(c)}`, 30, 15 * 60_000)
-  if (!limit.ok) {
-    return c.json(
-      { error: 'Too many attempts. Please try again shortly.' },
-      429,
-    )
-  }
+  const limit = await checkDurableLimit(
+    c.env.DB,
+    `verify:${clientKey(c)}`,
+    30,
+    15 * MINUTE,
+  )
+  if (!limit.ok) return tooMany(c, limit, 'Too many attempts.')
   const body = (await c.req.json().catch(() => null)) as Record<
     string,
     unknown
@@ -347,4 +518,60 @@ authRoutes.post('/verify-email', async (c) => {
     .run()
   await recordSecurityEvent(c.env.DB, userId, 'email_verified')
   return c.json({ ok: true })
+})
+
+// A pending user cannot sign in, so resending must work without a session.
+// Always use an indistinguishable reply for unknown/verified addresses.
+authRoutes.post('/verify-email/resend', async (c) => {
+  const limit = await checkDurableLimit(
+    c.env.DB,
+    `verify-public:${clientKey(c)}`,
+    5,
+    60 * MINUTE,
+  )
+  if (!limit.ok) return tooMany(c, limit, 'That’s a lot of emails.')
+  const body = (await c.req.json().catch(() => null)) as Record<
+    string,
+    unknown
+  > | null
+  const email = asString(body?.email, 254)?.toLowerCase()
+  if (!email || !isEmail(email)) {
+    return c.json({ error: 'Enter a valid email address.' }, 400)
+  }
+  const emailLimit = await checkDurableLimit(
+    c.env.DB,
+    `verify-public-email:${email}`,
+    3,
+    60 * MINUTE,
+  )
+  const reply = {
+    ok: true,
+    message: 'If this address needs confirmation, a new link is on its way.',
+  }
+  if (!emailLimit.ok) return c.json(reply)
+  if (!c.env.EMAIL) {
+    return c.json(
+      { error: 'Email is unavailable. Please try again later.' },
+      503,
+    )
+  }
+  const row = await c.env.DB.prepare(
+    'SELECT id, display_name, email_verified_at FROM users WHERE email = ? AND status = ?',
+  )
+    .bind(email, 'active')
+    .first<{
+      id: string
+      display_name: string
+      email_verified_at: string | null
+    }>()
+  if (row && !row.email_verified_at) {
+    await sendVerificationEmail(
+      c.env,
+      row.id,
+      email,
+      row.display_name,
+      c.req.url,
+    )
+  }
+  return c.json(reply)
 })

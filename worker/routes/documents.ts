@@ -1,3 +1,4 @@
+import { freeDocumentProcessingQuota } from '../lib/freeQuota'
 import { Hono } from 'hono'
 
 import type { Env } from '../env'
@@ -240,12 +241,17 @@ documentRoutes.post('/', async (c) => {
 
   // The same file again: reuse the open review, or point at the kept copy.
   const duplicate = await c.env.DB.prepare(
-    `SELECT id, retention, storage_key as storageKey
+    `SELECT id, retention, status, storage_key as storageKey
      FROM documents WHERE user_id = ? AND sha256 = ?
      ORDER BY created_at DESC LIMIT 1`,
   )
     .bind(user.id, hash)
-    .first<{ id: string; retention: string; storageKey: string }>()
+    .first<{
+      id: string
+      retention: string
+      status: string
+      storageKey: string
+    }>()
   if (duplicate) {
     // Nothing from it added yet? Read it again: the reader may have improved
     // (or the AI was busy) since last time.
@@ -258,7 +264,9 @@ documentRoutes.post('/', async (c) => {
     let processing: Awaited<ReturnType<typeof processDocumentForUser>> | null =
       null
     let autoAdded = { added: 0, already: 0 }
-    if (!used) {
+    if (!used && duplicate.status !== 'ready') {
+      const monthlyQuota = await freeDocumentProcessingQuota(c.env.DB, user.id)
+      if (monthlyQuota) return c.json(monthlyQuota, 403)
       // An unreadable "Just sort it" original is deleted straight away, so
       // read the copy just given (same bytes: the hash matched).
       await getObjectStore(c.env).put(
@@ -351,6 +359,10 @@ documentRoutes.post('/', async (c) => {
       429,
     )
   }
+
+  // Check the monthly allowance only after validation, storage and daily limits.
+  const monthlyQuota = await freeDocumentProcessingQuota(c.env.DB, user.id)
+  if (monthlyQuota) return c.json(monthlyQuota, 403)
 
   // Record first, store second: an interrupted upload leaves a row with an
   // expiry that the sweep cleans up, never an untracked file.
@@ -546,6 +558,8 @@ documentRoutes.post('/:id/process', async (c) => {
     .bind(id, user.id)
     .first()
   if (!existing) return c.json({ error: 'Document not found' }, 404)
+  const monthlyQuota = await freeDocumentProcessingQuota(c.env.DB, user.id)
+  if (monthlyQuota) return c.json(monthlyQuota, 403)
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>
   const result = await processDocumentForUser(
     c.env,

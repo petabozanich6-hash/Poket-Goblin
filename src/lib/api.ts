@@ -22,6 +22,8 @@ const PUBLIC_PAGES = new Set([
   '/forgot-password',
   '/reset-password',
   '/verify-email',
+  '/terms',
+  '/privacy',
 ])
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -53,6 +55,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       !PUBLIC_PAGES.has(window.location.pathname)
     ) {
       window.dispatchEvent(new CustomEvent('pg:session-expired'))
+    }
+    if (data.code === 'FREE_PLAN_LIMIT' && typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('pg:plan-limit', {
+          detail: { message: data.error ?? 'That’s the Free plan limit.' },
+        }),
+      )
     }
     throw new ApiError(
       response.status,

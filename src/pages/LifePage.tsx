@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router'
 
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -328,6 +329,13 @@ export function LifePage() {
           </Card>
           <Card>
             <h2>Schedule a reminder</h2>
+            <p className={styles.sub}>
+              Reminders show up here and in the bell while Pocket Goblin is
+              open. To get an alert when the app is closed, add your Goblin
+              calendar to your phone from{' '}
+              <Link to="/life/calendar">Calendar</Link> — your phone’s calendar
+              does the alerting.
+            </p>
             <form className={styles.stackTight} onSubmit={onAddReminder}>
               <Input
                 label="Reminder"

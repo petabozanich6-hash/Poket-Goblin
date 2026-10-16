@@ -123,6 +123,10 @@ export function SettingsPage() {
       <Card>
         <h2>Your data</h2>
         <YourData isOwner={Boolean(access?.isOwner)} />
+        <p className={styles.sub}>
+          How your data is used: <Link to="/privacy">Privacy</Link> ·{' '}
+          <Link to="/terms">Terms</Link>
+        </p>
       </Card>
 
       <section id="goblin" aria-labelledby="goblin-heading">

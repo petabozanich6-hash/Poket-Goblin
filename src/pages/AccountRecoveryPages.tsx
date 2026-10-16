@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
+import { TrustFooter } from '@/features/legal/TrustFooter'
 import { api, ApiError } from '@/lib/api'
 
 import styles from './AuthPage.module.css'
@@ -44,6 +45,7 @@ function Shell({
         <p className={styles.switch}>
           <Link to="/">Back to sign in</Link>
         </p>
+        <TrustFooter />
       </Card>
     </div>
   )
@@ -193,6 +195,10 @@ export function VerifyEmailPage() {
   const [state, setState] = useState<'working' | 'done' | 'failed'>(
     token ? 'working' : 'failed',
   )
+  const [email, setEmail] = useState('')
+  const [resending, setResending] = useState(false)
+  const [resent, setResent] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const sent = useRef(false)
 
   useEffect(() => {
@@ -201,9 +207,30 @@ export function VerifyEmailPage() {
     api
       .post('/auth/verify-email', { token })
       .then(() => setState('done'))
-      .catch(() => setState('failed'))
+      .catch((err) => {
+        // A dead link and a busy server need different advice.
+        if (err instanceof ApiError && err.status === 400) setState('failed')
+        else {
+          setState('failed')
+          setError(errorText(err))
+        }
+      })
       .finally(forgetFragment)
   }, [token])
+
+  async function resend(event: FormEvent) {
+    event.preventDefault()
+    setError(null)
+    setResending(true)
+    try {
+      await api.post('/auth/verify-email/resend', { email })
+      setResent(true)
+    } catch (err) {
+      setError(errorText(err))
+    } finally {
+      setResending(false)
+    }
+  }
 
   return (
     <Shell title="Confirm your email">
@@ -211,9 +238,43 @@ export function VerifyEmailPage() {
         {state === 'working'
           ? 'Checking your link…'
           : state === 'done'
-            ? 'Thanks — your email is confirmed. 👹'
-            : 'That link has expired or was already used. You can send a new one from Settings.'}
+            ? 'Thanks — your email is confirmed. 👹 You can sign in now.'
+            : 'That link may have expired or already been used. You can request a new one below.'}
       </p>
+      {state === 'done' || state === 'failed' ? (
+        <p>
+          {state === 'failed' ? 'Already confirmed it? Then just ' : ''}
+          <Link to="/">Sign in</Link>
+          {state === 'failed' ? '.' : ''}
+        </p>
+      ) : null}
+      {state === 'failed' ? (
+        <form className={styles.form} onSubmit={(e) => void resend(e)}>
+          <Input
+            label="Email address"
+            name="email"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          <Button type="submit" disabled={resending}>
+            {resending ? 'Sending…' : 'Send another confirmation link'}
+          </Button>
+          {resent ? (
+            <p role="status">
+              If that address still needs confirmation, another link is on its
+              way. Check your inbox and spam folder.
+            </p>
+          ) : null}
+          {error ? (
+            <p className={styles.error} role="alert">
+              {error}
+            </p>
+          ) : null}
+        </form>
+      ) : null}
     </Shell>
   )
 }

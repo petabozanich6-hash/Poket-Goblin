@@ -233,6 +233,9 @@ export async function callDocumentAi(
       20_000,
     )
   }
+  if (env.ENVIRONMENT === 'production') {
+    throw new Error('External AI document processing is disabled in production')
+  }
   const base = (env.AI_BASE_URL ?? 'https://api.openai.com/v1').replace(
     /\/$/,
     '',

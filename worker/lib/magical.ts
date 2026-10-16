@@ -309,7 +309,7 @@ export async function syncNudges(
   const now = new Date()
   const todayLocal = todayLocalFromOffset(timezoneOffsetMinutes, now)
   const quiet = isInQuietHours(
-    localMinutes(now),
+    localMinutes(now, timezoneOffsetMinutes),
     settings.quietHoursStart,
     settings.quietHoursEnd,
     settings.quietHoursEnabled,
@@ -399,7 +399,10 @@ export async function syncNudges(
     })
   }
 
-  if (settings.dailyBriefingEnabled && now.getHours() < 12) {
+  if (
+    settings.dailyBriefingEnabled &&
+    localMinutes(now, timezoneOffsetMinutes) < 12 * 60
+  ) {
     candidates.push({
       kind: 'daily_briefing',
       entityType: null,
@@ -409,7 +412,10 @@ export async function syncNudges(
     })
   }
 
-  if (settings.eveningCheckinEnabled && now.getHours() >= 18) {
+  if (
+    settings.eveningCheckinEnabled &&
+    localMinutes(now, timezoneOffsetMinutes) >= 18 * 60
+  ) {
     candidates.push({
       kind: 'evening_checkin',
       entityType: null,

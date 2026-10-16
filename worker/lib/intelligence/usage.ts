@@ -57,6 +57,7 @@ export async function loadAiPolicy(
           aiRequest: {
             userId,
             dailyLimit: aiDailyLimitFor(access.plan, settings),
+            plan: access.plan,
           },
         }
       : { ...env, AI_PROVIDER: 'none', aiRequest: undefined },

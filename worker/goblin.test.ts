@@ -331,3 +331,24 @@ describe('isolation', () => {
     expect(activeShopping()).toHaveLength(1)
   })
 })
+
+describe('Free plan protects Goblin voice actions', () => {
+  it('does not create an eleventh task from a spoken command', async () => {
+    for (let i = 0; i < 10; i++) {
+      const created = await h.request('/api/tasks', {
+        cookie: user.cookie,
+        body: { title: `Existing task ${i}` },
+      })
+      expect(created.status).toBe(201)
+    }
+    const response = await say('I need to call the dentist.')
+    expect(response.results[0]).toMatchObject({ kind: 'info' })
+    expect(response.results[0]?.message).toContain('Upgrade to Premium')
+    expect(
+      h.query(
+        "SELECT COUNT(*) AS n FROM tasks WHERE user_id = ? AND status = 'open'",
+        user.id,
+      ),
+    ).toEqual([{ n: 10 }])
+  })
+})

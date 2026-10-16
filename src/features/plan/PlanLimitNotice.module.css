@@ -1,0 +1,25 @@
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid
+    color-mix(in srgb, var(--color-warm) 45%, var(--color-border));
+  background: var(--color-warm-soft);
+}
+
+.notice p {
+  flex: 1;
+  min-width: 0;
+}
+
+.close {
+  flex: none;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+}

@@ -165,6 +165,7 @@ export type StripeSubscription = {
   id: string
   customer: string
   status: string
+  created?: number
   currency?: string
   cancel_at_period_end?: boolean
   current_period_end?: number
@@ -178,6 +179,43 @@ export type StripeSubscription = {
 }
 
 const ENDED = new Set(['canceled', 'incomplete_expired'])
+/** Stripe states that give Premium (matches resolvePlan in access.ts). */
+const GRANTING = new Set(['active', 'trialing', 'past_due'])
+/** ended_at status used when a subscription was superseded, not cancelled. */
+const REPLACED = 'replaced'
+
+function periodEndOf(sub: StripeSubscription): number | null {
+  return (
+    sub.current_period_end ?? sub.items?.data?.[0]?.current_period_end ?? null
+  )
+}
+
+/** Does this subscription give Premium right now? */
+export function grantsAccess(sub: StripeSubscription, now: Date): boolean {
+  const end = periodEndOf(sub)
+  return (
+    GRANTING.has(sub.status) && (end === null || end * 1000 > now.getTime())
+  )
+}
+
+/**
+ * May `incoming` take over from `current`? Only when `current` no longer
+ * gives access, or is already set to end while `incoming` renews. Two
+ * renewing subscriptions are never swapped: the one already followed stays,
+ * so a still-billing subscription is never marked as replaced.
+ */
+function mayReplace(
+  incoming: StripeSubscription,
+  current: StripeSubscription,
+  now: Date,
+): boolean {
+  if (!grantsAccess(current, now)) return true
+  return Boolean(current.cancel_at_period_end) && !incoming.cancel_at_period_end
+}
+
+export type FetchSubscription = (
+  id: string,
+) => Promise<StripeSubscription | null>
 
 /**
  * Make the person's Premium entitlement match the subscription. Returns the
@@ -188,6 +226,8 @@ export async function applySubscription(
   sub: StripeSubscription,
   hintUserId: string | null = null,
   now: Date = new Date(),
+  /** Reads another subscription's live state from Stripe (for replacements). */
+  fetchSubscription?: FetchSubscription,
 ): Promise<string | null> {
   const metaUser = sub.metadata?.user_id ?? null
   let userId = metaUser ?? hintUserId
@@ -210,7 +250,7 @@ export async function applySubscription(
   if (!exists) return null
 
   const item = sub.items?.data?.[0]
-  const periodEnd = sub.current_period_end ?? item?.current_period_end ?? null
+  const periodEnd = periodEndOf(sub)
   const fields = {
     status: sub.status,
     interval: item?.price?.recurring?.interval ?? null,
@@ -222,18 +262,82 @@ export async function applySubscription(
 
   const open = await db
     .prepare(
-      `SELECT id, source, stripe_subscription_id as subId FROM user_entitlements
+      `SELECT id, source, stripe_subscription_id as subId, status,
+              current_period_end as periodEnd, cancel_at_period_end as cancelAtPeriodEnd,
+              created_at as createdAt
+       FROM user_entitlements
        WHERE user_id = ? AND entitlement = 'premium' AND ended_at IS NULL`,
     )
     .bind(userId)
-    .first<{ id: string; source: string; subId: string | null }>()
+    .first<{
+      id: string
+      source: string
+      subId: string | null
+      status: string
+      periodEnd: string | null
+      cancelAtPeriodEnd: number
+      createdAt: string
+    }>()
 
   if (open && open.source !== 'stripe') {
     // Premium given by the Owner wins; billing never overwrites it.
     return userId
   }
-  if (open && open.subId && open.subId !== sub.id && ENDED.has(sub.status)) {
-    // An old subscription ending must not end a newer one.
+  if (open && open.subId && open.subId !== sub.id) {
+    // Another subscription is linked. A stale event for an old subscription
+    // must never overwrite it, but a legitimate replacement (bought again
+    // after cancelling, or after the old one stopped paying) must activate.
+    if (!grantsAccess(sub, now)) return userId
+    const reopened = await db
+      .prepare(
+        `SELECT status FROM user_entitlements
+         WHERE user_id = ? AND stripe_subscription_id = ? AND ended_at IS NOT NULL
+         ORDER BY updated_at DESC LIMIT 1`,
+      )
+      .bind(userId, sub.id)
+      .first<{ status: string }>()
+    // Cancelled subscriptions never come back; superseded ones may, below.
+    if (reopened && reopened.status !== REPLACED) return userId
+    // Judge the linked subscription by its live Stripe state when we can,
+    // falling back to what we last stored.
+    const live = fetchSubscription
+      ? await fetchSubscription(open.subId).catch(() => null)
+      : null
+    const current: StripeSubscription = live ?? {
+      id: open.subId,
+      customer: sub.customer,
+      status: open.status,
+      cancel_at_period_end: Boolean(open.cancelAtPeriodEnd),
+      current_period_end: open.periodEnd
+        ? Math.floor(new Date(open.periodEnd).getTime() / 1000)
+        : undefined,
+      created: Math.floor(new Date(open.createdAt).getTime() / 1000),
+    }
+    if (!mayReplace(sub, current, now)) {
+      if (grantsAccess(current, now) && !current.cancel_at_period_end)
+        console.warn(
+          'Two Premium subscriptions give access for one user; following',
+          open.subId,
+          'and ignoring',
+          sub.id,
+        )
+      return userId
+    }
+    // Swap atomically: close the old row, open one for the replacement.
+    await db.batch([
+      db
+        .prepare(
+          `UPDATE user_entitlements SET status = ?, ended_at = ?,
+             updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+           WHERE id = ? AND ended_at IS NULL`,
+        )
+        .bind(
+          ENDED.has(current.status) ? current.status : REPLACED,
+          now.toISOString(),
+          open.id,
+        ),
+      insertEntitlement(db, userId, sub, fields, true),
+    ])
     return userId
   }
   if (open) {
@@ -264,18 +368,98 @@ export async function applySubscription(
   const ended = await db
     .prepare(
       `SELECT 1 FROM user_entitlements
-       WHERE user_id = ? AND stripe_subscription_id = ? AND ended_at IS NOT NULL`,
+       WHERE user_id = ? AND stripe_subscription_id = ? AND ended_at IS NOT NULL
+         AND status != ?`,
     )
-    .bind(userId, sub.id)
+    .bind(userId, sub.id, REPLACED)
     .first()
   if (ended) return userId
-  await db
+  await insertEntitlement(db, userId, sub, fields, true).run()
+  return userId
+}
+
+export type ListSubscriptions = (
+  customer: string,
+) => Promise<StripeSubscription[]>
+
+/** Every subscription Stripe has for this customer (most recent first). */
+export function listCustomerSubscriptions(
+  config: Extract<BillingConfig, { enabled: true }>,
+): ListSubscriptions {
+  return async (customer) => {
+    const res = await stripe<{ data?: StripeSubscription[] }>(
+      config,
+      'GET',
+      '/subscriptions',
+      { customer, status: 'all', limit: 20 },
+    )
+    return res.data ?? []
+  }
+}
+
+/**
+ * After the linked subscription stops giving access, follow another of the
+ * customer's subscriptions that still does (someone who paid twice, then
+ * cancelled the one we followed). Without this they'd be Free until that
+ * other subscription's next renewal.
+ */
+export async function adoptRemainingSubscription(
+  db: D1Database,
+  userId: string,
+  ended: StripeSubscription,
+  list: ListSubscriptions,
+  now: Date = new Date(),
+  fetchSubscription?: FetchSubscription,
+): Promise<boolean> {
+  if (grantsAccess(ended, now)) return false
+  const open = await db
+    .prepare(
+      `SELECT 1 FROM user_entitlements
+       WHERE user_id = ? AND entitlement = 'premium' AND ended_at IS NULL`,
+    )
+    .bind(userId)
+    .first()
+  if (open) return false
+  for (const other of await list(ended.customer)) {
+    if (other.id === ended.id || !grantsAccess(other, now)) continue
+    if ((other.metadata?.user_id ?? userId) !== userId) continue
+    await applySubscription(db, other, userId, now, fetchSubscription)
+    return true
+  }
+  return false
+}
+
+type EntitlementFields = {
+  status: string
+  interval: string | null
+  currency: string | null
+  periodEnd: string | null
+  cancelAtPeriodEnd: number
+}
+
+/**
+ * Open a Premium row for this subscription — but only if no other open row
+ * exists by then, so two webhooks racing through a swap can't trip the
+ * one-open-row index (the loser becomes a no-op instead of an error).
+ */
+function insertEntitlement(
+  db: D1Database,
+  userId: string,
+  sub: StripeSubscription,
+  fields: EntitlementFields,
+  onlyIfNoneOpen = false,
+): D1PreparedStatement {
+  return db
     .prepare(
       `INSERT INTO user_entitlements
          (id, user_id, entitlement, source, status, billing_interval, currency,
           stripe_customer_id, stripe_subscription_id, current_period_end,
           cancel_at_period_end, granted_by, reason)
-       VALUES (?, ?, 'premium', 'stripe', ?, ?, ?, ?, ?, ?, ?, 'stripe', 'Subscription')`,
+       SELECT ?1, ?2, 'premium', 'stripe', ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'stripe', 'Subscription'
+       WHERE ?10 = 0 OR NOT EXISTS (
+         SELECT 1 FROM user_entitlements
+         WHERE user_id = ?2 AND entitlement = 'premium' AND ended_at IS NULL
+       )`,
     )
     .bind(
       newId('ent'),
@@ -287,7 +471,6 @@ export async function applySubscription(
       sub.id,
       fields.periodEnd,
       fields.cancelAtPeriodEnd,
+      onlyIfNoneOpen ? 1 : 0,
     )
-    .run()
-  return userId
 }

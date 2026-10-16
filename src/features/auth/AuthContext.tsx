@@ -86,9 +86,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       forgetUser()
       queryClient.clear()
       if (
-        !['/', '/forgot-password', '/reset-password', '/verify-email'].includes(
-          window.location.pathname,
-        )
+        ![
+          '/',
+          '/forgot-password',
+          '/reset-password',
+          '/verify-email',
+          '/terms',
+          '/privacy',
+        ].includes(window.location.pathname)
       ) {
         window.location.assign('/')
       }
@@ -138,7 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await loginMutation.mutateAsync(input)
       },
       register: async (input) => {
-        await registerMutation.mutateAsync(input)
+        return await registerMutation.mutateAsync(input)
       },
       logout: async () => {
         await logoutMutation.mutateAsync()

@@ -63,3 +63,64 @@ That needs the Owner's explicit approval.
 - The Stripe webhook and subscription entitlement handling remain unchanged.
 - Linking the price IDs does **not** require putting Stripe secrets in GitHub. Live billing must remain disabled until credentials, signing secret, webhook, portal and live checkout are verified, with explicit owner approval.
 - Existing Stripe promotion-code entry remains separate from Goblin Deals. Review this before turning on custom campaign redemptions.
+
+## Free and Premium: what is enforced (verified 16 October 2026)
+
+Free is permanent: no trial, countdown or card. Reaching a limit never
+deletes anything; downgrading keeps every record and file.
+
+| Allowance           | Free              | Premium   | Where it's enforced                                  |
+| ------------------- | ----------------- | --------- | ---------------------------------------------------- |
+| Active tasks        | 10                | no cap    | D1 triggers (migration 0016), every write path       |
+| Notes               | 5                 | no cap    | D1 triggers                                          |
+| Active reminders    | 3                 | no cap    | D1 triggers (pending/snoozed)                        |
+| Shopping lists      | 1 (items: no cap) | 1         | only one default list exists; no list-creation route |
+| AI-powered requests | 3 / day           | 40 / day  | atomic reservations before every Workers AI call     |
+| Document reads      | 2 / month         | 100 / day | atomic monthly reservation after validation          |
+| Kept documents      | 10 MB             | 1 GB      | checked on upload and on keep                        |
+
+- Triggers are the race-proof guard; app-level pre-checks give friendlier
+  messages. A trigger rejection becomes HTTP 403 `FREE_PLAN_LIMIT` with an
+  upgrade message, and the app shows a notice linking to the plan page.
+- Owner and active, trialing or past-due Stripe Premium (within the paid
+  period) are exempt, matching `resolvePlan` in `worker/lib/access.ts`.
+- Rule-only helpers (task breakdown, Ask the Goblin) never spend the AI
+  allowance. Over the limit, AI features fall back to the rule-based Goblin.
+- Free can use at most half of `AI_DAILY_GLOBAL_LIMIT` (production: 150 of
+  300), leaving room for Premium. External HTTP AI providers are refused in
+  production.
+- A document read is reserved after file validation, so a rejected file
+  costs nothing, and re-uploading a document that was already read
+  successfully doesn't spend another read. A read that fails after the
+  reservation (rare: storage error) does count.
+- Owner HQ settings (`platform_settings` `aiLimits`, `storageQuotas`)
+  override the defaults above. **Before launch, open Owner HQ → Platform
+  settings and confirm both say "Using the default" or the intended values.**
+
+## Subscription lifecycle (verified by tests in `worker/billing.test.ts`)
+
+- Every webhook re-reads the subscription from Stripe, so stale or
+  out-of-order payloads can't regress state; duplicate deliveries are
+  ignored by event id.
+- Handled: `checkout.session.completed`, `customer.subscription.*`
+  (created, updated, deleted, paused, resumed), `invoice.paid`,
+  `invoice.payment_failed`. **Add the two invoice events to the webhook
+  endpoint in the Stripe dashboard.**
+- Cancel at period end keeps Premium until the period ends; then the
+  account is Free with everything kept.
+- **Replacement subscriptions:** if the customer buys again (new
+  subscription id) the new one takes over as soon as the linked one stops
+  giving access, or immediately if it is preferred (it renews, then later
+  period end, then newer). Late events for the old subscription can never
+  take access away, and an unpaid replacement never grants access. The old
+  row is closed (`replaced` or its Stripe status) in the same batch.
+- Checkout is refused while a subscription that could still charge is open
+  (for example `unpaid` during card retries), so customers can't end up
+  paying twice. They're sent to "Manage billing".
+- **Hourly reconciliation** (cron) re-reads up to 25 linked subscriptions
+  that are due to renew within a day, lapsed, or in payment trouble, so a
+  lost webhook can't strand a paying customer on Free.
+- Account deletion is blocked only by a subscription that would still
+  renew; one already set to end at period end doesn't block it.
+- Recommended Stripe setting: after all payment retries fail, **cancel the
+  subscription** (rather than "mark unpaid").

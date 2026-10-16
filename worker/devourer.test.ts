@@ -256,7 +256,7 @@ describe('Just sort it (default)', () => {
     expect(h.query(`SELECT COUNT(*) as n FROM tasks`)).toEqual([{ n: 1 }])
   })
 
-  it('reads the same file again when nothing came of it last time', async () => {
+  it('reuses a successfully processed file even when suggestions were dismissed', async () => {
     await askFirst(alice)
     const first = await upload(alice, BILL)
     // Pretend the first read was poor: its suggestions were all skipped.
@@ -266,10 +266,15 @@ describe('Just sort it (default)', () => {
     const again = await upload(alice, BILL)
     expect(again.body).toMatchObject({
       duplicate: true,
-      message: 'You’ve given me this one before, so I read it again.',
-      processing: { status: 'ready' },
-      autoAdded: { added: 2 },
+      document: { status: 'ready' },
     })
+    expect(again.body.processing).toBeUndefined()
+    expect(
+      h.query(
+        'SELECT request_count AS n FROM ai_request_limits WHERE scope = ?',
+        `document-month:${alice.id}`,
+      ),
+    ).toEqual([{ n: 1 }])
     expect(h.query(`SELECT COUNT(*) as n FROM documents`)).toEqual([{ n: 1 }])
   })
 
@@ -377,7 +382,13 @@ describe('limits', () => {
     expect(h.query(`SELECT * FROM documents`)).toEqual([])
   })
 
-  it('limits documents waiting for review', async () => {
+  it('limits documents waiting for review for Premium accounts', async () => {
+    h.run(
+      `INSERT INTO user_entitlements (id, user_id, entitlement, source, status, granted_by)
+       VALUES (?, ?, 'premium', 'admin', 'active', 'test')`,
+      'ent_pending_limit',
+      alice.id,
+    )
     for (let i = 0; i < 10; i += 1) {
       expect((await upload(alice, `${BILL}\n#${i}`)).status).toBe(201)
     }
@@ -858,5 +869,37 @@ describe('photos and scans (Workers AI)', () => {
     })
     expect(body.document.status).toBe('needs_ocr')
     expect(h.query(`SELECT COUNT(*) as n FROM tasks`)).toEqual([{ n: 0 }])
+  })
+})
+
+describe('Free document allowance retry experience', () => {
+  it('does not spend another read on a successfully processed duplicate', async () => {
+    await askFirst(alice)
+    const first = await upload(alice, BILL)
+    expect(first.status).toBe(201)
+    expect(first.body.document.status).toBe('ready')
+    const again = await upload(alice, BILL)
+    expect(again.status).toBe(200)
+    expect(again.body.duplicate).toBe(true)
+    expect(
+      h.query(
+        'SELECT request_count AS n FROM ai_request_limits WHERE scope = ?',
+        `document-month:${alice.id}`,
+      ),
+    ).toEqual([{ n: 1 }])
+  })
+
+  it('does not consume a document read when storage is rejected', async () => {
+    h.run(
+      "INSERT INTO platform_settings (key, value_json) VALUES ('storageQuotas', ?)",
+      JSON.stringify({ freeMb: 0, premiumMb: 1024, ownerMb: 5120 }),
+    )
+    expect((await upload(alice, BILL, { mode: 'keep' })).status).toBe(413)
+    expect(
+      h.query(
+        'SELECT request_count FROM ai_request_limits WHERE scope = ?',
+        `document-month:${alice.id}`,
+      ),
+    ).toEqual([])
   })
 })

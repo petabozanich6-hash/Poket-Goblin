@@ -53,32 +53,114 @@ function escapeHtml(s: string) {
     .replace(/"/g, '&quot;')
 }
 
-/** Simple, accessible layout shared by account emails. */
+/** Hosted on the app itself, so no third-party image host sees opens. */
+const LOGO_URL = 'https://pocketgoblin.org/icons/icon-192.png'
+
+const COLOURS = {
+  forest: '#2f4a36',
+  ink: '#2c2a26',
+  muted: '#5c574e',
+  faint: '#7a7468',
+  paper: '#f7f4ef',
+  card: '#ffffff',
+  border: '#e2ddd3',
+}
+
+/**
+ * The shared Pocket Goblin account email: logo, one clear button with the
+ * raw link underneath (some mail apps strip buttons), a plain-text twin,
+ * table layout for older mail clients, and a 600px column that reflows on
+ * phones. Every value is escaped.
+ */
 export function accountEmail(input: {
   to: string
   subject: string
   greeting: string
   lines: string[]
-  action: { label: string; url: string }
+  action?: { label: string; url: string }
   footer: string
 }): OutgoingEmail {
   const text = [
     input.greeting,
     '',
     ...input.lines,
-    '',
-    `${input.action.label}: ${input.action.url}`,
+    ...(input.action ? ['', `${input.action.label}: ${input.action.url}`] : []),
     '',
     input.footer,
     '',
     `Pocket Goblin · ${SUPPORT}`,
   ].join('\n')
-  const html = `<!doctype html><html><body style="font-family:system-ui,sans-serif;color:#2c2a26;line-height:1.5;max-width:32rem;margin:0 auto;padding:1.5rem">
-<p>${escapeHtml(input.greeting)}</p>
-${input.lines.map((l) => `<p>${escapeHtml(l)}</p>`).join('\n')}
-<p><a href="${escapeHtml(input.action.url)}" style="display:inline-block;background:#2f4a36;color:#fff;padding:.7rem 1.2rem;border-radius:.6rem;text-decoration:none;font-weight:700">${escapeHtml(input.action.label)}</a></p>
-<p style="color:#5c574e;font-size:.9rem">${escapeHtml(input.footer)}</p>
-<p style="color:#7a7468;font-size:.8rem">Pocket Goblin · ${SUPPORT}</p>
-</body></html>`
+  const c = COLOURS
+  const preheader = escapeHtml(input.lines[0] ?? input.subject)
+  const button = input.action
+    ? `<tr><td style="padding:8px 0 4px">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td style="border-radius:10px;background:${c.forest}">
+<a href="${escapeHtml(input.action.url)}" style="display:inline-block;padding:12px 22px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px">${escapeHtml(input.action.label)}</a>
+</td></tr></table></td></tr>
+<tr><td style="padding:12px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:${c.muted}">
+If the button doesn’t work, copy this link into your browser:<br>
+<a href="${escapeHtml(input.action.url)}" style="color:${c.forest};word-break:break-all">${escapeHtml(input.action.url)}</a>
+</td></tr>`
+    : ''
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>${escapeHtml(input.subject)}</title>
+</head>
+<body style="margin:0;padding:0;background:${c.paper}">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0">${preheader}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${c.paper}">
+<tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px">
+<tr><td style="padding:0 0 16px">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+<td style="vertical-align:middle"><img src="${LOGO_URL}" width="48" height="48" alt="" style="display:block;border:0;border-radius:12px"></td>
+<td style="vertical-align:middle;padding-left:12px;font-family:Georgia,'Times New Roman',serif;font-size:20px;font-weight:700;color:${c.forest}">Pocket Goblin</td>
+</tr></table>
+</td></tr>
+<tr><td style="background:${c.card};border:1px solid ${c.border};border-radius:14px;padding:24px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr><td style="padding:0 0 12px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.55;color:${c.ink}">${escapeHtml(input.greeting)}</td></tr>
+${input.lines.map((l) => `<tr><td style="padding:0 0 12px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.55;color:${c.ink}">${escapeHtml(l)}</td></tr>`).join('\n')}
+${button}
+<tr><td style="padding:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:${c.muted}">${escapeHtml(input.footer)}</td></tr>
+</table>
+</td></tr>
+<tr><td style="padding:16px 4px 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:${c.faint}">
+Pocket Goblin · Questions? Reply to this email or write to <a href="mailto:${SUPPORT}" style="color:${c.faint}">${SUPPORT}</a>.
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>`
   return { to: input.to, subject: input.subject, text, html }
+}
+
+/** "Your password was changed" — sent after a change or a reset. */
+export function passwordChangedEmail(input: {
+  to: string
+  displayName: string
+  how: 'changed' | 'reset'
+  forgotUrl: string
+}): OutgoingEmail {
+  return accountEmail({
+    to: input.to,
+    subject: 'Your Pocket Goblin password was changed',
+    greeting: `Hi ${input.displayName},`,
+    lines: [
+      input.how === 'reset'
+        ? 'Your Pocket Goblin password was just reset, and every device was signed out.'
+        : 'Your Pocket Goblin password was just changed, and your other devices were signed out.',
+      'If this was you, there’s nothing else to do.',
+    ],
+    action: {
+      label: 'Wasn’t me — secure my account',
+      url: input.forgotUrl,
+    },
+    footer: `If you didn’t do this, reset your password straight away and tell us at ${SUPPORT}.`,
+  })
 }

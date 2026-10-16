@@ -465,16 +465,30 @@ describe('Owner entitlements', () => {
       owner.id,
       today,
     )
-    const res = await h.request('/api/intelligence/breakdown', {
+    const res = await h.request('/api/intelligence/interpret', {
       cookie: owner.cookie,
-      body: { title: 'Clean the garage' },
+      body: { text: 'Clean the garage' },
     })
-    expect(res.status).toBe(429)
+    // Over the limit: the rule-based goblin answers instead, no model call.
+    expect(res.status).toBe(200)
     const event = h.query(
       `SELECT feature, outcome FROM ai_events WHERE user_id = ?`,
       owner.id,
     )
-    expect(event).toEqual([{ feature: 'breakdown', outcome: 'limit_reached' }])
+    expect(event).toEqual([{ feature: 'interpret', outcome: 'limit_reached' }])
+
+    // Rule-only helpers don't spend (or need) the AI allowance.
+    const breakdown = await h.request('/api/intelligence/breakdown', {
+      cookie: owner.cookie,
+      body: { title: 'Clean the garage' },
+    })
+    expect(breakdown.status).toBe(200)
+    expect(
+      h.query(
+        `SELECT request_count AS n FROM ai_usage_daily WHERE user_id = ?`,
+        owner.id,
+      ),
+    ).toEqual([{ n: 200 }])
   })
 
   it('still applies the storage quota to the Owner', async () => {

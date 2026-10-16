@@ -24,6 +24,7 @@ import {
 } from '../../../shared/goblin/match'
 import { addHoursIso, localDateTimeToIso } from '../datetime'
 import { recordTaskHistory } from '../history'
+import { freePlanLimitFromError, freeQuota } from '../freeQuota'
 import { newId } from '../ids'
 import { ensureDefaultShoppingList } from '../shopping'
 
@@ -478,6 +479,26 @@ function subjectOf(plan: Plan): string | undefined {
   return undefined
 }
 
+async function quotaForPlan(db: D1Database, userId: string, plan: Plan) {
+  if (
+    plan.kind === 'task_insert' ||
+    (plan.kind === 'task_update' &&
+      plan.before.status !== 'open' &&
+      plan.after.status === 'open')
+  ) {
+    return freeQuota(db, userId, 'tasks')
+  }
+  if (
+    plan.kind === 'reminder_insert' ||
+    (plan.kind === 'reminder_update' &&
+      !['pending', 'snoozed'].includes(plan.before.status) &&
+      ['pending', 'snoozed'].includes(plan.after.status))
+  ) {
+    return freeQuota(db, userId, 'reminders')
+  }
+  return null
+}
+
 /** Record and (unless it needs a yes) carry out a plan. */
 export async function act(
   ctx: Ctx,
@@ -489,7 +510,11 @@ export async function act(
   const now = new Date().toISOString()
   const propose = mode === 'propose' || ctx.autonomy === 'ask'
   let target: string | null = 'id' in plan ? plan.id : null
-  if (!propose) target = await applyPlan(ctx.db, ctx.userId, plan, now)
+  if (!propose) {
+    const quota = await quotaForPlan(ctx.db, ctx.userId, plan)
+    if (quota) return { kind: 'info', message: quota.error }
+    target = await applyPlan(ctx.db, ctx.userId, plan, now)
+  }
   await ctx.db
     .prepare(
       `INSERT INTO goblin_actions (id, user_id, group_id, kind, target_type, target_id, status, message, after_json)
@@ -1273,7 +1298,27 @@ export async function undoAction(db: D1Database, userId: string, id: string) {
     .run()
   if (!claimed.meta.changes)
     return { ok: false as const, error: 'Nothing to undo.' }
-  await revertPlan(db, userId, JSON.parse(row.plan) as Plan, row.targetId, now)
+  try {
+    await revertPlan(
+      db,
+      userId,
+      JSON.parse(row.plan) as Plan,
+      row.targetId,
+      now,
+    )
+  } catch (error) {
+    // Reopening something can hit a Free limit: put the action back so it
+    // still says what really happened, and say why.
+    await db
+      .prepare(
+        `UPDATE goblin_actions SET status = 'done', updated_at = ? WHERE id = ? AND user_id = ? AND status = 'undone'`,
+      )
+      .bind(new Date().toISOString(), id, userId)
+      .run()
+    const limit = freePlanLimitFromError(error)
+    if (limit) return { ok: false as const, error: limit.error }
+    throw error
+  }
   return { ok: true as const, message: 'Undone. ↩️' }
 }
 
@@ -1285,6 +1330,8 @@ export async function confirmAction(
   const row = await loadAction(db, userId, id)
   if (!row || row.status !== 'proposed')
     return { ok: false as const, error: 'That’s already been handled.' }
+  const quota = await quotaForPlan(db, userId, JSON.parse(row.plan) as Plan)
+  if (quota) return { ok: false as const, error: quota.error }
   const now = new Date().toISOString()
   const claimed = await db
     .prepare(
@@ -1294,12 +1341,21 @@ export async function confirmAction(
     .run()
   if (!claimed.meta.changes)
     return { ok: false as const, error: 'That’s already been handled.' }
-  const targetId = await applyPlan(
-    db,
-    userId,
-    JSON.parse(row.plan) as Plan,
-    now,
-  )
+  let targetId: string
+  try {
+    targetId = await applyPlan(db, userId, JSON.parse(row.plan) as Plan, now)
+  } catch (error) {
+    // Nothing changed: leave it waiting for a yes, and say why.
+    await db
+      .prepare(
+        `UPDATE goblin_actions SET status = 'proposed', updated_at = ? WHERE id = ? AND user_id = ? AND status = 'done'`,
+      )
+      .bind(new Date().toISOString(), id, userId)
+      .run()
+    const limit = freePlanLimitFromError(error)
+    if (limit) return { ok: false as const, error: limit.error }
+    throw error
+  }
   await db
     .prepare(
       `UPDATE goblin_actions SET target_id = ? WHERE id = ? AND user_id = ?`,

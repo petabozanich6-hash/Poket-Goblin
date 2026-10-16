@@ -8,6 +8,7 @@ import {
   sweepExpiredChallenges,
   sweepExpiredDocuments,
 } from './lib/documents/lifecycle'
+import { reconcileSubscriptions } from './lib/billing/reconcile'
 import { newId } from './lib/ids'
 import {
   authSecretProblem,
@@ -88,6 +89,28 @@ app.use('*', async (c, next) => {
   return next()
 })
 
+// Cross-site request forgery guard for every state-changing call. SameSite
+// cookies alone still let another site submit a plain form to /api/auth/login
+// (signing the visitor into an attacker's account). Browsers label every
+// request with Sec-Fetch-Site and send Origin on cross-origin POSTs, so a
+// request from another site is refused; server-to-server callers such as the
+// Stripe webhook send neither and are verified by their own signatures.
+app.use('*', async (c, next) => {
+  const method = c.req.method
+  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS')
+    return next()
+  const site = c.req.header('Sec-Fetch-Site')
+  const origin = c.req.header('Origin')
+  const sameOrigin = origin === new URL(c.req.url).origin
+  if (
+    site === 'cross-site' ||
+    (origin && !sameOrigin && !allowedOrigin(origin, c.env.ENVIRONMENT))
+  ) {
+    return c.json({ error: 'Request blocked.' }, 403)
+  }
+  return next()
+})
+
 app.route('/auth', authRoutes)
 app.route('/platform', platformRoutes)
 // Calendar apps can't sign in: the private link's token is the key.
@@ -109,7 +132,11 @@ app.use('*', async (c, next) => {
   const resolved = await resolveSession(c.env.DB, c.env, c.req.header('Cookie'))
   if (resolved.kind === 'suspended') {
     return c.json(
-      { error: 'This account is suspended.', code: 'account_suspended' },
+      {
+        error:
+          'This account is suspended. If you think that’s a mistake, write to support@pocketgoblin.org.',
+        code: 'account_suspended',
+      },
       403,
     )
   }
@@ -145,9 +172,32 @@ app.route('/admin', adminRoutes)
 
 app.notFound((c) => c.json({ error: 'Not found' }, 404))
 
+// Database triggers are the final, atomic quota guard. Return a useful
+// upgrade message instead of leaking a SQLite constraint as HTTP 500.
 // Unhandled errors: log the route and error class (never bodies) so Goblin
 // HQ can report application health, then return a generic 500.
 app.onError(async (error, c) => {
+  const quotaMatch = String(
+    error instanceof Error ? error.message : error,
+  ).match(/FREE_PLAN_LIMIT:(tasks|notes|reminders)/)
+  if (quotaMatch?.[1]) {
+    const resource = quotaMatch[1]
+    const descriptions: Record<string, [number, string]> = {
+      tasks: [10, 'active tasks'],
+      notes: [5, 'notes'],
+      reminders: [3, 'active reminders'],
+    }
+    const [limit, label] = descriptions[resource]!
+    return c.json(
+      {
+        error: `Free includes ${limit} ${label}. Upgrade to Premium to add more.`,
+        code: 'FREE_PLAN_LIMIT',
+        resource,
+        limit,
+      },
+      403,
+    )
+  }
   console.error(error)
   try {
     await c.env.DB.prepare(
@@ -192,8 +242,20 @@ async function scheduled(
           new Date().toISOString(),
         ),
       ])
+      // Sign-in rate limit windows are at most an hour long. Separate, so a
+      // not-yet-applied migration can't stop the rest of housekeeping.
+      await env.DB.prepare(
+        `DELETE FROM auth_rate_limits WHERE window_start < ?`,
+      )
+        .bind(Date.now() - 2 * 3_600_000)
+        .run()
+        .catch(() => undefined)
+      const billing = await reconcileSubscriptions(env).catch(() => ({
+        checked: 0,
+        failed: -1,
+      }))
       console.log(
-        `housekeeping: ${documents.forgotten} document(s) forgotten, ${documents.failed} retry later`,
+        `housekeeping: ${documents.forgotten} document(s) forgotten, ${documents.failed} retry later; billing ${billing.checked} checked, ${billing.failed} failed`,
       )
     })(),
   )

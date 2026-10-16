@@ -11,7 +11,9 @@ import { Hono } from 'hono'
 import type { Env } from '../env'
 import { loadAccess, PLAN_LABELS } from '../lib/access'
 import {
+  adoptRemainingSubscription,
   applySubscription,
+  listCustomerSubscriptions,
   billingConfig,
   stripe,
   StripeError,
@@ -165,6 +167,26 @@ billingRoutes.post('/checkout', async (c) => {
       409,
     )
   }
+  // A subscription that hasn't given up yet (e.g. a card retry, or
+  // incomplete) would keep charging alongside a new one: fix that first.
+  const stuck = await c.env.DB.prepare(
+    `SELECT status FROM user_entitlements
+     WHERE user_id = ? AND source = 'stripe' AND ended_at IS NULL
+       AND cancel_at_period_end = 0
+       AND status NOT IN ('canceled', 'incomplete_expired')`,
+  )
+    .bind(user.id)
+    .first<{ status: string }>()
+  if (stuck) {
+    return c.json(
+      {
+        error:
+          'Your previous subscription is still open (usually a payment that needs updating). Open “Manage billing” to update your card or cancel it, then come back.',
+        code: 'subscription_open',
+      },
+      409,
+    )
+  }
   const previous = await stripeRow(c.env.DB, user.id)
   const origin = siteOrigin(c)
   try {
@@ -233,6 +255,10 @@ const HANDLED = new Set([
   'customer.subscription.deleted',
   'customer.subscription.paused',
   'customer.subscription.resumed',
+  // Renewals and failed payments: re-read the subscription so a missed
+  // subscription.updated can't leave a paying customer on Free.
+  'invoice.paid',
+  'invoice.payment_failed',
 ])
 
 billingWebhookRoutes.post('/', async (c) => {
@@ -269,8 +295,11 @@ billingWebhookRoutes.post('/', async (c) => {
   try {
     const obj = event.data.object
     const subId =
-      event.type === 'checkout.session.completed'
-        ? (obj.subscription as string | null)
+      event.type === 'checkout.session.completed' ||
+      event.type.startsWith('invoice.')
+        ? typeof obj.subscription === 'string'
+          ? obj.subscription
+          : null
         : (obj.id as string)
     if (subId) {
       // Always read the latest state, so out-of-order events can't regress it.
@@ -283,7 +312,28 @@ billingWebhookRoutes.post('/', async (c) => {
         event.type === 'checkout.session.completed'
           ? ((obj.client_reference_id as string | null) ?? null)
           : null
-      await applySubscription(c.env.DB, sub, hint)
+      const fetchSub = (id: string) =>
+        stripe<StripeSubscription>(
+          config,
+          'GET',
+          `/subscriptions/${encodeURIComponent(id)}`,
+        )
+      const userId = await applySubscription(
+        c.env.DB,
+        sub,
+        hint,
+        new Date(),
+        fetchSub,
+      )
+      if (userId)
+        await adoptRemainingSubscription(
+          c.env.DB,
+          userId,
+          sub,
+          listCustomerSubscriptions(config),
+          new Date(),
+          fetchSub,
+        )
     }
   } catch (error) {
     // Let Stripe retry: forget that we saw it.

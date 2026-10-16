@@ -1,3 +1,4 @@
+import { freeQuota } from '../lib/freeQuota'
 import { CATEGORY_NAME_SQL } from '../../shared/categories'
 import { Hono } from 'hono'
 
@@ -77,6 +78,9 @@ noteRoutes.post('/', async (c) => {
     { kind: 'event', id: linkedEventId },
   ])
   if (unowned) return c.json(linkNotFound(unowned), 404)
+
+  const quota = await freeQuota(c.env.DB, user.id, 'notes')
+  if (quota) return c.json(quota, 403)
 
   const id = newId('note')
   await c.env.DB.prepare(
