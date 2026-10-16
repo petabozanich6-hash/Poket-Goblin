@@ -236,7 +236,7 @@ describe('distributed cost and rate controls', () => {
 describe('Workers AI authenticated routes', () => {
   it('rejects anonymous callers and shares budget across interpretation and uploads', async () => {
     const { h, run } = setup()
-    h.env.AI_DAILY_GLOBAL_LIMIT = '1'
+    h.env.AI_DAILY_GLOBAL_LIMIT = '2'
     const anonymous = await h.request('/api/intelligence/interpret', {
       body: { text: 'Call mum' },
     })
