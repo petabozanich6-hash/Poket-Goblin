@@ -34,10 +34,15 @@ export function AuthPage() {
         await login({ email, password })
       } else {
         const created = await register({ email, password, displayName })
-        if (created.verificationRequired) setPendingEmail(created.email || email)
+        if (created.verificationRequired) {
+          setPendingEmail(created.email || email)
+        }
       }
     } catch (err) {
-      if (err instanceof ApiError && err.message.includes('confirm your email')) {
+      if (
+        err instanceof ApiError &&
+        err.message.includes('confirm your email')
+      ) {
         setPendingEmail(email)
       } else {
         setError(err instanceof ApiError ? err.message : 'Something went wrong')
@@ -100,8 +105,8 @@ export function AuthPage() {
         {pendingEmail ? (
           <div className={styles.form} data-testid="email-verification-pending">
             <p role="status">
-              <strong>Check your inbox!</strong> We sent a confirmation link to{' '}
-              {pendingEmail}. You can enter the Goblin's den after confirming
+              <strong>Check your inbox!</strong> We sent a confirmation link to
+              {' '}{pendingEmail}. You can enter the Goblin's den after confirming
               that the email is yours.
             </p>
             <p>
