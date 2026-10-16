@@ -33,6 +33,9 @@ export async function persistApprovedPathway(
   for (const session of sessions) {
     if (
       !/^\d{4}-\d{2}-\d{2}$/.test(session.date) ||
+      !Number.isFinite(Date.parse(session.date + 'T00:00:00Z')) ||
+      new Date(session.date + 'T00:00:00Z').toISOString().slice(0, 10) !==
+        session.date ||
       !Number.isInteger(session.minutes) ||
       session.minutes < 1 ||
       session.minutes > 240 ||
