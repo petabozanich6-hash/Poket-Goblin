@@ -237,6 +237,22 @@ describe('opt-in verified email registration gate', () => {
     ).toBe(400)
   })
 
+  it('keeps legacy login working before migration, but fails closed if gate is enabled', async () => {
+    const original = h.env.DB
+    h.env.DB = {
+      ...original,
+      prepare(sql: string) {
+        if (sql.includes('SELECT email_verification_required_at')) {
+          throw new Error('D1_ERROR: no such column: email_verification_required_at')
+        }
+        return original.prepare(sql)
+      },
+    } as D1Database
+    expect((await h.login('alice@example.com', 'original password')).status).toBe(200)
+    h.env.EMAIL_VERIFICATION_REQUIRED = 'true'
+    expect((await h.login('alice@example.com', 'original password')).status).toBe(503)
+  })
+
   it('resends safely and preserves legacy accounts', async () => {
     h.env.EMAIL_VERIFICATION_REQUIRED = 'true'
     const legacy = await h.login('alice@example.com', 'original password')
