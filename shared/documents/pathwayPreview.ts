@@ -41,11 +41,19 @@ export function previewDocumentPathway(
   const unschedulable = eligible.filter(
     (item) => !item.dueDate || item.uncertain,
   )
-  const usable = eligible.filter(
-    (item) => item.dueDate && !item.uncertain,
-  )
-  const steps: PathwayStep[] = usable.map((item, index) => ({
-    id: `${documentId}:${index}:${item.title}`,
+  const usable = eligible
+    .filter((item) => item.dueDate && !item.uncertain)
+    .map((item, originalIndex) => ({ item, originalIndex }))
+    .sort((a, b) => {
+      if (a.item.group !== b.item.group) return a.originalIndex - b.originalIndex
+      const aStep = Number(a.item.step?.split('/')[0])
+      const bStep = Number(b.item.step?.split('/')[0])
+      if (Number.isFinite(aStep) && Number.isFinite(bStep))
+        return aStep - bStep || a.originalIndex - b.originalIndex
+      return a.originalIndex - b.originalIndex
+    })
+  const steps: PathwayStep[] = usable.map(({ item, originalIndex }) => ({
+    id: `${documentId}:${originalIndex}:${item.title}`,
     goalId: `${documentId}:${item.group}`,
     title: item.title,
     deadline: item.dueDate!,
