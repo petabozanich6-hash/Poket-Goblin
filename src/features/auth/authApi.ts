@@ -25,7 +25,12 @@ export function registerAccount(input: {
   password: string
   displayName: string
 }) {
-  return api.post<{ user?: User; verificationRequired?: boolean; emailSent?: boolean; email?: string }>('/auth/register', input)
+  return api.post<{
+    user?: User
+    verificationRequired?: boolean
+    emailSent?: boolean
+    email?: string
+  }>('/auth/register', input)
 }
 
 export function loginAccount(input: { email: string; password: string }) {
