@@ -16,7 +16,11 @@ export type SavedSessionForReplan = {
 export type ReplanMove = { sessionId: string; date: string; minutes: number }
 export type ReplanWarning = {
   sessionId: string
-  reason: 'missing_deadline' | 'deadline_passed' | 'insufficient_capacity'
+  reason:
+    | 'missing_deadline'
+    | 'deadline_passed'
+    | 'insufficient_capacity'
+    | 'dependency_order'
 }
 
 const shiftDay = (day: string, amount: number): string => {
