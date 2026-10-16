@@ -476,10 +476,14 @@ export function DevourReview({
                   s.type === 'task' ? (
                     <li key={s.id} className={styles.suggestion}>
                       <strong>{s.title}</strong>
-                      {s.details ? <p className={styles.muted}>{s.details}</p> : null}
+                      {s.details ? (
+                        <p className={styles.muted}>{s.details}</p>
+                      ) : null}
                       <p className={styles.muted}>
                         Proposed study step · only added after pathway approval
-                        {s.dueDate ? ` · Assessment date: ${formatDay(s.dueDate)}` : ''}
+                        {s.dueDate
+                          ? ` · Assessment date: ${formatDay(s.dueDate)}`
+                          : ''}
                       </p>
                     </li>
                   ) : (

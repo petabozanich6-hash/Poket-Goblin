@@ -267,7 +267,10 @@ describe('approved pathway transactions and Undo', () => {
       },
     ])
     expect(
-      h.query('SELECT id FROM study_pathways WHERE user_id = ?', deletingUser.id),
+      h.query(
+        'SELECT id FROM study_pathways WHERE user_id = ?',
+        deletingUser.id,
+      ),
     ).toHaveLength(1)
     const deleted = await h.request('/api/account', {
       cookie: deletingUser.cookie,
@@ -276,11 +279,16 @@ describe('approved pathway transactions and Undo', () => {
     })
     expect(deleted.status).toBe(200)
     expect(
-      h.query('SELECT id FROM study_pathways WHERE user_id = ?', deletingUser.id),
+      h.query(
+        'SELECT id FROM study_pathways WHERE user_id = ?',
+        deletingUser.id,
+      ),
     ).toEqual([])
     expect(
-      h.query('SELECT id FROM study_pathway_sessions WHERE user_id = ?', deletingUser.id),
+      h.query(
+        'SELECT id FROM study_pathway_sessions WHERE user_id = ?',
+        deletingUser.id,
+      ),
     ).toEqual([])
   })
-
 })
