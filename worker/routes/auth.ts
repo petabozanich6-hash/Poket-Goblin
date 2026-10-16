@@ -182,7 +182,8 @@ authRoutes.post('/login', async (c) => {
     )
   }
 
-  if (c.env.EMAIL_VERIFICATION_REQUIRED === 'true') {
+  {
+    // A previously gated user stays protected even when gating new signups is switched off.
     const pending = await c.env.DB.prepare(
       'SELECT email_verification_required_at, email_verified_at FROM users WHERE id = ?',
     ).bind(user.id).first<{ email_verification_required_at: string | null; email_verified_at: string | null }>()
