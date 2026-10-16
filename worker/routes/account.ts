@@ -46,6 +46,8 @@ export const EXPORTED_TABLES: Record<string, { omit?: string[] }> = {
   documents: { omit: ['storage_key'] },
   document_extractions: {},
   review_items: {},
+  study_pathways: {},
+  study_pathway_sessions: {},
   record_links: {},
   daily_plans: {},
   user_memory: {},
