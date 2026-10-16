@@ -253,4 +253,34 @@ describe('approved pathway transactions and Undo', () => {
       ),
     ).toEqual([{ date: '2030-05-07', minutes: 45 }])
   })
+
+  it('removes approved pathways and sessions when a user deletes their account', async () => {
+    const deletingUser = await h.register('delete-study-pathway@example.com')
+    await persistApprovedPathway(h.env.DB, deletingUser.id, 'past-document', [
+      {
+        stepId: 'assessment:0:Read chapter',
+        goalId: 'assessment',
+        title: 'Read chapter',
+        date: '2030-05-12',
+        minutes: 45,
+        sequence: 1,
+      },
+    ])
+    expect(
+      h.query('SELECT id FROM study_pathways WHERE user_id = ?', deletingUser.id),
+    ).toHaveLength(1)
+    const deleted = await h.request('/api/account', {
+      cookie: deletingUser.cookie,
+      method: 'DELETE',
+      body: { password: 'correct horse battery', confirm: 'DELETE' },
+    })
+    expect(deleted.status).toBe(200)
+    expect(
+      h.query('SELECT id FROM study_pathways WHERE user_id = ?', deletingUser.id),
+    ).toEqual([])
+    expect(
+      h.query('SELECT id FROM study_pathway_sessions WHERE user_id = ?', deletingUser.id),
+    ).toEqual([])
+  })
+
 })
