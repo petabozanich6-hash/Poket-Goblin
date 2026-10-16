@@ -599,8 +599,10 @@ documentRoutes.post('/:id/pathway-replan', async (c) => {
   }
   const saved = await c.env.DB.prepare(
     `SELECT s.id, s.scheduled_date as date,
-            s.deadline_date as deadlineDate, s.minutes, s.status,
-            s.task_id as taskId, t.status as taskStatus
+            s.goal_id as goalId, s.step_order as stepOrder,
+            s.sequence, s.deadline_date as deadlineDate,
+            s.minutes, s.status, s.task_id as taskId,
+            t.status as taskStatus
      FROM study_pathway_sessions s
      LEFT JOIN tasks t ON t.id = s.task_id AND t.user_id = s.user_id
      WHERE s.pathway_id = ? AND s.user_id = ?`,
