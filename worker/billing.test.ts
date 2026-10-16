@@ -141,7 +141,7 @@ describe('the subscription area', () => {
       subscription: null,
       canManage: false,
     })
-    expect(body.limits.free.storageMb).toBe(100)
+    expect(body.limits.free.storageMb).toBe(10)
     expect(body.limits.premium.storageMb).toBe(1024)
   })
 
