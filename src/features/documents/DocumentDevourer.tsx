@@ -455,7 +455,7 @@ export function DevourReview({
           </div>
           <p className={styles.muted}>
             {hasStudyPathway
-              ? 'These are proposed steps, not an availability-checked study timetable. Review each step before adding it. Your actual assessment deadlines stay unchanged.'
+              ? 'Study tasks are proposals until you approve the capacity-checked pathway above. Assessment dates and ordinary reminders can still be reviewed separately.'
               : 'Steps go on your task list, due dates go in your calendar. Skip anything you don’t want first.'}
           </p>
           {hasStudyPathway ? (
@@ -470,18 +470,31 @@ export function DevourReview({
                 </p>
               ) : null}
               <ul className={styles.suggestions}>
-                {group.items.map((s) => (
-                  <SuggestionRow
-                    key={s.id}
-                    suggestion={s}
-                    compact
-                    onDone={(outcome) => {
-                      setOpen((list) => list.filter((x) => x.id !== s.id))
-                      if (outcome === 'accepted') setSaved((n) => n + 1)
-                      void refresh()
-                    }}
-                  />
-                ))}
+                {group.items.map((s) =>
+                  hasStudyPathway &&
+                  isStudyPathwayGroup(group.label) &&
+                  s.type === 'task' ? (
+                    <li key={s.id} className={styles.suggestion}>
+                      <strong>{s.title}</strong>
+                      {s.details ? <p className={styles.muted}>{s.details}</p> : null}
+                      <p className={styles.muted}>
+                        Proposed study step · only added after pathway approval
+                        {s.dueDate ? ` · Assessment date: ${formatDay(s.dueDate)}` : ''}
+                      </p>
+                    </li>
+                  ) : (
+                    <SuggestionRow
+                      key={s.id}
+                      suggestion={s}
+                      compact
+                      onDone={(outcome) => {
+                        setOpen((list) => list.filter((x) => x.id !== s.id))
+                        if (outcome === 'accepted') setSaved((n) => n + 1)
+                        void refresh()
+                      }}
+                    />
+                  ),
+                )}
               </ul>
             </div>
           ))}
