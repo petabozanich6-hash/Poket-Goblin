@@ -47,7 +47,7 @@ export async function autoAddFromDocument(
       continue
     }
     const dated = typeof payload.dueDate === 'string'
-    if (row.uncertain || row.type === 'note' || payload.origin === 'ai')
+    if (row.uncertain || row.type === 'note' || payload.origin === 'ai' || payload.requiresReview === true)
       continue
     if (row.type !== 'task' && !dated) continue
     const accepted = await acceptReviewItem(
