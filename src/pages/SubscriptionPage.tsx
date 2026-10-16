@@ -76,7 +76,7 @@ export function SubscriptionPage() {
   })
   const go = (url: string) => window.location.assign(url)
   const checkout = useMutation({
-    mutationFn: () => startCheckout(interval),
+    mutationFn: () => startCheckout(chosen?.interval ?? interval),
     onSuccess: (data) => go(data.url),
     onError: (err) =>
       setError(err instanceof ApiError ? err.message : 'Try again.'),
@@ -209,10 +209,9 @@ export function SubscriptionPage() {
                     <span className={pageStyles.sub}> / {chosen.interval}</span>
                   </p>
                   <p className={pageStyles.sub}>
-                    Base price shown in {chosen.currency.toUpperCase()}. Stripe
-                    automatically shows your supported local currency and
-                    confirms the exact recurring amount before you pay. No
-                    conversion is calculated by Pocket Goblin.
+                    Price shown in {chosen.currency.toUpperCase()}. Check the
+                    currency and exact recurring charge on Stripe’s secure
+                    checkout before paying.
                   </p>
                 </>
               ) : (
