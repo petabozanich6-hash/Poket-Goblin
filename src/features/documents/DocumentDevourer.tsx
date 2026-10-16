@@ -325,6 +325,11 @@ export function DevourReview({
 
   const actedFirst = auto.added > 0
   const groups = planGroups(open)
+  const hasStudyPathway = groups.some((group) =>
+    /^(?:week\s+\d+|.*\b(?:essay|assessment|assignment|exam|study)\b)/i.test(
+      group.label,
+    ),
+  )
   const loose = open.filter((s) => !s.group)
 
   if (devoured) {
@@ -433,8 +438,9 @@ export function DevourReview({
             <h3 id="plan-heading">
               {actedFirst ? 'Check these — I wasn’t sure' : 'Your plan'}
             </h3>
-            <Button
-              onClick={() => void addWholePlan()}
+            {!hasStudyPathway ? (
+              <Button
+              onClick={() => void addWholePlan()
               disabled={adding !== null}
             >
               <CalendarDays size={16} aria-hidden />
@@ -443,11 +449,13 @@ export function DevourReview({
                 : actedFirst
                   ? `Add these too (${open.length})`
                   : `Add the whole plan (${open.length})`}
-            </Button>
+              </Button>
+            ) : null}
           </div>
           <p className={styles.muted}>
-            Steps go on your task list, due dates go in your calendar. Skip
-            anything you don’t want first.
+            {hasStudyPathway
+              ? 'These are proposed steps, not an availability-checked study timetable. Review each step before adding it. Your actual assessment deadlines stay unchanged.'
+              : 'Steps go on your task list, due dates go in your calendar. Skip anything you don’t want first.'}
           </p>
           {groups.map((group) => (
             <div key={group.label} className={styles.planGroup}>
