@@ -23,6 +23,7 @@ import {
 } from '@/features/explore/exploreApi'
 import { ApiError } from '@/lib/api'
 
+import { StudyPathwayPreviewPanel } from './StudyPathwayPreviewPanel'
 import styles from './DocumentDevourer.module.css'
 
 const TYPE_META: Record<
@@ -459,6 +460,9 @@ export function DevourReview({
               ? 'These are proposed steps, not an availability-checked study timetable. Review each step before adding it. Your actual assessment deadlines stay unchanged.'
               : 'Steps go on your task list, due dates go in your calendar. Skip anything you don’t want first.'}
           </p>
+          {hasStudyPathway ? (
+            <StudyPathwayPreviewPanel documentId={doc.id} />
+          ) : null}
           {groups.map((group) => (
             <div key={group.label} className={styles.planGroup}>
               <h4 className={styles.planHead}>{group.label}</h4>
