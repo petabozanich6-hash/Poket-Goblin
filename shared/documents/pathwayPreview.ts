@@ -41,11 +41,18 @@ export function previewDocumentPathway(
   const unschedulable = eligible.filter(
     (item) => !item.dueDate || item.uncertain,
   )
+  const groupOrder = new Map<string, number>()
   const usable = eligible
     .filter((item) => item.dueDate && !item.uncertain)
-    .map((item, originalIndex) => ({ item, originalIndex }))
+    .map((item, originalIndex) => {
+      const group = item.group!
+      if (!groupOrder.has(group)) groupOrder.set(group, groupOrder.size)
+      return { item, originalIndex }
+    })
     .sort((a, b) => {
-      if (a.item.group !== b.item.group) return a.originalIndex - b.originalIndex
+      if (a.item.group !== b.item.group)
+        return (groupOrder.get(a.item.group!) ?? 0) -
+          (groupOrder.get(b.item.group!) ?? 0)
       const aStep = Number(a.item.step?.split('/')[0])
       const bStep = Number(b.item.step?.split('/')[0])
       if (Number.isFinite(aStep) && Number.isFinite(bStep))
