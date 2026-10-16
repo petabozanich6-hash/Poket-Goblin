@@ -30,7 +30,7 @@ import { HqCustomerPage } from '@/pages/hq/HqCustomerPage'
 import { HqCustomersPage } from '@/pages/hq/HqCustomersPage'
 import { HqLayout } from '@/pages/hq/HqLayout'
 import { HqOverviewPage } from '@/pages/hq/HqOverviewPage'
-import { HqSecurityPage } from '@/pages/hq/HqSecurityPage'
+import { HqSecurityPage, HqAuditPage } from '@/pages/hq/HqSecurityPage'
 import { HqSettingsPage } from '@/pages/hq/HqSettingsPage'
 
 import { AppShell } from './AppShell'
@@ -151,6 +151,7 @@ export function AppRouter() {
             <Route path="feedback" element={<HqFeedbackPage />} />
             <Route path="settings" element={<HqSettingsPage />} />
             <Route path="security" element={<HqSecurityPage />} />
+            <Route path="audit" element={<HqAuditPage />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
