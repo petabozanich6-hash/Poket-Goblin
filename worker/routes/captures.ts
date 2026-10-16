@@ -487,14 +487,27 @@ captureRoutes.post('/:captureId/items/:itemId/accept', async (c) => {
     }
   }
   // Quotas apply to accepted suggestions too, before claiming the item.
-  const quotaChecks: { resource: 'tasks' | 'notes' | 'reminders'; adding: number }[] =
-    item.kind === 'note' ? [{ resource: 'notes', adding: 1 }] :
-    item.kind === 'reminder' ? [{ resource: 'reminders', adding: 1 }, { resource: 'tasks', adding: 1 }] :
-    item.kind === 'task' || item.kind === 'follow_up'
-      ? [{ resource: 'tasks', adding: item.recurrenceFrequency ? 4 : 1 }]
-      : []
+  const quotaChecks: {
+    resource: 'tasks' | 'notes' | 'reminders'
+    adding: number
+  }[] =
+    item.kind === 'note'
+      ? [{ resource: 'notes', adding: 1 }]
+      : item.kind === 'reminder'
+        ? [
+            { resource: 'reminders', adding: 1 },
+            { resource: 'tasks', adding: 1 },
+          ]
+        : item.kind === 'task' || item.kind === 'follow_up'
+          ? [{ resource: 'tasks', adding: item.recurrenceFrequency ? 4 : 1 }]
+          : []
   for (const check of quotaChecks) {
-    const quota = await freeQuota(c.env.DB, user.id, check.resource, check.adding)
+    const quota = await freeQuota(
+      c.env.DB,
+      user.id,
+      check.resource,
+      check.adding,
+    )
     if (quota) return c.json(quota, 403)
   }
 
