@@ -51,10 +51,7 @@ export async function autoAddFromDocument(
       row.uncertain ||
       row.type === 'note' ||
       payload.origin === 'ai' ||
-      payload.requiresReview === true ||
-      (row.type === 'task' &&
-        typeof payload.group === 'string' &&
-        payload.group.length > 0)
+      payload.requiresReview === true
     )
       continue
     if (row.type !== 'task' && !dated) continue
