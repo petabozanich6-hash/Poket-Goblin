@@ -1,0 +1,28 @@
+name: One-time billing regression format
+on:
+  push:
+    branches: [feat/restrict-free-tier-foundation]
+    paths: [.github/workflows/billing-test-format-once.yml]
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/restrict-free-tier-foundation
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx prettier --write worker/billing.test.ts
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add worker/billing.test.ts
+          if ! git diff --cached --quiet; then
+            git commit -m "style(billing): format subscription identity test"
+            git push origin HEAD:feat/restrict-free-tier-foundation
+          fi
