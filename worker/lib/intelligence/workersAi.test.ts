@@ -159,6 +159,27 @@ describe('Workers AI provider', () => {
   })
 })
 
+describe('Premium AI reserve', () => {
+  it('keeps half the global budget available when Free requests are exhausted', async () => {
+    const { env } = setup()
+    const now = Date.UTC(2026, 9, 16)
+    const free: Env = {
+      ...env,
+      AI_DAILY_GLOBAL_LIMIT: '4',
+      aiRequest: { userId: 'alice', dailyLimit: 40, plan: 'free' },
+    }
+    await reserveWorkersAi(free, now)
+    await reserveWorkersAi(free, now)
+    await expect(reserveWorkersAi(free, now)).rejects.toThrow()
+    const premium: Env = {
+      ...env,
+      AI_DAILY_GLOBAL_LIMIT: '4',
+      aiRequest: { userId: 'bob', dailyLimit: 40, plan: 'premium' },
+    }
+    await reserveWorkersAi(premium, now)
+  })
+})
+
 describe('distributed cost and rate controls', () => {
   const now = Date.UTC(2026, 9, 15)
   it('never exceeds per-user daily allowance under concurrent reservations', async () => {
