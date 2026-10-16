@@ -83,4 +83,48 @@ describe('approved pathway transactions and Undo', () => {
       h.query('SELECT id FROM study_pathways WHERE user_id = ?', alice.id),
     ).toHaveLength(0)
   })
+
+  it('keeps completed pathway tasks and unrelated tasks when Undo is requested', async () => {
+    await persistApprovedPathway(h.env.DB, alice.id, 'mixed-doc', [
+      {
+        stepId: 'done-step',
+        goalId: 'goal',
+        title: 'Completed reading',
+        date: '2030-05-12',
+        minutes: 30,
+        sequence: 1,
+      },
+      {
+        stepId: 'open-step',
+        goalId: 'goal',
+        title: 'Pending writing',
+        date: '2030-05-13',
+        minutes: 60,
+        sequence: 1,
+      },
+    ])
+    await h.env.DB.prepare(
+      "UPDATE tasks SET status = 'completed' WHERE user_id = ? AND title = ?",
+    )
+      .bind(alice.id, 'Completed reading')
+      .run()
+    await h.env.DB.prepare(
+      'INSERT INTO tasks (id, user_id, title, priority, capacity_cost) VALUES (?, ?, ?, ?, ?)',
+    )
+      .bind('unrelated-task', alice.id, 'Unrelated chore', 'normal', 1)
+      .run()
+
+    const response = await h.request(
+      '/api/documents/mixed-doc/pathway-undo',
+      { method: 'POST', cookie: alice.cookie },
+    )
+    expect(response.status).toBe(200)
+    expect(
+      h.query('SELECT title FROM tasks WHERE user_id = ? ORDER BY title', alice.id),
+    ).toEqual([
+      { title: 'Completed reading' },
+      { title: 'Unrelated chore' },
+    ])
+  })
+
 })
