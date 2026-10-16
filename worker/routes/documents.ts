@@ -1,3 +1,4 @@
+import { freeDocumentProcessingQuota } from '../lib/freeQuota'
 import { Hono } from 'hono'
 
 import type { Env } from '../env'
@@ -259,6 +260,8 @@ documentRoutes.post('/', async (c) => {
       null
     let autoAdded = { added: 0, already: 0 }
     if (!used) {
+      const monthlyQuota = await freeDocumentProcessingQuota(c.env.DB, user.id)
+      if (monthlyQuota) return c.json(monthlyQuota, 403)
       // An unreadable "Just sort it" original is deleted straight away, so
       // read the copy just given (same bytes: the hash matched).
       await getObjectStore(c.env).put(
@@ -299,6 +302,9 @@ documentRoutes.post('/', async (c) => {
       200,
     )
   }
+
+  const monthlyQuota = await freeDocumentProcessingQuota(c.env.DB, user.id)
+  if (monthlyQuota) return c.json(monthlyQuota, 403)
 
   if (mode === 'keep') {
     // Only deliberately kept documents count towards the allowance.
@@ -546,6 +552,8 @@ documentRoutes.post('/:id/process', async (c) => {
     .bind(id, user.id)
     .first()
   if (!existing) return c.json({ error: 'Document not found' }, 404)
+  const monthlyQuota = await freeDocumentProcessingQuota(c.env.DB, user.id)
+  if (monthlyQuota) return c.json(monthlyQuota, 403)
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>
   const result = await processDocumentForUser(
     c.env,
