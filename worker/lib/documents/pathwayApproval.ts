@@ -25,10 +25,12 @@ export async function persistApprovedPathway(
 
   const pathwayId = newId('pathway')
   const statements = [
-    db.prepare(
-      `INSERT INTO study_pathways (id, user_id, document_id)
+    db
+      .prepare(
+        `INSERT INTO study_pathways (id, user_id, document_id)
        VALUES (?, ?, ?)`,
-    ).bind(pathwayId, userId, documentId),
+      )
+      .bind(pathwayId, userId, documentId),
   ]
   for (const session of sessions) {
     if (
@@ -49,33 +51,37 @@ export async function persistApprovedPathway(
     const taskId = newId('task')
     const sessionId = newId('session')
     statements.push(
-      db.prepare(
-        `INSERT INTO tasks
+      db
+        .prepare(
+          `INSERT INTO tasks
           (id, user_id, title, notes, priority, due_date, capacity_cost)
          VALUES (?, ?, ?, ?, 'normal', ?, 1)`,
-      ).bind(
-        taskId,
-        userId,
-        session.title.slice(0, 200),
-        `Pocket Goblin approved study session · ${session.minutes} min · pathway ${pathwayId}`,
-        session.date,
-      ),
-      db.prepare(
-        `INSERT INTO study_pathway_sessions
+        )
+        .bind(
+          taskId,
+          userId,
+          session.title.slice(0, 200),
+          `Pocket Goblin approved study session · ${session.minutes} min · pathway ${pathwayId}`,
+          session.date,
+        ),
+      db
+        .prepare(
+          `INSERT INTO study_pathway_sessions
           (id, pathway_id, user_id, step_id, title, scheduled_date, minutes,
            sequence, task_id)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ).bind(
-        sessionId,
-        pathwayId,
-        userId,
-        session.stepId,
-        session.title.slice(0, 200),
-        session.date,
-        session.minutes,
-        session.sequence,
-        taskId,
-      ),
+        )
+        .bind(
+          sessionId,
+          pathwayId,
+          userId,
+          session.stepId,
+          session.title.slice(0, 200),
+          session.date,
+          session.minutes,
+          session.sequence,
+          taskId,
+        ),
     )
   }
   // D1 batch runs in a single transaction; failure rolls back every write.

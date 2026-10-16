@@ -62,10 +62,16 @@ export function StudyPathwayPreviewPanel({
     setSaving(true)
     setError(null)
     try {
-      await approveStudyPathway(documentId, availability, preview.preview.sessions)
+      await approveStudyPathway(
+        documentId,
+        availability,
+        preview.preview.sessions,
+      )
       setSaved(true)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not save the pathway.')
+      setError(
+        cause instanceof Error ? cause.message : 'Could not save the pathway.',
+      )
       setPreview(null)
     } finally {
       setSaving(false)
@@ -76,7 +82,9 @@ export function StudyPathwayPreviewPanel({
     <section aria-label="Study pathway preview">
       <h4>Plan my study time</h4>
       <p>
-        See how these steps could fit into your available study days. Previewing does not change your tasks or calendar. Only approving a complete plan creates tasks.
+        See how these steps could fit into your available study days. Previewing
+        does not change your tasks or calendar. Only approving a complete plan
+        creates tasks.
       </p>
       <label>
         Planning window{' '}
