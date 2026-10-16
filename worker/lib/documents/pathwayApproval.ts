@@ -18,7 +18,7 @@ export async function persistApprovedPathway(
   }
   const existing = await db
     .prepare(
-      'SELECT id FROM study_pathways WHERE user_id = ? AND document_id = ?',
+      "SELECT id FROM study_pathways WHERE user_id = ? AND document_id = ? AND status = 'active'",
     )
     .bind(userId, documentId)
     .first<{ id: string }>()
@@ -80,8 +80,8 @@ export async function persistApprovedPathway(
         .prepare(
           `INSERT INTO study_pathway_sessions
           (id, pathway_id, user_id, step_id, title, scheduled_date, minutes,
-           sequence, task_id, deadline_date)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           sequence, task_id, deadline_date, goal_id, step_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           sessionId,
@@ -94,6 +94,10 @@ export async function persistApprovedPathway(
           session.sequence,
           taskId,
           deadline ?? null,
+          session.goalId,
+          Number.isFinite(Number(session.stepId.match(/^.+?:(\\d+):/)?.[1]))
+            ? Number(session.stepId.match(/^.+?:(\\d+):/)?.[1])
+            : null,
         ),
     )
   }
