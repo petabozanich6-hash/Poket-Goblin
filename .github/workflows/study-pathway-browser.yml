@@ -1,0 +1,49 @@
+name: Study pathway browser acceptance
+
+on:
+  pull_request:
+    branches: [main, development]
+    paths:
+      - 'e2e/study-pathway.spec.ts'
+      - 'src/features/documents/**'
+      - 'shared/documents/**'
+      - 'worker/routes/documents.ts'
+      - 'worker/lib/documents/**'
+      - 'worker/lib/ics.ts'
+      - 'migrations/**'
+      - '.github/workflows/study-pathway-browser.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  study-journey:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Configure local-only credentials
+        run: |
+          printf 'ENVIRONMENT=development\nAUTH_SECRET=browser-test-only-not-for-production-1234567890\nAI_PROVIDER=none\n' > .dev.vars
+      - name: Prepare isolated local database
+        run: npm run db:migrate:local
+      - name: Browser acceptance test
+        run: PLAYWRIGHT_WEB_SERVER=1 npx playwright test e2e/study-pathway.spec.ts --reporter=line
+      - name: Upload browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: study-pathway-browser-failure
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 3
