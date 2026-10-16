@@ -181,6 +181,30 @@ documentRoutes.get('/', async (c) => {
   })
 })
 
+/** Saved study pathways remain accessible after a temporary upload is deleted. */
+documentRoutes.get('/study-pathways', async (c) => {
+  const user = c.get('user')
+  const rows = await c.env.DB.prepare(
+    `SELECT p.id, p.document_id as documentId,
+            p.approved_at as approvedAt,
+            COALESCE(d.display_name, MIN(s.title), 'Study pathway') as title,
+            COUNT(CASE WHEN s.status = 'planned' AND t.status = 'open'
+                  THEN 1 END) as openSessions,
+            COUNT(CASE WHEN t.status = 'completed' THEN 1 END) as completedSessions
+     FROM study_pathways p
+     LEFT JOIN documents d ON d.id = p.document_id AND d.user_id = p.user_id
+     LEFT JOIN study_pathway_sessions s ON s.pathway_id = p.id
+       AND s.user_id = p.user_id
+     LEFT JOIN tasks t ON t.id = s.task_id AND t.user_id = p.user_id
+     WHERE p.user_id = ? AND p.status = 'active'
+     GROUP BY p.id, p.document_id, p.approved_at, d.display_name
+     ORDER BY p.approved_at DESC, p.id DESC LIMIT 100`,
+  )
+    .bind(user.id)
+    .all()
+  return c.json({ pathways: rows.results ?? [] })
+})
+
 documentRoutes.get('/:id', async (c) => {
   const user = c.get('user')
   const id = c.req.param('id')
