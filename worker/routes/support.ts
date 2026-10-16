@@ -44,7 +44,17 @@ supportRoutes.get('/unread', async (c) => {
   )
     .bind(c.get('user').id)
     .first<{ n: number }>()
-  return c.json({ unread: Number(row?.n ?? 0) })
+  // The reply id lets the client distinguish a genuinely new message from
+  // one already acknowledged in this browser session.
+  const latest = await c.env.DB.prepare(
+    `SELECT r.id FROM support_replies r
+     JOIN support_threads t ON t.id = r.thread_id
+     WHERE t.user_id = ? AND t.unread_for_user = 1 AND r.author = 'owner'
+     ORDER BY r.created_at DESC, r.id DESC LIMIT 1`,
+  )
+    .bind(c.get('user').id)
+    .first<{ id: string }>()
+  return c.json({ unread: Number(row?.n ?? 0), latestReplyId: latest?.id ?? null })
 })
 
 supportRoutes.get('/', async (c) => {
