@@ -77,4 +77,12 @@ describe('recommendPathway', () => {
     ])
     expect(result.unscheduledMinutes).toBe(60)
   })
+  it('rejects impossible dates rather than treating rollover dates as deadlines', () => {
+    const result = recommendPathway([step({ deadline: '2026-02-30' })], [
+      { date: '2026-02-27', availableMinutes: 120 },
+    ])
+    expect(result.sessions).toHaveLength(0)
+    expect(result.warnings[0]?.reason).toBe('invalid_deadline')
+  })
+
 })
