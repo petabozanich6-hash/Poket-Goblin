@@ -2,6 +2,7 @@ import { previewDocumentPathway } from '../../shared/documents/pathwayPreview'
 import type { DocumentSuggestion } from '../../shared/documents/understand'
 import type { DayAvailability } from '../../shared/documents/pathwayScheduler'
 import { freeDocumentProcessingQuota } from '../lib/freeQuota'
+import { persistApprovedPathway } from '../lib/documents/pathwayApproval'
 import { Hono } from 'hono'
 
 import type { Env } from '../env'
@@ -317,6 +318,95 @@ documentRoutes.post('/:id/pathway-preview', async (c) => {
     },
     applied: false,
   })
+})
+
+/**
+ * Approval must recompute the study schedule server-side. Never trust a
+ * submitted session list or a previously displayed preview.
+ */
+documentRoutes.post('/:id/pathway-approve', async (c) => {
+  const user = c.get('user')
+  const documentId = c.req.param('id')
+  const document = await c.env.DB.prepare(
+    'SELECT id FROM documents WHERE id = ? AND user_id = ?',
+  ).bind(documentId, user.id).first()
+  if (!document) return c.json({ error: 'Document not found' }, 404)
+
+  const body = await c.req.json().catch(() => null) as {
+    availability?: DayAvailability[]
+    expectedSessions?: unknown[]
+  } | null
+  if (!body || !Array.isArray(body.availability) ||
+      body.availability.length === 0 || body.availability.length > 120 ||
+      !Array.isArray(body.expectedSessions) ||
+      body.expectedSessions.length === 0 || body.expectedSessions.length > 500 ||
+      body.availability.some(day =>
+        !day || typeof day.date !== 'string' ||
+        !/^\\d{4}-\\d{2}-\\d{2}$/.test(day.date) ||
+        !Number.isFinite(Date.parse(day.date + 'T00:00:00Z')) ||
+        new Date(day.date + 'T00:00:00Z').toISOString().slice(0, 10) !== day.date ||
+        !Number.isFinite(day.availableMinutes) ||
+        day.availableMinutes < 0 || day.availableMinutes > 1440 ||
+        (day.committedMinutes !== undefined &&
+          (!Number.isFinite(day.committedMinutes) ||
+           day.committedMinutes < 0 || day.committedMinutes > 1440)) ||
+        (day.blocked !== undefined && typeof day.blocked !== 'boolean')
+      )) {
+    return c.json({ error: 'Invalid pathway approval request' }, 400)
+  }
+
+  const rows = await c.env.DB.prepare(
+    `SELECT payload_json as payload FROM review_items
+     WHERE user_id = ? AND source_type = 'document' AND source_id = ?
+       AND status IN ('pending', 'snoozed', 'edited')
+     ORDER BY created_at ASC, rowid ASC`,
+  ).bind(user.id, documentId).all<{ payload: string }>()
+  const suggestions: DocumentSuggestion[] = []
+  for (const row of rows.results ?? []) {
+    try {
+      const item = JSON.parse(row.payload) as DocumentSuggestion & {
+        requiresReview?: boolean
+      }
+      if (item.type === 'task' && item.group && item.requiresReview === true) {
+        suggestions.push(item)
+      }
+    } catch {
+      // Treat invalid document-generated proposals as unavailable.
+    }
+  }
+
+  const offset = readOffsetMinutes({
+    timezoneOffsetMinutes: Number(c.req.query('timezoneOffsetMinutes') ?? 0),
+  })
+  const availability = await Promise.all(body.availability.map(async day => {
+    const tasks = await c.env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM tasks WHERE user_id = ?
+       AND status = 'open' AND due_date = ?`,
+    ).bind(user.id, day.date).first<{ n: number }>()
+    const start = new Date(Date.parse(day.date + 'T00:00:00Z') + offset * 60000)
+    const end = new Date(start.getTime() + 86400000)
+    const events = await c.env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM events WHERE user_id = ?
+       AND status = 'scheduled' AND starts_at >= ? AND starts_at < ?`,
+    ).bind(user.id, start.toISOString(), end.toISOString()).first<{ n: number }>()
+    return {
+      ...day,
+      committedMinutes: (day.committedMinutes ?? 0) +
+        Number(tasks?.n ?? 0) * 30 + Number(events?.n ?? 0) * 60,
+    }
+  }))
+  const result = previewDocumentPathway(documentId, suggestions, availability)
+  // Refuse silent partial approval or stale preview. The user needs to
+  // review a new preview whenever deadlines or commitments change.
+  if (result.unscheduledMinutes > 0 || result.unschedulable.length > 0 ||
+      result.warnings.length > 0) {
+    return c.json({ error: 'Some work cannot be scheduled. Review the pathway again.' }, 409)
+  }
+  if (JSON.stringify(result.sessions) !== JSON.stringify(body.expectedSessions)) {
+    return c.json({ error: 'Your pathway has changed. Preview it again before approving.' }, 409)
+  }
+  const saved = await persistApprovedPathway(c.env.DB, user.id, documentId, result.sessions)
+  return c.json({ pathwayId: saved.id, alreadySaved: saved.alreadySaved }, saved.alreadySaved ? 200 : 201)
 })
 
 documentRoutes.post('/', async (c) => {
