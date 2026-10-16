@@ -54,7 +54,10 @@ supportRoutes.get('/unread', async (c) => {
   )
     .bind(c.get('user').id)
     .first<{ id: string }>()
-  return c.json({ unread: Number(row?.n ?? 0), latestReplyId: latest?.id ?? null })
+  return c.json({
+    unread: Number(row?.n ?? 0),
+    latestReplyId: latest?.id ?? null,
+  })
 })
 
 supportRoutes.get('/', async (c) => {
