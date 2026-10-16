@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createHarness, type Harness, type TestUser } from './testing/harness'
+import { freeDocumentProcessingQuota } from './lib/freeQuota'
 
 let h: Harness
 let user: TestUser
@@ -92,5 +93,15 @@ describe('permanent Free quotas — direct routes', () => {
       dueDate: '2026-11-01',
     })
     expect(rejected.status).toBe(403)
+  })
+})
+
+describe('atomic Free document processing allowance', () => {
+  it('allows only two simultaneous reservations per UTC month', async () => {
+    const attempts = await Promise.all(
+      Array.from({ length: 8 }, () => freeDocumentProcessingQuota(h.db, user.id)),
+    )
+    expect(attempts.filter((result) => result === null)).toHaveLength(2)
+    expect(attempts.filter((result) => result?.code === 'FREE_PLAN_LIMIT')).toHaveLength(6)
   })
 })
