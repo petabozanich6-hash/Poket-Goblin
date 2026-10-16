@@ -41,7 +41,11 @@ export async function loadStudyWorkload(
          WHERE user_id = ? AND status = 'scheduled'
            AND starts_at >= ? AND starts_at <= ? LIMIT 1000`,
       )
-      .bind(userId, `${addDays(today, -1)}T00:00:00Z`, `${addDays(end, 1)}T23:59:59Z`)
+      .bind(
+        userId,
+        `${addDays(today, -1)}T00:00:00Z`,
+        `${addDays(end, 1)}T23:59:59Z`,
+      )
       .all<{ startsAt: string }>(),
   ])
   const dailyLoad: Record<string, number> = {}
@@ -53,7 +57,11 @@ export async function loadStudyWorkload(
   for (const event of events.results ?? []) {
     const time = Date.parse(event.startsAt)
     if (!Number.isFinite(time)) continue
-    count(new Date(time - timezoneOffsetMinutes * 60_000).toISOString().slice(0, 10))
+    count(
+      new Date(time - timezoneOffsetMinutes * 60_000)
+        .toISOString()
+        .slice(0, 10),
+    )
   }
   return {
     dailyLoad,
