@@ -153,7 +153,7 @@ app.onError(async (error, c) => {
   const quotaMatch = String(
     error instanceof Error ? error.message : error,
   ).match(/FREE_PLAN_LIMIT:(tasks|notes|reminders)/)
-  if (quotaMatch) {
+  if (quotaMatch?.[1]) {
     const resource = quotaMatch[1]
     const descriptions: Record<string, [number, string]> = {
       tasks: [10, 'active tasks'],
