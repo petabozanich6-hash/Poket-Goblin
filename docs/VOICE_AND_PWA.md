@@ -4,7 +4,7 @@
 sentence, job done — from any screen, or straight from the home screen.
 
 Status: implemented on `claude/pocket-goblin-pwa-voice-991yas`, **not merged or
-deployed**. Needs production migration `0011_goblin_voice.sql` (see “Before
+deployed**. Needs production migration `0013_goblin_voice.sql` (see “Before
 production”).
 
 ## What was built
@@ -23,7 +23,7 @@ production”).
 | Replies in chosen style | `shared/goblin/voiceStyle.ts`                                                     |
 | Conversation API        | `POST /api/goblin/converse` → `worker/lib/goblin/converse.ts`                     |
 | Profile / expressions   | `/api/goblin/profile`, `/api/goblin/expressions` → `worker/lib/goblin/profile.ts` |
-| Schema                  | `migrations/0011_goblin_voice.sql`                                                |
+| Schema                  | `migrations/0013_goblin_voice.sql`                                                |
 
 ## How a request flows
 
@@ -170,7 +170,7 @@ understanding is rule-based; raising the cap is an owner decision.
 ## Before production
 
 1. Review and merge (not done; no deployment performed).
-2. Apply `0011_goblin_voice.sql` with the approval-gated workflow
+2. Apply `0013_goblin_voice.sql` with the approval-gated workflow
    (`docs/D1_MIGRATIONS.md`) **before** the Worker deploy.
 3. Deploy; confirm `https://pocketgoblin.org/manifest.webmanifest` and
    `/sw.js` return 200 with `Cache-Control: no-cache`.
