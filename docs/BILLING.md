@@ -52,3 +52,14 @@ Portal. Pocket Goblin never sees card details.
 
 Going live repeats steps 2–6 in live mode, plus `STRIPE_LIVE_ENABLED = "true"`.
 That needs the Owner's explicit approval.
+
+## Existing multi-currency Stripe prices (October 2026)
+
+- Monthly: `price_1UQcuoRA6WYgjfaI4nZemncM` (AUD default A$9.95/month).
+- Annual: `price_1UQcehRA6WYgjfaIchHkzT9R` (AUD default A$99/year).
+- Both prices have manually configured currency options in Stripe (CAD, EUR, GBP, NZD and USD, as well as AUD).
+- Checkout passes the Stripe Price ID but deliberately does **not** pass a `currency` parameter. Stripe Checkout selects the appropriate configured currency automatically for supported customers. If no matching currency is available, it uses the default AUD price. No customer IP lookup, currency switcher or homemade FX conversion is needed.
+- The plan page displays the base AUD amount and explicitly states that Stripe confirms the final currency and amount before payment. **Do not claim the default displayed amount is the customer's localized amount.**
+- The Stripe webhook and subscription entitlement handling remain unchanged.
+- Linking the price IDs does **not** require putting Stripe secrets in GitHub. Live billing must remain disabled until credentials, signing secret, webhook, portal and live checkout are verified, with explicit owner approval.
+- Existing Stripe promotion-code entry remains separate from Goblin Deals. Review this before turning on custom campaign redemptions.
