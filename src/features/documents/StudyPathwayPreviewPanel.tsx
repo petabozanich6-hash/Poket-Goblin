@@ -2,11 +2,13 @@ import { useState } from 'react'
 
 import { Button } from '@/components/ui/Button'
 import {
+  approveStudyPathway,
   previewStudyPathway,
   type StudyPathwayPreview,
+  type StudyDayAvailability,
 } from '@/features/explore/exploreApi'
 
-/** Read-only preview; no tasks or events are written until a separate approval flow exists. */
+/** Approvals always require the backend to revalidate the displayed pathway. */
 export function StudyPathwayPreviewPanel({
   documentId,
 }: {
@@ -17,12 +19,16 @@ export function StudyPathwayPreviewPanel({
   const [horizonDays, setHorizonDays] = useState(21)
   const [preview, setPreview] = useState<StudyPathwayPreview | null>(null)
   const [loading, setLoading] = useState(false)
+  const [availability, setAvailability] = useState<StudyDayAvailability[]>([])
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function generate() {
     setLoading(true)
     setError(null)
     setPreview(null)
+    setSaved(false)
     try {
       const dates = Array.from({ length: horizonDays }, (_, index) => {
         const date = new Date()
@@ -37,7 +43,9 @@ export function StudyPathwayPreviewPanel({
         ].join('-')
         return { date: iso, availableMinutes: blocked ? 0 : minutes }
       })
-      setPreview(await previewStudyPathway(documentId, dates))
+      const result = await previewStudyPathway(documentId, dates)
+      setAvailability(dates)
+      setPreview(result)
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -49,12 +57,26 @@ export function StudyPathwayPreviewPanel({
     }
   }
 
+  async function approve() {
+    if (!preview || saving) return
+    setSaving(true)
+    setError(null)
+    try {
+      await approveStudyPathway(documentId, availability, preview.preview.sessions)
+      setSaved(true)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not save the pathway.')
+      setPreview(null)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <section aria-label="Study pathway preview">
       <h4>Plan my study time</h4>
       <p>
-        See how these steps could fit into your available study days. This is only a
-        preview and will not change your tasks or calendar.
+        See how these steps could fit into your available study days. Previewing does not change your tasks or calendar. Only approving a complete plan creates tasks.
       </p>
       <label>
         Planning window{' '}
@@ -125,10 +147,22 @@ export function StudyPathwayPreviewPanel({
               confirmed deadline before they can be scheduled.
             </p>
           ) : null}
-          <p>
-            Nothing has been added. Approval and rescheduling are still being
-            built.
-          </p>
+          {saved ? (
+            <p role="status">Pathway approved and saved to your tasks.</p>
+          ) : (
+            <Button
+              onClick={() => void approve()}
+              disabled={
+                saving ||
+                preview.preview.sessions.length === 0 ||
+                preview.preview.unscheduledMinutes > 0 ||
+                preview.preview.warnings.length > 0 ||
+                preview.preview.unschedulable.length > 0
+              }
+            >
+              {saving ? 'Saving…' : 'Approve and add these study tasks'}
+            </Button>
+          )}
         </div>
       ) : null}
     </section>
