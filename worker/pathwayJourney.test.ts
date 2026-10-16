@@ -116,6 +116,22 @@ describe('document to approved study pathway journey', () => {
       body: { availability, expectedSessions: view.preview.sessions },
     })
     expect(approval.status).toBe(201)
+    // Calendar export must include the study tasks without a phone sync
+    // connection, and Undo must remove their previously exported entries.
+    const [createdTask] = h.query(
+      'SELECT id FROM tasks WHERE user_id = ? AND status = ? ORDER BY id',
+      owner.id,
+      'open',
+    ) as Array<{ id: string }>
+    expect(createdTask).toBeTruthy()
+    const beforeCalendar = await h.request('/api/calendar/export.ics', {
+      cookie: owner.cookie,
+    })
+    expect(beforeCalendar.status).toBe(200)
+    expect(await beforeCalendar.text()).toContain(
+      `UID:task-${createdTask.id}@pocketgoblin.org`,
+    )
+
     const saved = await h.request(`/api/documents/${id}/pathway`, {
       cookie: owner.cookie,
     })
@@ -161,6 +177,13 @@ describe('document to approved study pathway journey', () => {
       method: 'POST',
     })
     expect(undo.status).toBe(200)
+    const afterCalendar = await h.request('/api/calendar/export.ics', {
+      cookie: owner.cookie,
+    })
+    expect(afterCalendar.status).toBe(200)
+    expect(await afterCalendar.text()).not.toContain(
+      `UID:task-${createdTask.id}@pocketgoblin.org`,
+    )
     const active = h.query(
       'SELECT status FROM study_pathways WHERE user_id = ?',
       owner.id,
