@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import type { Env } from '../env'
 import { newId } from '../lib/ids'
+import { checkDurableLimit, waitMessage } from '../lib/rateLimit'
 import type { AuthUser } from '../lib/session'
 import { allowedOrigin } from '../lib/cors'
 
@@ -82,6 +83,19 @@ supportRoutes.get('/', async (c) => {
 })
 
 supportRoutes.post('/', async (c) => {
+  const limited = await checkDurableLimit(
+    c.env.DB,
+    `support:${c.get('user').id}`,
+    10,
+    60 * 60_000,
+  )
+  if (!limited.ok)
+    return c.json(
+      {
+        error: `That’s a lot of messages in an hour — we’ve got them. ${waitMessage(limited.retryAfterSec)}`,
+      },
+      429,
+    )
   const data: unknown = await c.req.json().catch(() => null)
   if (!data || typeof data !== 'object' || Array.isArray(data))
     return c.json({ error: 'Invalid message' }, 400)
@@ -124,6 +138,19 @@ supportRoutes.post('/:id/read', async (c) => {
 })
 
 supportRoutes.post('/:id/reply', async (c) => {
+  const limited = await checkDurableLimit(
+    c.env.DB,
+    `support:${c.get('user').id}`,
+    10,
+    60 * 60_000,
+  )
+  if (!limited.ok)
+    return c.json(
+      {
+        error: `That’s a lot of messages in an hour — we’ve got them. ${waitMessage(limited.retryAfterSec)}`,
+      },
+      429,
+    )
   const data: unknown = await c.req.json().catch(() => null)
   const body =
     data && typeof data === 'object' && !Array.isArray(data)

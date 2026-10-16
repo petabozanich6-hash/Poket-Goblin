@@ -16,7 +16,19 @@ const userEmail = `hq_user_${stamp}@example.com`
 function localD1(sql: string) {
   execFileSync(
     'npx',
-    ['wrangler', 'd1', 'execute', 'pocket-goblin', '--local', '--command', sql],
+    [
+      'wrangler',
+      'd1',
+      'execute',
+      'pocket-goblin',
+      '--local',
+      // Match `wrangler dev --persist-to <dir>` when testing a separate database.
+      ...(process.env.E2E_D1_PERSIST
+        ? ['--persist-to', process.env.E2E_D1_PERSIST]
+        : []),
+      '--command',
+      sql,
+    ],
     { stdio: 'pipe' },
   )
 }
@@ -137,7 +149,7 @@ test.describe.serial('Goblin HQ', () => {
     ).toBeVisible()
 
     // Audit log shows the change.
-    await page.getByRole('link', { name: 'Security & audit' }).click()
+    await page.getByRole('link', { name: 'Audit log' }).click()
     await expect(
       page.getByRole('cell', { name: 'settings.update' }).first(),
     ).toBeVisible()

@@ -1,5 +1,8 @@
 .page {
   display: grid;
+  /* A long word or file name wraps instead of widening the whole page. */
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: var(--space-5);
 }
 
