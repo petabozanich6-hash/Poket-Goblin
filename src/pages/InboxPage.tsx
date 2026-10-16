@@ -7,23 +7,13 @@ import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import {
   acceptReviewItem,
-  connectProvider,
-  disconnectProvider,
   dismissReviewItem,
-  fetchConnections,
   fetchReviewItems,
   snoozeReviewItem,
 } from '@/features/explore/exploreApi'
 import { ApiError } from '@/lib/api'
 
 import styles from './Page.module.css'
-
-const providerLabels: Record<string, string> = {
-  gmail: 'Gmail',
-  outlook_mail: 'Outlook Mail',
-  google_calendar: 'Google Calendar',
-  outlook_calendar: 'Outlook Calendar',
-}
 
 function duplicateTitle(payload: unknown): string | null {
   const ref = (payload as { possibleDuplicateOf?: { title?: unknown } } | null)
@@ -40,10 +30,6 @@ export function InboxPage() {
   const reviewQuery = useQuery({
     queryKey: ['review', tab],
     queryFn: () => fetchReviewItems(tab === 'pending' ? 'pending' : 'all'),
-  })
-  const connectionsQuery = useQuery({
-    queryKey: ['connections'],
-    queryFn: fetchConnections,
   })
 
   const invalidate = async () => {
@@ -75,28 +61,6 @@ export function InboxPage() {
     mutationFn: (id: string) => snoozeReviewItem(id, 24),
     onSuccess: invalidate,
   })
-  const connectMutation = useMutation({
-    mutationFn: connectProvider,
-    onSuccess: (data) => {
-      if (data.authorizeUrl) {
-        window.location.href = data.authorizeUrl
-        return
-      }
-      setBanner(data.message || data.error || 'OAuth is not configured yet.')
-      void queryClient.invalidateQueries({ queryKey: ['connections'] })
-    },
-    onError: (err) => {
-      setBanner(
-        err instanceof ApiError ? err.message : 'Could not start connection',
-      )
-    },
-  })
-  const disconnectMutation = useMutation({
-    mutationFn: disconnectProvider,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['connections'] })
-    },
-  })
 
   const items = reviewQuery.data?.items ?? []
 
@@ -106,8 +70,7 @@ export function InboxPage() {
         <div>
           <h1>Inbox</h1>
           <p className={styles.sub}>
-            One calm review shelf for dumps, documents and future integrations —
-            not another email app.
+            Review suggestions from your thoughts and documents.
           </p>
         </div>
       </header>
@@ -211,45 +174,6 @@ export function InboxPage() {
             ))}
           </ul>
         )}
-      </Card>
-
-      <Card>
-        <h2>Connections</h2>
-        <p className={styles.sub}>
-          Official OAuth only. Read-only scopes. No fake inboxes. Connect when
-          server credentials exist.
-        </p>
-        <ul className={styles.stack}>
-          {(connectionsQuery.data?.connections ?? []).map((conn) => (
-            <li key={conn.id} className={styles.listRow}>
-              <div>
-                <strong>
-                  {providerLabels[conn.provider] ?? conn.provider}
-                </strong>
-                <p className={styles.sub}>
-                  {conn.status}
-                  {conn.statusMessage ? ` — ${conn.statusMessage}` : ''}
-                </p>
-              </div>
-              <div className={styles.tabs}>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => connectMutation.mutate(conn.provider)}
-                >
-                  Connect
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => disconnectMutation.mutate(conn.provider)}
-                >
-                  Disconnect
-                </Button>
-              </div>
-            </li>
-          ))}
-        </ul>
       </Card>
     </div>
   )
