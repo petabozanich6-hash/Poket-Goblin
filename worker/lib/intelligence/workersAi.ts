@@ -55,6 +55,17 @@ export async function reserveWorkersAi(
       globalLimit(env.AI_DAILY_GLOBAL_LIMIT),
     ],
   ]
+  // Reserve half the global daily budget for paying subscribers and Owner.
+  // This uses the same atomic D1 gate as the other AI limits, so concurrent
+  // Free requests cannot consume the Premium reserve.
+  if (ctx.plan === 'free') {
+    gates.splice(gates.length - 1, 0, [
+      'global-free-day',
+      null,
+      Math.floor(now / 86_400_000),
+      Math.floor(globalLimit(env.AI_DAILY_GLOBAL_LIMIT) / 2),
+    ])
+  }
   for (const [scope, userId, window, limit] of gates) {
     if (limit === 0) throw new Error('AI budget disabled')
     const result = await env.DB.prepare(
