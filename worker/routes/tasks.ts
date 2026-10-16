@@ -227,6 +227,11 @@ taskRoutes.patch('/:id', async (c) => {
     if (status === 'open') completedAt = null
   }
 
+  if (status === 'open' && existing.status !== 'open') {
+    const quota = await freeQuota(c.env.DB, user.id, 'tasks')
+    if (quota) return c.json(quota, 403)
+  }
+
   await c.env.DB.prepare(
     `UPDATE tasks SET
       title = ?, notes = ?, priority = ?, due_date = ?, capacity_cost = ?,
