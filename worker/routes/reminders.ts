@@ -1,3 +1,4 @@
+import { freeQuota } from '../lib/freeQuota'
 import { Hono } from 'hono'
 
 import type { ReminderEntityType } from '../../shared/types'
@@ -100,6 +101,9 @@ reminderRoutes.post('/', async (c) => {
       return c.json(linkNotFound(entityType), 404)
     }
   }
+
+  const quota = await freeQuota(c.env.DB, user.id, 'reminders')
+  if (quota) return c.json(quota, 403)
 
   const id = newId('rem')
   await c.env.DB.prepare(
