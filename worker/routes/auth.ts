@@ -199,15 +199,34 @@ authRoutes.post('/login', async (c) => {
     )
   }
 
-  // A previously gated user stays protected even when gating new signups is off.
-  const pending = await c.env.DB.prepare(
-    'SELECT email_verification_required_at, email_verified_at FROM users WHERE id = ?',
-  )
-    .bind(user.id)
-    .first<{
-      email_verification_required_at: string | null
-      email_verified_at: string | null
-    }>()
+  // Previously gated users remain protected when new signups are ungated.
+  // This fallback is only for pre-migration legacy accounts: deployment of
+  // migration 0016 and activation of the flag are separate owner approvals.
+  let pending: {
+    email_verification_required_at: string | null
+    email_verified_at: string | null
+  } | null = null
+  try {
+    pending = await c.env.DB.prepare(
+      'SELECT email_verification_required_at, email_verified_at FROM users WHERE id = ?',
+    )
+      .bind(user.id)
+      .first<{
+        email_verification_required_at: string | null
+        email_verified_at: string | null
+      }>()
+  } catch (error) {
+    const missingColumn = /no such column: email_verification_required_at/i.test(
+      String(error),
+    )
+    if (!missingColumn || c.env.EMAIL_VERIFICATION_REQUIRED === 'true') {
+      return c.json(
+        { error: 'Email verification is temporarily unavailable. Please try again.' },
+        503,
+      )
+    }
+    // No gated user could have been created before migration 0016.
+  }
   if (pending?.email_verification_required_at && !pending.email_verified_at) {
     return c.json(
       {
