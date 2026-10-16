@@ -87,3 +87,17 @@ Default **new** platform settings now offer Free 3 AI requests/day and 10 MB of 
 - **Critical release blocker:** tasks, notes and reminders still use count-then-insert checks that are _not atomic_. Simultaneous requests can exceed those quotas; implement database-level enforcement or an equivalent all-write-path atomic mechanism and regression-test it before merge.
 - **Critical release blocker:** monthly document reservations share a limit but an operation that fails or is retried consumes another reservation; confirm customer-facing wording and retry semantics before launch.
 - Confirm saved Owner HQ settings in production; defaults are not a guarantee of active settings.
+
+## Final Free/Premium release audit — 16 October 2026
+
+**Hold release pending live-settings and paid-provider checks.** Backend record caps are enforced by migration 0016, with Free limits of ten open tasks, five notes, and three pending/snoozed reminders. D1 trigger errors map to HTTP 403 FREE_PLAN_LIMIT. Owner and active paid entitlements are exempt; downgrades do not delete data. The monthly Free document allowance uses atomic ai_request_limits reservations, and the Workers AI transport reserves 50% of its configured global daily capacity against Free usage.
+
+**Must resolve before merging/deploying:**
+
+1. Verify production `platform_settings.aiLimits` and `platform_settings.storageQuotas` using authenticated Owner HQ settings API. Saved settings override defaults; the repository cannot establish live values.
+2. Audit the `openai_compatible` provider path for atomic, pre-call cost reservations. The shared atomic gate presently exists in the Workers AI binding; the separate external HTTP provider uses per-user request checks/usage recording and may not share global reservation safeguards. Either prohibit the external provider in production or bring it under the same cost controls before launch.
+3. Test customer-visible quota failures and downgrade transitions end-to-end, including document/manual reread handling. Reservations count processing **attempts**, including failed attempts after reservation, and duplicate uploads can consume another slot.
+4. Verify production billing settings/webhook safely. `STRIPE_LIVE_ENABLED` remains an explicit real-money release gate; CI green does not demonstrate checkout readiness. Do not enable without separate approval.
+5. Ensure Premium isn't described as having multi-list shopping or other functionality not provided by the current routes. The price page should reflect actual saved settings.
+
+**Product decision:** Permanent Free is limited by allowances; Premium presently offers higher quotas rather than an entirely different workflow. Keep marketing promises proportional to this distinction.
