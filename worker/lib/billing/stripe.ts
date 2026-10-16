@@ -232,8 +232,10 @@ export async function applySubscription(
     // Premium given by the Owner wins; billing never overwrites it.
     return userId
   }
-  if (open && open.subId && open.subId !== sub.id && ENDED.has(sub.status)) {
-    // An old subscription ending must not end a newer one.
+  if (open && open.subId && open.subId !== sub.id) {
+    // A different subscription must never overwrite the currently linked one.
+    // Reconcile replacement subscriptions explicitly rather than trusting the
+    // delivery order of webhooks for two subscription ids.
     return userId
   }
   if (open) {
