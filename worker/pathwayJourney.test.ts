@@ -1,0 +1,135 @@
+import { beforeEach, describe, expect, it } from 'vitest'
+
+import { app } from './index'
+import { createHarness, type Harness, type TestUser } from './testing/harness'
+
+let h: Harness
+let owner: TestUser
+let stranger: TestUser
+
+const STUDY_SCHEDULE = [
+  'University Study Schedule - Semester 2 2026',
+  'Week Commencing Topic Assessment',
+  '1 19 October 2026',
+  'Module 1: Understanding evidence',
+  '2 26 October 2026',
+  'Module 2: Research and sources',
+  'Assessment 1 Research essay (40%) due Sunday 29 November 2026',
+].join('\n')
+
+beforeEach(async () => {
+  h = createHarness()
+  owner = await h.register('study-journey-owner@example.com')
+  stranger = await h.register('study-journey-stranger@example.com')
+})
+
+async function uploadSchedule() {
+  const data = new FormData()
+  data.append(
+    'file',
+    new File([STUDY_SCHEDULE], 'University Study Schedule.txt', {
+      type: 'text/plain',
+    }),
+  )
+  const response = await app.request(
+    '/api/documents',
+    { method: 'POST', headers: { Cookie: owner.cookie }, body: data },
+    h.env,
+  )
+  expect(response.status).toBe(201)
+  const result = (await response.json()) as { document: { id: string } }
+  return result.document.id
+}
+
+function availableDays() {
+  return Array.from({ length: 43 }, (_, index) => {
+    const date = new Date(Date.UTC(2026, 9, 19 + index))
+      .toISOString()
+      .slice(0, 10)
+    return { date, availableMinutes: 240 }
+  })
+}
+
+describe('document to approved study pathway journey', () => {
+  it('retains academic weekly steps for review, then previews, approves and undoes safely', async () => {
+    const id = await uploadSchedule()
+    const rows = h.query(
+      `SELECT payload_json as payload, status FROM review_items
+       WHERE user_id = ? AND source_type = 'document' AND source_id = ?`,
+      owner.id,
+      id,
+    ) as Array<{ payload: string; status: string }>
+    const weekly = rows
+      .map((row) => ({ ...row, item: JSON.parse(row.payload) as {
+        title: string
+        group?: string
+        requiresReview?: boolean
+      } }))
+      .filter((row) => row.item.group === 'Week by week')
+    expect(weekly.length).toBeGreaterThan(0)
+    expect(weekly.every((row) => row.item.requiresReview === true)).toBe(true)
+    expect(weekly.every((row) => row.status === 'pending')).toBe(true)
+
+    const availability = availableDays()
+    const forbidden = await h.request(`/api/documents/${id}/pathway-preview`, {
+      cookie: stranger.cookie,
+      body: { availability },
+    })
+    expect(forbidden.status).toBe(404)
+
+    const preview = await h.request(`/api/documents/${id}/pathway-preview`, {
+      cookie: owner.cookie,
+      body: { availability },
+    })
+    expect(preview.status).toBe(200)
+    const view = (await preview.json()) as {
+      preview: {
+        sessions: Array<{
+          stepId: string
+          goalId: string
+          title: string
+          date: string
+          minutes: number
+          sequence: number
+        }>
+        unscheduledMinutes: number
+        warnings: unknown[]
+        unschedulable: unknown[]
+      }
+    }
+    expect(view.preview.sessions.length).toBeGreaterThan(0)
+    expect(view.preview.sessions.some((item) => item.title.includes('Week 1'))).toBe(true)
+    expect(view.preview.unscheduledMinutes).toBe(0)
+    expect(view.preview.warnings).toEqual([])
+    expect(view.preview.unschedulable).toEqual([])
+
+    const approval = await h.request(`/api/documents/${id}/pathway-approve`, {
+      cookie: owner.cookie,
+      body: { availability, expectedSessions: view.preview.sessions },
+    })
+    expect(approval.status).toBe(201)
+    const saved = await h.request(`/api/documents/${id}/pathway`, {
+      cookie: owner.cookie,
+    })
+    expect(saved.status).toBe(200)
+    const stored = (await saved.json()) as { sessions: Array<{ id: string }> }
+    expect(stored.sessions.length).toBe(view.preview.sessions.length)
+
+    const duplicated = await h.request(`/api/documents/${id}/pathway-approve`, {
+      cookie: owner.cookie,
+      body: { availability, expectedSessions: view.preview.sessions },
+    })
+    expect(duplicated.status).not.toBe(201)
+
+    const undo = await h.request(`/api/documents/${id}/pathway-undo`, {
+      cookie: owner.cookie,
+      method: 'POST',
+    })
+    expect(undo.status).toBe(200)
+    const active = h.query(
+      'SELECT status FROM study_pathways WHERE user_id = ?',
+      owner.id,
+    ) as Array<{ status: string }>
+    expect(active).toEqual([{ status: 'cancelled' }])
+  })
+})
