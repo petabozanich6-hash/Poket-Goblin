@@ -11,6 +11,7 @@ export async function persistApprovedPathway(
   userId: string,
   documentId: string,
   sessions: ScheduledSession[],
+  stepDeadlines: ReadonlyMap<string, string> = new Map(),
 ) {
   if (!sessions.length || sessions.length > 500) {
     throw new Error('A pathway needs between 1 and 500 sessions')
@@ -68,8 +69,8 @@ export async function persistApprovedPathway(
         .prepare(
           `INSERT INTO study_pathway_sessions
           (id, pathway_id, user_id, step_id, title, scheduled_date, minutes,
-           sequence, task_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           sequence, task_id, deadline_date)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           sessionId,
