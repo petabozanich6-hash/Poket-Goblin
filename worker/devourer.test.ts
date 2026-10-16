@@ -269,10 +269,12 @@ describe('Just sort it (default)', () => {
       document: { status: 'ready' },
     })
     expect(again.body.processing).toBeUndefined()
-    expect(h.query(
-      'SELECT request_count AS n FROM ai_request_limits WHERE scope = ?',
-      `document-month:${alice.id}`,
-    )).toEqual([{ n: 1 }])
+    expect(
+      h.query(
+        'SELECT request_count AS n FROM ai_request_limits WHERE scope = ?',
+        `document-month:${alice.id}`,
+      ),
+    ).toEqual([{ n: 1 }])
     expect(h.query(`SELECT COUNT(*) as n FROM documents`)).toEqual([{ n: 1 }])
   })
 
