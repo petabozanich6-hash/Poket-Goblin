@@ -181,6 +181,53 @@ describe('email verification', () => {
   })
 })
 
+describe('opt-in verified email registration gate', () => {
+  it('refuses gated registration before writing anything if mail is not configured', async () => {
+    const plain = createHarness({ EMAIL_VERIFICATION_REQUIRED: 'true' })
+    const res = await plain.request('/api/auth/register', {
+      body: { email: 'pending@example.com', password: 'correct horse battery', displayName: 'Pending' },
+    })
+    expect(res.status).toBe(503)
+    expect(plain.query("SELECT email FROM users WHERE email = 'pending@example.com'")).toHaveLength(0)
+  })
+
+  it('sends a verification link but gives no cookie or account access until used', async () => {
+    h.env.EMAIL_VERIFICATION_REQUIRED = 'true'
+    const res = await h.request('/api/auth/register', {
+      body: { email: 'new-verification@example.com', password: 'correct horse battery', displayName: 'New User' },
+    })
+    expect(res.status).toBe(201)
+    expect(res.headers.get('set-cookie')).toBeNull()
+    const reply = await json(res)
+    expect(reply).toMatchObject({ verificationRequired: true, emailSent: true })
+    const unverifiedLogin = await h.login('new-verification@example.com')
+    expect(unverifiedLogin.status).toBe(403)
+    expect(await json(unverifiedLogin)).toMatchObject({ code: 'email_verification_required' })
+    expect((await h.request('/api/me')).status).toBe(401)
+    const verifyToken = lastToken('verify-email')
+    const verified = await h.request('/api/auth/verify-email', { body: { token: verifyToken } })
+    expect(verified.status).toBe(200)
+    expect((await h.login('new-verification@example.com')).status).toBe(200)
+    expect((await h.request('/api/auth/verify-email', { body: { token: verifyToken } })).status).toBe(400)
+  })
+
+  it('resends for pending emails with indistinguishable responses and preserves old accounts', async () => {
+    h.env.EMAIL_VERIFICATION_REQUIRED = 'true'
+    const legacy = await h.login('alice@example.com', 'original password')
+    expect(legacy.status).toBe(200)
+    await h.request('/api/auth/register', {
+      body: { email: 'waiting@example.com', password: 'correct horse battery', displayName: 'Waiting' },
+    })
+    const before = sent.length
+    const known = await h.request('/api/auth/verify-email/resend', { body: { email: 'waiting@example.com' } })
+    const unknown = await h.request('/api/auth/verify-email/resend', { body: { email: 'nonexistent@example.com' } })
+    expect(known.status).toBe(200)
+    expect(unknown.status).toBe(200)
+    expect(await json(known)).toEqual(await json(unknown))
+    expect(sent.length).toBe(before + 1)
+  })
+})
+
 describe('change password', () => {
   it('needs the current password and signs out other sessions', async () => {
     const other = cookieFrom(
