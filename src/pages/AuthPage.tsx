@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { useAuth } from '@/features/auth/useAuth'
 import { PlatformBanner } from '@/features/platform/PlatformBanner'
-import { ApiError } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 
 import styles from './AuthPage.module.css'
 
@@ -18,6 +18,8 @@ export function AuthPage() {
   const [displayName, setDisplayName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null)
+  const [resendMessage, setResendMessage] = useState<string | null>(null)
 
   if (!isLoading && isAuthenticated) {
     return <Navigate to="/den" replace />
@@ -31,7 +33,8 @@ export function AuthPage() {
       if (mode === 'login') {
         await login({ email, password })
       } else {
-        await register({ email, password, displayName })
+        const created = await register({ email, password, displayName })
+        if (created.verificationRequired) setPendingEmail(created.email || email)
       }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong')
@@ -74,7 +77,23 @@ export function AuthPage() {
           </button>
         </div>
 
-        <form className={styles.form} onSubmit={(e) => void onSubmit(e)}>
+        {pendingEmail ? (
+          <div className={styles.form} data-testid="email-verification-pending">
+            <p role="status"><strong>Check your inbox!</strong> We've sent a confirmation link to {pendingEmail}. You can enter the Goblin's den after verifying your address.</p>
+            <p>If it isn't there, check spam. Email delivery may take a few minutes.</p>
+            <Button type="button" disabled={busy} onClick={() => {
+              setBusy(true); setError(null);
+              void api.post('/auth/verify-email/resend', { email: pendingEmail })
+                .then(() => setResendMessage("If your address is awaiting confirmation, a fresh link is on its way."))
+                .catch((err) => setError(err instanceof ApiError ? err.message : 'Could not resend the email'))
+                .finally(() => setBusy(false));
+            }}>{busy ? 'Sending…' : 'Resend confirmation email'}</Button>
+            {resendMessage && <p role="status">{resendMessage}</p>}
+            {error && <p className={styles.error} role="alert">{error}</p>}
+            <button type="button" onClick={() => { setPendingEmail(null); setMode('login') }}>Already verified? Sign in</button>
+            <button type="button" onClick={() => { setPendingEmail(null); setMode('register') }}>Wrong address? Register with the correct email</button>
+          </div>
+        ) : <form className={styles.form} onSubmit={(e) => void onSubmit(e)}>
           {mode === 'register' ? (
             <Input
               label="What should the goblin call you?"
@@ -120,15 +139,15 @@ export function AuthPage() {
                 ? 'Enter the den'
                 : 'Create account'}
           </Button>
-        </form>
+        </form>}
 
-        {mode === 'login' ? (
+        {!pendingEmail && mode === 'login' ? (
           <p className={styles.switch}>
             <Link to="/forgot-password">Forgot your password?</Link>
           </p>
         ) : null}
 
-        <p className={styles.switch}>
+        {!pendingEmail && <p className={styles.switch}>
           {mode === 'login' ? (
             <>
               New here?{' '}
@@ -144,7 +163,7 @@ export function AuthPage() {
               </button>
             </>
           )}
-        </p>
+        </p>}
       </Card>
     </div>
   )
