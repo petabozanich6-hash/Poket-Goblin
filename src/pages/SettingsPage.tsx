@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router'
 
 import type {
   CapacityMode,
@@ -19,6 +20,8 @@ import {
 } from '@/features/account/AccountControls'
 import { useAuth } from '@/features/auth/useAuth'
 import { fetchAchievements } from '@/features/magical/magicalApi'
+import { InstallGuide } from '@/features/pwa/InstallGuide'
+import { GoblinSettings } from '@/features/voice/GoblinSettings'
 import { applyTheme } from '@/lib/theme'
 
 import styles from './Page.module.css'
@@ -32,6 +35,11 @@ export function SettingsPage() {
     queryKey: ['achievements'],
     queryFn: fetchAchievements,
   })
+  const location = useLocation()
+  useEffect(() => {
+    if (location.hash === '#goblin' && settings)
+      document.getElementById('goblin')?.scrollIntoView({ block: 'start' })
+  }, [location.hash, settings])
 
   if (!settings) {
     return (
@@ -110,6 +118,18 @@ export function SettingsPage() {
       <Card>
         <h2>Your data</h2>
         <YourData isOwner={Boolean(access?.isOwner)} />
+      </Card>
+
+      <section id="goblin" aria-labelledby="goblin-heading">
+        <Card>
+          <h2 id="goblin-heading">Get to Know Your Goblin</h2>
+          <GoblinSettings />
+        </Card>
+      </section>
+
+      <Card>
+        <h2>Put Pocket Goblin on your home screen</h2>
+        <InstallGuide />
       </Card>
 
       <Card>

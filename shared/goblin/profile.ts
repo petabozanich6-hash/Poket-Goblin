@@ -54,7 +54,10 @@ export const DEFAULT_PROFILE: GoblinProfile = {
   speechNoticeAt: null,
 }
 
-export const STYLE_LABELS: Record<GoblinStyle, { label: string; sample: string }> = {
+export const STYLE_LABELS: Record<
+  GoblinStyle,
+  { label: string; sample: string }
+> = {
   friendly: {
     label: 'Friendly',
     sample: 'Morning! One appointment and three things to tackle today.',
@@ -116,7 +119,12 @@ export function understandsLanguage(tag: string): boolean {
 
 function cleanName(value: unknown, max: number): string | null {
   if (typeof value !== 'string') return null
-  const v = value.replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim()
+  // Drop control characters and angle brackets; keep everything else.
+  const v = Array.from(value)
+    .filter((ch) => ch.charCodeAt(0) >= 32 && ch !== '<' && ch !== '>')
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim()
   if (!v || v.length > max) return null
   return v
 }
@@ -128,23 +136,34 @@ export function validateProfilePatch(
   const patch: Partial<GoblinProfile> = {}
   if ('name' in body) {
     const name = cleanName(body.name, LIMITS.name)
-    if (!name) return { ok: false, error: 'Give your Goblin a name (up to 40 characters).' }
+    if (!name)
+      return {
+        ok: false,
+        error: 'Give your Goblin a name (up to 40 characters).',
+      }
     patch.name = name
   }
   if ('aliases' in body) {
-    if (!Array.isArray(body.aliases)) return { ok: false, error: 'Nicknames must be a list.' }
+    if (!Array.isArray(body.aliases))
+      return { ok: false, error: 'Nicknames must be a list.' }
     const aliases: string[] = []
     for (const raw of body.aliases) {
       const alias = cleanName(raw, LIMITS.alias)
-      if (!alias) return { ok: false, error: 'Each nickname must be 1–40 characters.' }
-      if (!aliases.some((a) => a.toLowerCase() === alias.toLowerCase())) aliases.push(alias)
+      if (!alias)
+        return { ok: false, error: 'Each nickname must be 1–40 characters.' }
+      if (!aliases.some((a) => a.toLowerCase() === alias.toLowerCase()))
+        aliases.push(alias)
     }
     if (aliases.length > LIMITS.aliases)
       return { ok: false, error: `Up to ${LIMITS.aliases} nicknames.` }
     patch.aliases = aliases
   }
   if ('style' in body) {
-    if (!['friendly', 'professional', 'chaotic', 'quiet'].includes(body.style as string))
+    if (
+      !['friendly', 'professional', 'chaotic', 'quiet'].includes(
+        body.style as string,
+      )
+    )
       return { ok: false, error: 'Unknown style.' }
     patch.style = body.style as GoblinStyle
   }
@@ -159,7 +178,8 @@ export function validateProfilePatch(
     patch.replyLength = body.replyLength as GoblinReplyLength
   }
   if ('speakReplies' in body) {
-    if (typeof body.speakReplies !== 'boolean') return { ok: false, error: 'speakReplies must be true or false.' }
+    if (typeof body.speakReplies !== 'boolean')
+      return { ok: false, error: 'speakReplies must be true or false.' }
     patch.speakReplies = body.speakReplies
   }
   if ('voiceName' in body) {
@@ -169,16 +189,21 @@ export function validateProfilePatch(
   }
   if ('speechRate' in body) {
     const n = Number(body.speechRate)
-    if (!Number.isFinite(n) || n < 0.5 || n > 2) return { ok: false, error: 'Speech rate must be 0.5–2.' }
+    if (!Number.isFinite(n) || n < 0.5 || n > 2)
+      return { ok: false, error: 'Speech rate must be 0.5–2.' }
     patch.speechRate = Math.round(n * 100) / 100
   }
   if ('speechVolume' in body) {
     const n = Number(body.speechVolume)
-    if (!Number.isFinite(n) || n < 0 || n > 1) return { ok: false, error: 'Volume must be 0–1.' }
+    if (!Number.isFinite(n) || n < 0 || n > 1)
+      return { ok: false, error: 'Volume must be 0–1.' }
     patch.speechVolume = Math.round(n * 100) / 100
   }
   if ('language' in body) {
-    if (typeof body.language !== 'string' || !/^(?:[a-zA-Z]{2,3}(?:-[a-zA-Z0-9]{2,8}){0,2})?$/.test(body.language))
+    if (
+      typeof body.language !== 'string' ||
+      !/^(?:[a-zA-Z]{2,3}(?:-[a-zA-Z0-9]{2,8}){0,2})?$/.test(body.language)
+    )
       return { ok: false, error: 'Unknown language.' }
     patch.language = body.language
   }
@@ -188,20 +213,28 @@ export function validateProfilePatch(
     patch.listenMode = body.listenMode as ListenMode
   }
   if ('speechNoticeAccepted' in body) {
-    if (body.speechNoticeAccepted !== true && body.speechNoticeAccepted !== false)
+    if (
+      body.speechNoticeAccepted !== true &&
+      body.speechNoticeAccepted !== false
+    )
       return { ok: false, error: 'speechNoticeAccepted must be true or false.' }
-    patch.speechNoticeAt = body.speechNoticeAccepted ? new Date().toISOString() : null
+    patch.speechNoticeAt = body.speechNoticeAccepted
+      ? new Date().toISOString()
+      : null
   }
   return { ok: true, patch }
 }
 
 export function validateExpression(
   body: Record<string, unknown> | null,
-): { ok: true; phrase: string; meaning: string } | { ok: false; error: string } {
+):
+  { ok: true; phrase: string; meaning: string } | { ok: false; error: string } {
   const phrase = cleanName(body?.phrase, LIMITS.phrase)
   const meaning = cleanName(body?.meaning, LIMITS.meaning)
-  if (!phrase) return { ok: false, error: 'Say the phrase you use (up to 80 characters).' }
-  if (!meaning) return { ok: false, error: 'Say what it means (up to 240 characters).' }
+  if (!phrase)
+    return { ok: false, error: 'Say the phrase you use (up to 80 characters).' }
+  if (!meaning)
+    return { ok: false, error: 'Say what it means (up to 240 characters).' }
   if (phrase.replace(/[^a-z0-9]/gi, '').length < 2)
     return { ok: false, error: 'That phrase is too short to recognise.' }
   return { ok: true, phrase, meaning }

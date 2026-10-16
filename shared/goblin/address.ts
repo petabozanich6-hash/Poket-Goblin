@@ -124,7 +124,8 @@ export function normaliseAddress(
   for (let round = 0; round < 6; round += 1) {
     const before = text
     const greet = text.match(GREETING)
-    if (greet && greet[0].length < text.length) text = text.slice(greet[0].length)
+    if (greet && greet[0].length < text.length)
+      text = text.slice(greet[0].length)
 
     // Honorifics only count when they lead up to a name.
     const named = findName(text, known)

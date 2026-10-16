@@ -153,7 +153,11 @@ function itemLabel(entry: ShoppingEntry): string {
   return entry.quantity ? `${entry.quantity} ${entry.name}` : entry.name
 }
 
-export function dayLabel(iso: string, offset: number, withTime: boolean): string {
+export function dayLabel(
+  iso: string,
+  offset: number,
+  withTime: boolean,
+): string {
   const local = new Date(new Date(iso).getTime() - offset * 60_000)
   const day = local.toLocaleDateString('en', {
     weekday: 'short',
@@ -385,7 +389,9 @@ async function applyPlan(
           userId,
           item.id,
           'rescheduled',
-          item.after ? `Moved to ${item.after} by the Goblin` : 'Date cleared by the Goblin',
+          item.after
+            ? `Moved to ${item.after} by the Goblin`
+            : 'Date cleared by the Goblin',
         )
       }
       return 'batch'
@@ -451,7 +457,11 @@ export async function revertPlan(
         userId,
         {
           ...plan,
-          items: plan.items.map((i) => ({ ...i, before: i.after, after: i.before })),
+          items: plan.items.map((i) => ({
+            ...i,
+            before: i.after,
+            after: i.before,
+          })),
         },
         now,
       )

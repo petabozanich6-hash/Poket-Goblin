@@ -1,0 +1,70 @@
+{
+  "id": "/den",
+  "name": "Pocket Goblin",
+  "short_name": "Goblin",
+  "description": "Your brain has enough tabs open. Throw the chaos at the Goblin and let it sort it out.",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "/den?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#f7f4ef",
+  "theme_color": "#3d5c45",
+  "categories": ["productivity", "lifestyle", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Talk to Goblin",
+      "short_name": "Talk",
+      "description": "Open straight to the microphone",
+      "url": "/voice?listen=1&source=shortcut",
+      "icons": [
+        {
+          "src": "/icons/shortcut-mic.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Quick capture",
+      "short_name": "Capture",
+      "description": "Type a thought for the Goblin to sort",
+      "url": "/voice?type=1&source=shortcut",
+      "icons": [
+        {
+          "src": "/icons/shortcut-capture.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ]
+}

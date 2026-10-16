@@ -194,7 +194,11 @@ goblinRoutes.patch('/profile', async (c) => {
 
 goblinRoutes.delete('/profile', async (c) => {
   await resetPersonalisation(c.env.DB, c.get('user').id)
-  return c.json({ ok: true, profile: await loadProfile(c.env.DB, c.get('user').id), expressions: [] })
+  return c.json({
+    ok: true,
+    profile: await loadProfile(c.env.DB, c.get('user').id),
+    expressions: [],
+  })
 })
 
 goblinRoutes.post('/expressions', async (c) => {
@@ -227,6 +231,10 @@ goblinRoutes.patch('/expressions/:id', async (c) => {
 })
 
 goblinRoutes.delete('/expressions/:id', async (c) => {
-  const ok = await deleteExpression(c.env.DB, c.get('user').id, c.req.param('id'))
+  const ok = await deleteExpression(
+    c.env.DB,
+    c.get('user').id,
+    c.req.param('id'),
+  )
   return ok ? c.json({ ok }) : c.json({ error: 'Not found' }, 404)
 })

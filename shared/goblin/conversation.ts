@@ -78,17 +78,19 @@ export function parseDayRange(text: string, wallClock: Date): DayRange {
   if (/\b(this|the|on the)?\s*weekend\b/.test(lower)) {
     const daysToSat = (6 - weekday + 7) % 7
     const start =
-      weekday === 0 ? wallClock : addDays(wallClock, weekday === 6 ? 0 : daysToSat)
+      weekday === 0
+        ? wallClock
+        : addDays(wallClock, weekday === 6 ? 0 : daysToSat)
     const end = weekday === 0 ? addDays(wallClock, 1) : addDays(start, 2)
     return { from: iso(start), to: iso(end), label: 'this weekend' }
   }
   if (/\bnext week\b/.test(lower)) {
-    const toMonday = ((8 - weekday) % 7) || 7
+    const toMonday = (8 - weekday) % 7 || 7
     const start = addDays(wallClock, toMonday)
     return { from: iso(start), to: iso(addDays(start, 7)), label: 'next week' }
   }
   if (/\b(this|the rest of the) week\b/.test(lower)) {
-    const toMonday = ((8 - weekday) % 7) || 7
+    const toMonday = (8 - weekday) % 7 || 7
     return {
       from: iso(wallClock),
       to: iso(addDays(wallClock, toMonday)),
@@ -134,7 +136,7 @@ const FOCUS =
 const DEFER_WORD =
   '(?:move|push|postpone|defer|shift|bump|reschedule|put off|kick|punt|shove|park|carry over)'
 const POINTER =
-  "(them|those|these|those ones|these ones|it|that|that one|this one|the rest|everything else|all of them|all that|all those|the flexible ones|the ones that can wait|everything that can wait|the lot)"
+  '(them|those|these|those ones|these ones|it|that|that one|this one|the rest|everything else|all of them|all that|all those|the flexible ones|the ones that can wait|everything that can wait|the lot)'
 
 const DEFER_REFS = new RegExp(
   `^(?:(?:ok(?:ay)?|yes|yeah|right|fine|great|sure|go on|then|and|so)[,\\s]+)*(?:please\\s+|just\\s+|can you\\s+|could you\\s+)?${DEFER_WORD}\\s+${POINTER}(?:\\s+(?:off|back|over|along|on))?(?:\\s+(?:to|until|till|til|for|into)\\s+(.+?))?[.!?]*$`,
@@ -197,7 +199,8 @@ export function classifyConversation(
 
   if (CREATING.test(lower)) return null
 
-  const asks = ASK.test(lower) || /\?\s*$/.test(clause) || SUMMARY_NOUN.test(lower)
+  const asks =
+    ASK.test(lower) || /\?\s*$/.test(clause) || SUMMARY_NOUN.test(lower)
 
   if (
     /\b(?:am|are) (?:i|we) (?:free|busy|available|around)\b|\b(?:any|got any) free time\b|\bfree (?:on|this|tomorrow|today|at)\b/.test(
@@ -294,7 +297,9 @@ export function looksLikeShopping(item: string): boolean {
     .replace(/[^a-z\s]/g, ' ')
     .split(/\s+/)
     .filter(Boolean)
-  return words.some((w) => GROCERY_HINTS.has(w) || GROCERY_HINTS.has(w.replace(/s$/, '')))
+  return words.some(
+    (w) => GROCERY_HINTS.has(w) || GROCERY_HINTS.has(w.replace(/s$/, '')),
+  )
 }
 
 export type Expression = { phrase: string; meaning: string }
@@ -327,9 +332,14 @@ export function applyExpressions(
     .sort((a, b) => b.key.length - a.key.length)
   let changed = false
   for (const expression of sorted) {
-    const re = new RegExp(`(^|\\s)${expression.key.replace(/\s+/g, '\\s+')}(?=\\s|$)`)
+    const re = new RegExp(
+      `(^|\\s)${expression.key.replace(/\s+/g, '\\s+')}(?=\\s|$)`,
+    )
     if (re.test(flat)) {
-      flat = flat.replace(re, `$1${expression.meaning.trim().replace(/[.!?]+$/, '')}`)
+      flat = flat.replace(
+        re,
+        `$1${expression.meaning.trim().replace(/[.!?]+$/, '')}`,
+      )
       used.push(expression.phrase)
       changed = true
     }

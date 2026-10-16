@@ -23,7 +23,11 @@ import {
 } from '../../../shared/goblin/conversation'
 import { normaliseAddress } from '../../../shared/goblin/address'
 import { parseOperation, splitClauses } from '../../../shared/goblin/language'
-import { styleReply, type ReplyPart, type ReplyTopic } from '../../../shared/goblin/voiceStyle'
+import {
+  styleReply,
+  type ReplyPart,
+  type ReplyTopic,
+} from '../../../shared/goblin/voiceStyle'
 import { localDateTimeToIso } from '../datetime'
 import { newId } from '../ids'
 import { ensureDefaultShoppingList } from '../shopping'
@@ -76,7 +80,13 @@ type TaskRow = {
   priority: 'low' | 'normal' | 'high'
   linked: number
 }
-type EventRow = { id: string; title: string; startsAt: string; allDay: number; endsAt: string }
+type EventRow = {
+  id: string
+  title: string
+  startsAt: string
+  allDay: number
+  endsAt: string
+}
 
 // Words that suggest a real deadline or someone else depends on it.
 const FIXED_FEEL =
@@ -139,7 +149,11 @@ async function eventsIn(ctx: Ctx, range: DayRange): Promise<EventRow[]> {
   return (rows.results ?? []).filter((e) => inPart(e, range, ctx.offset))
 }
 
-async function openTasks(ctx: Ctx, where: string, ...args: unknown[]): Promise<TaskRow[]> {
+async function openTasks(
+  ctx: Ctx,
+  where: string,
+  ...args: unknown[]
+): Promise<TaskRow[]> {
   const rows = await ctx.db
     .prepare(
       `SELECT t.id, t.title, t.due_date as dueDate, t.priority,
@@ -155,7 +169,9 @@ async function openTasks(ctx: Ctx, where: string, ...args: unknown[]): Promise<T
 }
 
 function todayOf(ctx: Ctx): string {
-  return new Date(ctx.now.getTime() - ctx.offset * 60_000).toISOString().slice(0, 10)
+  return new Date(ctx.now.getTime() - ctx.offset * 60_000)
+    .toISOString()
+    .slice(0, 10)
 }
 
 function eventLine(e: EventRow, ctx: Ctx): string {
@@ -163,7 +179,8 @@ function eventLine(e: EventRow, ctx: Ctx): string {
 }
 
 function eventShort(e: EventRow, ctx: Ctx, multiDay: boolean): string {
-  if (multiDay) return `${e.title} (${dayLabel(e.startsAt, ctx.offset, !e.allDay)})`
+  if (multiDay)
+    return `${e.title} (${dayLabel(e.startsAt, ctx.offset, !e.allDay)})`
   if (e.allDay) return e.title
   const local = new Date(new Date(e.startsAt).getTime() - ctx.offset * 60_000)
   const time = local.toLocaleTimeString('en', {
@@ -187,9 +204,18 @@ function overlaps(events: EventRow[]): [EventRow, EventRow] | null {
 
 // --------------------------------------------------------------- context
 
-type ContextRow = { topic: string; refs: { id: string; title: string }[]; to: string | null }
+type ContextRow = {
+  topic: string
+  refs: { id: string; title: string }[]
+  to: string | null
+}
 
-async function setContext(ctx: Ctx, topic: string, refs: { id: string; title: string }[], to: string | null) {
+async function setContext(
+  ctx: Ctx,
+  topic: string,
+  refs: { id: string; title: string }[],
+  to: string | null,
+) {
   await ctx.db
     .prepare(
       `INSERT INTO goblin_context (user_id, topic, refs_json, expires_at) VALUES (?, ?, ?, ?)
@@ -214,7 +240,10 @@ async function getContext(ctx: Ctx): Promise<ContextRow | null> {
     .first<{ topic: string; refs: string }>()
   if (!row) return null
   try {
-    const parsed = JSON.parse(row.refs) as { refs?: { id: string; title: string }[]; to?: string | null }
+    const parsed = JSON.parse(row.refs) as {
+      refs?: { id: string; title: string }[]
+      to?: string | null
+    }
     return { topic: row.topic, refs: parsed.refs ?? [], to: parsed.to ?? null }
   } catch {
     return null
@@ -222,7 +251,10 @@ async function getContext(ctx: Ctx): Promise<ContextRow | null> {
 }
 
 async function clearContext(ctx: Ctx) {
-  await ctx.db.prepare(`DELETE FROM goblin_context WHERE user_id = ?`).bind(ctx.userId).run()
+  await ctx.db
+    .prepare(`DELETE FROM goblin_context WHERE user_id = ?`)
+    .bind(ctx.userId)
+    .run()
 }
 
 // -------------------------------------------------------------- handlers
@@ -239,13 +271,18 @@ async function overview(ctx: Ctx, range: DayRange, turn: Turn) {
   const [events, due, overdue] = await Promise.all([
     eventsIn(ctx, range),
     openTasks(ctx, 't.due_date >= ? AND t.due_date < ?', range.from, range.to),
-    range.from <= today ? openTasks(ctx, 't.due_date < ?', today) : Promise.resolve([]),
+    range.from <= today
+      ? openTasks(ctx, 't.due_date < ?', today)
+      : Promise.resolve([]),
   ])
   const label = range.label.charAt(0).toUpperCase() + range.label.slice(1)
   const lines = [
-    ...events.map((e) => `📅 ${eventLine(e, ctx)}`),
-    ...due.map((t) => `✅ ${t.title}${multiDay && t.dueDate ? ` (${shortDate(t.dueDate)})` : ''}${t.priority === 'high' ? ' — high priority' : ''}`),
-    ...overdue.map((t) => `⏰ ${t.title} — was due ${shortDate(t.dueDate!)}`),
+    ...events.map((e) => `${eventLine(e, ctx)}`),
+    ...due.map(
+      (t) =>
+        `${t.title}${multiDay && t.dueDate ? ` (${shortDate(t.dueDate)})` : ''}${t.priority === 'high' ? ' — high priority' : ''}`,
+    ),
+    ...overdue.map((t) => `${t.title} — was due ${shortDate(t.dueDate!)}`),
   ]
   if (events.length === 0 && due.length === 0 && overdue.length === 0) {
     turn.parts.push({
@@ -260,11 +297,27 @@ async function overview(ctx: Ctx, range: DayRange, turn: Turn) {
   if (due.length) counts.push(plural(due.length, 'task'))
   const what = counts.length ? counts.join(' and ') : 'nothing scheduled'
   const detail: string[] = []
-  if (events.length) detail.push(joinNames(events.map((e) => eventShort(e, ctx, multiDay)), 3))
-  if (due.length) detail.push(joinNames(due.map((t) => t.title), 3))
-  const overdueText = overdue.length ? ` ${plural(overdue.length, 'thing')} overdue too.` : ''
+  if (events.length)
+    detail.push(
+      joinNames(
+        events.map((e) => eventShort(e, ctx, multiDay)),
+        3,
+      ),
+    )
+  if (due.length)
+    detail.push(
+      joinNames(
+        due.map((t) => t.title),
+        3,
+      ),
+    )
+  const overdueText = overdue.length
+    ? ` ${plural(overdue.length, 'thing')} overdue too.`
+    : ''
   const clash = overlaps(events)
-  const clashText = clash ? ` Heads up: ${clash[0].title} and ${clash[1].title} overlap.` : ''
+  const clashText = clash
+    ? ` Heads up: ${clash[0].title} and ${clash[1].title} overlap.`
+    : ''
   turn.parts.push({
     tone: 'info',
     topic: 'overview',
@@ -292,14 +345,18 @@ async function availability(ctx: Ctx, range: DayRange, turn: Turn) {
   })
   turn.answers.push({
     title: range.label.charAt(0).toUpperCase() + range.label.slice(1),
-    lines: events.map((e) => `📅 ${eventLine(e, ctx)}`),
+    lines: events.map((e) => `${eventLine(e, ctx)}`),
   })
 }
 
 async function overdueTasks(ctx: Ctx, turn: Turn) {
   const tasks = await openTasks(ctx, 't.due_date < ?', todayOf(ctx))
   if (tasks.length === 0) {
-    turn.parts.push({ tone: 'info', topic: 'overview', text: 'Nothing overdue. Not a thing.' })
+    turn.parts.push({
+      tone: 'info',
+      topic: 'overview',
+      text: 'Nothing overdue. Not a thing.',
+    })
     return
   }
   turn.parts.push({
@@ -313,7 +370,7 @@ async function overdueTasks(ctx: Ctx, turn: Turn) {
   })
   turn.answers.push({
     title: 'Overdue',
-    lines: tasks.map((t) => `⏰ ${t.title} — was due ${shortDate(t.dueDate!)}`),
+    lines: tasks.map((t) => `${t.title} — was due ${shortDate(t.dueDate!)}`),
   })
 }
 
@@ -331,7 +388,11 @@ async function focus(ctx: Ctx, turn: Turn) {
     eventsIn(ctx, range),
     openTasks(ctx, 't.due_date = ?', today),
     openTasks(ctx, 't.due_date < ?', today),
-    openTasks(ctx, "t.priority = 'high' AND (t.due_date IS NULL OR t.due_date > ?)", today),
+    openTasks(
+      ctx,
+      "t.priority = 'high' AND (t.due_date IS NULL OR t.due_date > ?)",
+      today,
+    ),
   ])
   const essentials: string[] = [
     ...events.map((e) => eventShort(e, ctx, false)),
@@ -357,18 +418,34 @@ async function focus(ctx: Ctx, turn: Turn) {
     topic: 'none',
     text: `What actually matters: ${joinNames(top)}.${rest > 0 ? ' The rest can wait.' : ''}`,
   })
-  turn.answers.push({ title: 'What matters', lines: top.map((t) => `⭐ ${t}`) })
+  turn.answers.push({ title: 'What matters', lines: top.map((t) => `${t}`) })
 }
 
-async function flexible(ctx: Ctx, range: DayRange, propose: boolean, turn: Turn) {
+async function flexible(
+  ctx: Ctx,
+  range: DayRange,
+  propose: boolean,
+  turn: Turn,
+) {
   const today = todayOf(ctx)
   const [events, due] = await Promise.all([
     eventsIn(ctx, range),
-    openTasks(ctx, 't.due_date >= ? AND t.due_date < ?', range.from < today ? today : range.from, range.to),
+    openTasks(
+      ctx,
+      't.due_date >= ? AND t.due_date < ?',
+      range.from < today ? today : range.from,
+      range.to,
+    ),
   ])
   const movable = due.filter((t) => !isFixedTask(t))
   const kept = due.filter((t) => isFixedTask(t))
-  const to = nextDay(range.to > range.from ? new Date(new Date(`${range.to}T12:00:00Z`).getTime() - 86_400_000).toISOString().slice(0, 10) : range.from)
+  const to = nextDay(
+    range.to > range.from
+      ? new Date(new Date(`${range.to}T12:00:00Z`).getTime() - 86_400_000)
+          .toISOString()
+          .slice(0, 10)
+      : range.from,
+  )
   const keptNotes = [
     ...kept.map((t) => `${t.title} (${isFixedTask(t)})`),
     ...events.map((e) => `${eventShort(e, ctx, false)} (appointment)`),
@@ -376,8 +453,8 @@ async function flexible(ctx: Ctx, range: DayRange, propose: boolean, turn: Turn)
   turn.answers.push({
     title: `${range.label.charAt(0).toUpperCase() + range.label.slice(1)}: what can wait`,
     lines: [
-      ...movable.map((t) => `↪️ ${t.title} — can move`),
-      ...keptNotes.map((k) => `📌 ${k} — staying put`),
+      ...movable.map((t) => `${t.title} — can move`),
+      ...keptNotes.map((k) => `${k} — staying put`),
     ],
   })
   if (movable.length === 0) {
@@ -398,7 +475,9 @@ async function flexible(ctx: Ctx, range: DayRange, propose: boolean, turn: Turn)
     to,
   )
   const names = joinNames(movable.map((t) => t.title))
-  const keepText = keptNotes.length ? ` I’d keep ${joinNames(keptNotes, 3)}.` : ''
+  const keepText = keptNotes.length
+    ? ` I’d keep ${joinNames(keptNotes, 3)}.`
+    : ''
   if (!propose) {
     turn.parts.push({
       tone: 'info',
@@ -421,9 +500,17 @@ async function proposeMove(
     ctx,
     {
       kind: 'tasks_reschedule',
-      items: tasks.map((t) => ({ id: t.id, title: t.title, before: t.dueDate, after: to })),
+      items: tasks.map((t) => ({
+        id: t.id,
+        title: t.title,
+        before: t.dueDate,
+        after: to,
+      })),
     },
-    `move ${joinNames(tasks.map((t) => t.title), 6)} to ${shortDate(to)}.`,
+    `move ${joinNames(
+      tasks.map((t) => t.title),
+      6,
+    )} to ${shortDate(to)}.`,
     'propose',
   )
   turn.results.push(result)
@@ -431,7 +518,12 @@ async function proposeMove(
   await clearContext(ctx)
 }
 
-async function deferRefs(ctx: Ctx, toDate: string | null, single: boolean, turn: Turn) {
+async function deferRefs(
+  ctx: Ctx,
+  toDate: string | null,
+  single: boolean,
+  turn: Turn,
+) {
   const context = await getContext(ctx)
   if (!context || context.topic !== 'flexible' || context.refs.length === 0) {
     turn.parts.push({
@@ -443,10 +535,18 @@ async function deferRefs(ctx: Ctx, toDate: string | null, single: boolean, turn:
   }
   // Re-read the records: only still-open tasks that belong to this person.
   const ids = context.refs.map((r) => r.id)
-  const rows = await openTasks(ctx, `t.id IN (${ids.map(() => '?').join(', ')})`, ...ids)
+  const rows = await openTasks(
+    ctx,
+    `t.id IN (${ids.map(() => '?').join(', ')})`,
+    ...ids,
+  )
   if (rows.length === 0) {
     await clearContext(ctx)
-    turn.parts.push({ tone: 'info', topic: 'none', text: 'Those are already sorted — nothing left to move.' })
+    turn.parts.push({
+      tone: 'info',
+      topic: 'none',
+      text: 'Those are already sorted — nothing left to move.',
+    })
     return
   }
   const to = toDate ?? context.to ?? nextDay(todayOf(ctx))
@@ -472,14 +572,19 @@ async function deferRefs(ctx: Ctx, toDate: string | null, single: boolean, turn:
 
 type PendingRow = { id: string; groupId: string; message: string }
 
-async function latestProposal(ctx: Ctx): Promise<{ row: PendingRow; count: number } | null> {
+async function latestProposal(
+  ctx: Ctx,
+): Promise<{ row: PendingRow; count: number } | null> {
   const row = await ctx.db
     .prepare(
       `SELECT id, group_id as groupId, message FROM goblin_actions
        WHERE user_id = ? AND status = 'proposed' AND created_at >= ?
        ORDER BY created_at DESC LIMIT 1`,
     )
-    .bind(ctx.userId, new Date(ctx.now.getTime() - CONTEXT_MINUTES * 60_000).toISOString())
+    .bind(
+      ctx.userId,
+      new Date(ctx.now.getTime() - CONTEXT_MINUTES * 60_000).toISOString(),
+    )
     .first<PendingRow>()
   if (!row) return null
   const count = await ctx.db
@@ -494,7 +599,11 @@ async function latestProposal(ctx: Ctx): Promise<{ row: PendingRow; count: numbe
 async function affirm(ctx: Ctx, turn: Turn) {
   const pending = await latestProposal(ctx)
   if (!pending) {
-    turn.parts.push({ tone: 'info', topic: 'none', text: 'Nothing is waiting for a yes right now.' })
+    turn.parts.push({
+      tone: 'info',
+      topic: 'none',
+      text: 'Nothing is waiting for a yes right now.',
+    })
     return
   }
   if (pending.count > 1) {
@@ -510,7 +619,12 @@ async function affirm(ctx: Ctx, turn: Turn) {
     turn.parts.push({ tone: 'info', topic: 'none', text: res.error })
     return
   }
-  turn.results.push({ kind: 'done', actionId: res.actionId, message: res.message, undoable: true })
+  turn.results.push({
+    kind: 'done',
+    actionId: res.actionId,
+    message: res.message,
+    undoable: true,
+  })
   turn.parts.push({ tone: 'done', topic: 'task', text: res.message })
 }
 
@@ -521,7 +635,11 @@ async function deny(ctx: Ctx, turn: Turn) {
     return
   }
   await declineAction(ctx.db, ctx.userId, pending.row.id)
-  turn.parts.push({ tone: 'info', topic: 'none', text: 'Okay, left as it was.' })
+  turn.parts.push({
+    tone: 'info',
+    topic: 'none',
+    text: 'Okay, left as it was.',
+  })
 }
 
 async function undoLast(ctx: Ctx, turn: Turn) {
@@ -534,7 +652,11 @@ async function undoLast(ctx: Ctx, turn: Turn) {
     .bind(ctx.userId, new Date(ctx.now.getTime() - 15 * 60_000).toISOString())
     .first<{ groupId: string }>()
   if (!latest) {
-    turn.parts.push({ tone: 'info', topic: 'none', text: 'Nothing recent to undo.' })
+    turn.parts.push({
+      tone: 'info',
+      topic: 'none',
+      text: 'Nothing recent to undo.',
+    })
     return
   }
   const rows = await ctx.db
@@ -546,7 +668,7 @@ async function undoLast(ctx: Ctx, turn: Turn) {
   const undone: string[] = []
   for (const row of rows.results ?? []) {
     const res = await undoAction(ctx.db, ctx.userId, row.id)
-    if (res.ok) undone.push(row.message.replace(/[\s👹↩️]+$/u, ''))
+    if (res.ok) undone.push(row.message.replace(/(?:\s|👹|↩️|↩)+$/u, ''))
   }
   turn.parts.push({
     tone: 'done',
@@ -558,9 +680,20 @@ async function undoLast(ctx: Ctx, turn: Turn) {
   })
 }
 
-async function bare(ctx: Ctx, item: string, shoppingContext: boolean, turn: Turn): Promise<ActResponse | null> {
+async function bare(
+  ctx: Ctx,
+  item: string,
+  shoppingContext: boolean,
+  turn: Turn,
+): Promise<ActResponse | null> {
   if (looksLikeShopping(item) || shoppingContext) {
-    return actOnText(ctx.db, ctx.userId, `add ${item} to my shopping list`, ctx.offset, ctx.now)
+    return actOnText(
+      ctx.db,
+      ctx.userId,
+      `add ${item} to my shopping list`,
+      ctx.offset,
+      ctx.now,
+    )
   }
   const name = item.charAt(0).toUpperCase() + item.slice(1)
   const listId = await ensureDefaultShoppingList(ctx.db, ctx.userId)
@@ -598,7 +731,7 @@ function briefOf(message: string): string {
     .replace(/ added added\./, ' added.')
     .replace(/ crossed off your list!?/, ' crossed off.')
     .replace(/ to your tasks(?= for|\.)/, '')
-    .replace(/[\s👹👍🌿↩️]+$/u, '')
+    .replace(/(?:\s|👹|👍|🌿|↩️|↩)+$/u, '')
 }
 
 function partsFromResults(results: ActResult[]): ReplyPart[] {
@@ -613,7 +746,8 @@ function partsFromResults(results: ActResult[]): ReplyPart[] {
         ...(r.subject ? { items: [r.subject] } : {}),
       }
     }
-    if (r.kind === 'info') return { tone: 'info', topic: 'none', text: r.message }
+    if (r.kind === 'info')
+      return { tone: 'info', topic: 'none', text: r.message }
     return { tone: 'ask', topic: 'none', text: r.message }
   })
 }
@@ -633,7 +767,9 @@ export async function converse(
   const names = [profile.name, ...profile.aliases]
   const first = normaliseAddress(input.text, names)
   const taught = applyExpressions(first.text, expressions)
-  const heard = taught.used.length ? normaliseAddress(taught.text, names).text : first.text
+  const heard = taught.used.length
+    ? normaliseAddress(taught.text, names).text
+    : first.text
 
   const response: ConverseResponse = {
     results: [],
@@ -655,7 +791,9 @@ export async function converse(
   }
 
   const autonomy = await db
-    .prepare(`SELECT goblin_autonomy as autonomy FROM user_settings WHERE user_id = ?`)
+    .prepare(
+      `SELECT goblin_autonomy as autonomy FROM user_settings WHERE user_id = ?`,
+    )
     .bind(userId)
     .first<{ autonomy: 'auto' | 'ask' }>()
   const ctx: Ctx = {
@@ -675,9 +813,14 @@ export async function converse(
   const delegated: ActResponse[] = []
 
   for (const clause of splitClauses(heard)) {
-    const conversational: Conversational | null = classifyConversation(clause, ctx.wallClock)
+    const conversational: Conversational | null = classifyConversation(
+      clause,
+      ctx.wallClock,
+    )
     if (conversational) {
-      const contextual = ['affirm', 'deny', 'undo', 'defer_refs'].includes(conversational.kind)
+      const contextual = ['affirm', 'deny', 'undo', 'defer_refs'].includes(
+        conversational.kind,
+      )
       if (contextual && !input.live) {
         turn.parts.push({
           tone: 'info',
@@ -700,10 +843,20 @@ export async function converse(
           await focus(ctx, turn)
           break
         case 'flexible':
-          await flexible(ctx, conversational.range, conversational.propose, turn)
+          await flexible(
+            ctx,
+            conversational.range,
+            conversational.propose,
+            turn,
+          )
           break
         case 'defer_refs':
-          await deferRefs(ctx, conversational.toDate, conversational.single, turn)
+          await deferRefs(
+            ctx,
+            conversational.toDate,
+            conversational.single,
+            turn,
+          )
           break
         case 'undo':
           await undoLast(ctx, turn)
@@ -728,7 +881,9 @@ export async function converse(
   }
 
   if (leftovers.length) {
-    delegated.push(await actOnText(db, userId, leftovers.join('\n'), input.offset, now))
+    delegated.push(
+      await actOnText(db, userId, leftovers.join('\n'), input.offset, now),
+    )
   }
 
   // Results and replies in the order they were said is close enough: the
@@ -758,7 +913,9 @@ export async function converse(
     })
 
   if (input.live) {
-    const shopped = turn.results.some((r) => r.kind === 'done' && r.topic === 'shopping')
+    const shopped = turn.results.some(
+      (r) => r.kind === 'done' && r.topic === 'shopping',
+    )
     if (shopped) {
       shoppingContext = true
       await setContext(ctx, 'shopping', [], null)

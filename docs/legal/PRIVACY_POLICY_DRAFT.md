@@ -28,6 +28,21 @@ We do not sell personal information or use it for advertising.
   walk away. Its text is not stored. Only the items you approve are saved.
 - **Keep this document:** the file is stored privately until you delete it.
 
+## Talking to the Goblin (voice)
+
+- Pocket Goblin never records or stores audio.
+- When you use the microphone, **your browser’s** speech service turns speech
+  into text. In Chrome, Edge and Samsung Internet this usually happens on the
+  browser maker’s servers (e.g. Google); in Safari on Apple’s servers or on
+  your device, under their own terms. You’re told this before first use, and
+  you can always type instead.
+- The words are used to carry out your request and are not stored as a
+  transcript. We keep your Goblin preferences, any phrases you teach it, record
+  ids for a few minutes (so “move them” works), and a duplicate-protection
+  record of the reply for up to 2 days.
+- Spoken replies use your device’s built-in voices.
+- Thoughts typed while offline are stored on your device until they’re sent.
+
 ## AI processing
 
 ⚠️ State which AI provider is configured. Currently none: production uses

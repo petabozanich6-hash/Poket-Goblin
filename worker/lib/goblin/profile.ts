@@ -29,7 +29,9 @@ function parseAliases(json: string): string[] {
   try {
     const value = JSON.parse(json) as unknown
     return Array.isArray(value)
-      ? value.filter((v): v is string => typeof v === 'string').slice(0, LIMITS.aliases)
+      ? value
+          .filter((v): v is string => typeof v === 'string')
+          .slice(0, LIMITS.aliases)
       : []
   } catch {
     return []
@@ -134,12 +136,17 @@ export async function addExpression(
   userId: string,
   phrase: string,
   meaning: string,
-): Promise<{ ok: true; expression: GoblinExpression } | { ok: false; error: string }> {
+): Promise<
+  { ok: true; expression: GoblinExpression } | { ok: false; error: string }
+> {
   const existing = await listExpressions(db, userId)
   if (existing.length >= LIMITS.expressions)
     return { ok: false, error: `Up to ${LIMITS.expressions} expressions.` }
   if (existing.some((e) => e.phrase.toLowerCase() === phrase.toLowerCase()))
-    return { ok: false, error: 'You already taught me that phrase — edit it instead.' }
+    return {
+      ok: false,
+      error: 'You already taught me that phrase — edit it instead.',
+    }
   const id = newId('gexp')
   await db
     .prepare(

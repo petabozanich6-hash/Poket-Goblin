@@ -8,13 +8,7 @@
 import type { GoblinProfile } from './profile'
 
 export type ReplyTopic =
-  | 'shopping'
-  | 'task'
-  | 'reminder'
-  | 'event'
-  | 'overview'
-  | 'undo'
-  | 'none'
+  'shopping' | 'task' | 'reminder' | 'event' | 'overview' | 'undo' | 'none'
 
 export type ReplyPart = {
   /** done: something changed. info: an answer. ask: a question back. care: sensitive. */
@@ -32,7 +26,10 @@ const DAIRY = /\b(milk|cheese|butter|yog(?:h)?urt|cream)\b/i
 const CAFFEINE = /\b(coffee|tea|energy drink)\b/i
 const CHOCOLATE = /\b(chocolate|biscuits?|crisps|snacks?|cake)\b/i
 
-const QUIPS: Record<'shopping' | 'task' | 'reminder' | 'event' | 'overview' | 'undo', string[]> = {
+const QUIPS: Record<
+  'shopping' | 'task' | 'reminder' | 'event' | 'overview' | 'undo',
+  string[]
+> = {
   shopping: [
     'The list grows stronger.',
     'Your future self thanks you.',
@@ -71,7 +68,10 @@ function pick<T>(list: T[], seed: string): T {
 /** Remove emoji and decorative symbols so speech synthesis reads cleanly. */
 export function speakable(text: string): string {
   return text
-    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, '')
+    .replace(
+      /(?:[\u{1F300}-\u{1FAFF}]|[\u{2600}-\u{27BF}]|\u{FE0F}|\u{200D})/gu,
+      '',
+    )
     .replace(/[“”]/g, '"')
     .replace(/\s+([.,!?])/g, '$1')
     .replace(/\s{2,}/g, ' ')
@@ -118,7 +118,12 @@ export function styleReply(
   const sensitive = parts.some((p) => p.tone === 'care' || p.tone === 'ask')
   const lead = parts.find((p) => p.tone === 'done' || p.tone === 'info')
   let quip: string | null = null
-  if (!sensitive && lead && profile.humour !== 'none' && lead.topic !== 'none') {
+  if (
+    !sensitive &&
+    lead &&
+    profile.humour !== 'none' &&
+    lead.topic !== 'none'
+  ) {
     const wantsQuip =
       profile.humour === 'lots' ||
       profile.style === 'chaotic' ||
@@ -131,8 +136,12 @@ export function styleReply(
   }
 
   if (profile.style === 'chaotic') {
-    const opener = sensitive ? '' : pick(['RIGHT.', 'BEHOLD.', 'HUMAN.', 'SORTED.'], seed + text)
-    return [opener, text, quip ? quip.toUpperCase() : ''].filter(Boolean).join(' ')
+    const opener = sensitive
+      ? ''
+      : pick(['RIGHT.', 'BEHOLD.', 'HUMAN.', 'SORTED.'], seed + text)
+    return [opener, text, quip ? quip.toUpperCase() : '']
+      .filter(Boolean)
+      .join(' ')
   }
   return [text, quip].filter(Boolean).join(' ')
 }

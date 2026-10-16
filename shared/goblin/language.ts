@@ -164,24 +164,26 @@ function splitList(text: string): string[] {
 export function splitClauses(text: string): string[] {
   const starters =
     "(?:i\\b|i'|remind|add|also|still|please|can you|could you|don'?t|do not|move|reschedule|cancel|remove|book|call|pay|buy|get|pick up|grab|need|we\\b|my\\b|did|when|what)"
-  return text
-    .split(/(?:\n+|(?<=[.!?;])\s+)/)
-    .flatMap((sentence) =>
-      sentence.split(
-        new RegExp(
-          `\\s*(?:,\\s*(?:but|and|then)?|\\s+but|\\s+and(?:\\s+then)?|\\s+then)\\s+(?=${starters})`,
-          'i',
+  return (
+    text
+      .split(/(?:\n+|(?<=[.!?;])\s+)/)
+      .flatMap((sentence) =>
+        sentence.split(
+          new RegExp(
+            `\\s*(?:,\\s*(?:but|and|then)?|\\s+but|\\s+and(?:\\s+then)?|\\s+then)\\s+(?=${starters})`,
+            'i',
+          ),
         ),
-      ),
-    )
-    // "…, and the washing needs doing": a new subject with its own verb.
-    .flatMap((clause) =>
-      clause.split(
-        /\s*,\s*(?:and\s+|then\s+)?(?=(?:the|my|our)\s+[\w']+(?:\s+[\w']+)?\s+(?:needs?|is|are|has|have|wants?)\b)/i,
-      ),
-    )
-    .map((c) => c.trim())
-    .filter((c) => c.replace(/[^a-z0-9]/gi, '').length > 1)
+      )
+      // "…, and the washing needs doing": a new subject with its own verb.
+      .flatMap((clause) =>
+        clause.split(
+          /\s*,\s*(?:and\s+|then\s+)?(?=(?:the|my|our)\s+[\w']+(?:\s+[\w']+)?\s+(?:needs?|is|are|has|have|wants?)\b)/i,
+        ),
+      )
+      .map((c) => c.trim())
+      .filter((c) => c.replace(/[^a-z0-9]/gi, '').length > 1)
+  )
 }
 
 function cap(text: string): string {
@@ -465,7 +467,11 @@ export function parseOperation(rawClause: string, now: Date): Operation {
   const needsDoing = text.match(
     /^(?:the\s+|my\s+|our\s+|that\s+)?(.+?)\s+(?:needs|need|wants|is due)\s+(?:to\s+be\s+)?(doing|done|sorting|sorted|sorting out|fixing|fixed|cleaning|cleaned|washing|washed|paying|paid|booking|booked|renewing|renewed|emptying|emptied|mowing|mowed|ironing|ironed|hoovering|hoovered|vacuuming|tidying|tidied|changing|changed|replacing|replaced|putting away|taking out|doing again|a clean|a wash)(?:\s+(?:today|tomorrow|soon|asap|again))?$/i,
   )
-  if (needsDoing?.[1] && needsDoing[2] && needsDoing[1].split(/\s+/).length <= 6) {
+  if (
+    needsDoing?.[1] &&
+    needsDoing[2] &&
+    needsDoing[1].split(/\s+/).length <= 6
+  ) {
     const thing = needsDoing[1].trim()
     const verb = TASK_VERBS[needsDoing[2].toLowerCase()] ?? 'Do'
     const article = /^(?:the|my|our|that)\s/i.test(clause.trim()) ? 'the ' : ''

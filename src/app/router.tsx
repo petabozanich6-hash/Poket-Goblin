@@ -21,6 +21,7 @@ import { SearchPage } from '@/pages/SearchPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { TasksPage } from '@/pages/TasksPage'
 import { TellPage } from '@/pages/TellPage'
+import { VoicePage } from '@/pages/VoicePage'
 import { HqCustomerPage } from '@/pages/hq/HqCustomerPage'
 import { HqCustomersPage } from '@/pages/hq/HqCustomersPage'
 import { HqLayout } from '@/pages/hq/HqLayout'
@@ -72,6 +73,15 @@ export function AppRouter() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
+        {/* Straight to the microphone: no dashboard in the way. */}
+        <Route
+          path="/voice"
+          element={
+            <Protected>
+              <VoicePage />
+            </Protected>
+          }
+        />
         <Route
           element={
             <Protected>

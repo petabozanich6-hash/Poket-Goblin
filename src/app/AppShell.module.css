@@ -82,6 +82,8 @@
   margin: 0 auto;
   gap: var(--space-5);
   padding: var(--space-5);
+  /* Keep the floating microphone clear of the last content. */
+  padding-bottom: 6rem;
 }
 
 .nav {
@@ -156,8 +158,8 @@
   .body {
     grid-template-columns: 1fr;
     padding: var(--space-4);
-    /* Room for the bottom tab bar. */
-    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+    /* Room for the bottom tab bar and the floating microphone. */
+    padding-bottom: calc(10rem + env(safe-area-inset-bottom));
   }
 
   .nav {

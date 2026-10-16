@@ -15,6 +15,10 @@ import { NudgeTray } from '@/features/magical/NudgeTray'
 import { OverwhelmMode } from '@/features/magical/OverwhelmMode'
 import { OverwhelmProvider } from '@/features/magical/OverwhelmContext'
 import { PlatformBanner } from '@/features/platform/PlatformBanner'
+import { UpdatePrompt } from '@/features/pwa/UpdatePrompt'
+import { VoiceFab } from '@/features/voice/VoiceFab'
+import { VoiceProvider } from '@/features/voice/VoiceContext'
+import { readQueue } from '@/features/voice/offlineQueue'
 
 import styles from './AppShell.module.css'
 
@@ -90,61 +94,81 @@ export function AppShell() {
       : 'false'
   }, [settings?.reducedMotion])
 
+  async function signOut() {
+    const waiting = user ? readQueue(user.id).length : 0
+    if (
+      waiting > 0 &&
+      !window.confirm(
+        `${waiting} thought${waiting === 1 ? ' is' : 's are'} saved on this device and not sent yet. Log out anyway? They’ll stay on this device until you sign back in here.`,
+      )
+    )
+      return
+    await logout()
+  }
+
   return (
     <OverwhelmProvider>
-      <div className={styles.shell}>
-        <a href="#main" className={styles.skipLink}>
-          Skip to main content
-        </a>
-        <header className={styles.topbar}>
-          <NavLink to="/den" className={styles.brandLink}>
-            <div className={styles.brand}>
-              <div>
-                <p className={styles.brandName}>Pocket Goblin</p>
-                <p className={styles.brandTag}>
-                  Your brain has enough tabs open.
-                </p>
+      <VoiceProvider>
+        <div className={styles.shell}>
+          <a href="#main" className={styles.skipLink}>
+            Skip to main content
+          </a>
+          <header className={styles.topbar}>
+            <NavLink to="/den" className={styles.brandLink}>
+              <div className={styles.brand}>
+                <div>
+                  <p className={styles.brandName}>Pocket Goblin</p>
+                  <p className={styles.brandTag}>
+                    Your brain has enough tabs open.
+                  </p>
+                </div>
               </div>
+            </NavLink>
+            <div className={styles.topActions}>
+              <span className={styles.userChip}>{user?.displayName}</span>
+              <NudgeTray />
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => void signOut()}
+              >
+                <LogOut size={16} aria-hidden />
+                Log out
+              </Button>
             </div>
-          </NavLink>
-          <div className={styles.topActions}>
-            <span className={styles.userChip}>{user?.displayName}</span>
-            <NudgeTray />
-            <Button variant="secondary" size="sm" onClick={() => void logout()}>
-              <LogOut size={16} aria-hidden />
-              Log out
-            </Button>
-          </div>
-        </header>
+          </header>
 
-        <div className={styles.body}>
-          {/* Display only: Goblin HQ authorises every request on the server. */}
-          <nav className={styles.nav} aria-label="Main">
+          <div className={styles.body}>
+            {/* Display only: Goblin HQ authorises every request on the server. */}
+            <nav className={styles.nav} aria-label="Main">
+              <NavItems
+                links={
+                  access?.isOwner
+                    ? [...destinations, ownerDestination]
+                    : destinations
+                }
+              />
+            </nav>
+            <main className={styles.main} id="main" tabIndex={-1}>
+              <PlatformBanner />
+              <Outlet />
+            </main>
+          </div>
+          <nav className={styles.tabBar} aria-label="Main">
             <NavItems
               links={
                 access?.isOwner
                   ? [...destinations, ownerDestination]
                   : destinations
               }
+              compact
             />
           </nav>
-          <main className={styles.main} id="main" tabIndex={-1}>
-            <PlatformBanner />
-            <Outlet />
-          </main>
+          <OverwhelmMode />
+          <VoiceFab />
+          <UpdatePrompt />
         </div>
-        <nav className={styles.tabBar} aria-label="Main">
-          <NavItems
-            links={
-              access?.isOwner
-                ? [...destinations, ownerDestination]
-                : destinations
-            }
-            compact
-          />
-        </nav>
-        <OverwhelmMode />
-      </div>
+      </VoiceProvider>
     </OverwhelmProvider>
   )
 }

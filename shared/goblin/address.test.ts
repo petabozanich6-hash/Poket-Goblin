@@ -38,7 +38,10 @@ describe('how people address their Goblin', () => {
     ['Milk.', 'Milk.'],
     ['what’s on today, Goblin?', 'what’s on today?'],
     ['Oi Goblin, milk', 'milk'],
-    ['Hey Gobbo, chuck milk on the shopping list', 'chuck milk on the shopping list'],
+    [
+      'Hey Gobbo, chuck milk on the shopping list',
+      'chuck milk on the shopping list',
+    ],
   ])('%s → %s', (said, request) => {
     expect(normaliseAddress(said, names).text).toBe(request)
   })
@@ -47,14 +50,18 @@ describe('how people address their Goblin', () => {
     expect(normaliseAddress('Remind me to call Mum on Thursday').text).toBe(
       'Remind me to call Mum on Thursday',
     )
-    expect(normaliseAddress('Remind me to call Mum on Thursday').addressed).toBe(false)
+    expect(
+      normaliseAddress('Remind me to call Mum on Thursday').addressed,
+    ).toBe(false)
   })
 
   it('keeps words that only look like greetings', () => {
     expect(normaliseAddress('morning appointment moved to 10').text).toBe(
       'morning appointment moved to 10',
     )
-    expect(normaliseAddress('my dentist appointment').text).toBe('my dentist appointment')
+    expect(normaliseAddress('my dentist appointment').text).toBe(
+      'my dentist appointment',
+    )
   })
 
   it('treats a bare name as attention, not a request', () => {
@@ -67,14 +74,22 @@ describe('how people address their Goblin', () => {
 
   it('custom names work, and the built-in name always does', () => {
     expect(normaliseAddress('Gerald, buy bread', names).text).toBe('buy bread')
-    expect(normaliseAddress('Gerald, buy bread', []).text).toBe('Gerald, buy bread')
-    expect(normaliseAddress('Goblin, buy bread', ['Gerald']).text).toBe('buy bread')
+    expect(normaliseAddress('Gerald, buy bread', []).text).toBe(
+      'Gerald, buy bread',
+    )
+    expect(normaliseAddress('Goblin, buy bread', ['Gerald']).text).toBe(
+      'buy bread',
+    )
   })
 
   it('hands-free: only an utterance that leads with a name counts', () => {
     expect(startsWithAddress('Hey Gobbo, sort my life out', names)).toBe(true)
-    expect(startsWithAddress('Excuse me, Sir Reginald', ['Reginald'])).toBe(true)
-    expect(startsWithAddress('my goblin figurine is on the shelf', names)).toBe(false)
+    expect(startsWithAddress('Excuse me, Sir Reginald', ['Reginald'])).toBe(
+      true,
+    )
+    expect(startsWithAddress('my goblin figurine is on the shelf', names)).toBe(
+      false,
+    )
     expect(startsWithAddress('pass the salt', names)).toBe(false)
   })
 })
@@ -102,15 +117,24 @@ describe('the same schedule intent, however it is asked', () => {
   })
 
   it('understands other days', () => {
-    expect(classifyConversation('Yo Goblin, what’s the damage tomorrow?'.replace(/^.*?, /, ''), wallClock)).toMatchObject({
+    expect(
+      classifyConversation(
+        'Yo Goblin, what’s the damage tomorrow?'.replace(/^.*?, /, ''),
+        wallClock,
+      ),
+    ).toMatchObject({
       kind: 'overview',
       range: { from: '2026-10-16', to: '2026-10-17' },
     })
-    expect(classifyConversation('What’s on this weekend?', wallClock)).toMatchObject({
+    expect(
+      classifyConversation('What’s on this weekend?', wallClock),
+    ).toMatchObject({
       kind: 'overview',
       range: { from: '2026-10-17', to: '2026-10-19', label: 'this weekend' },
     })
-    expect(classifyConversation('Am I free Thursday afternoon?', wallClock)).toMatchObject({
+    expect(
+      classifyConversation('Am I free Thursday afternoon?', wallClock),
+    ).toMatchObject({
       kind: 'availability',
       range: { part: 'afternoon' },
     })
@@ -139,11 +163,18 @@ describe('conversational requests', () => {
   })
 
   it('"what can I move until tomorrow" is about today', () => {
-    expect(classifyConversation('What can I move until tomorrow?', wallClock)).toMatchObject({
+    expect(
+      classifyConversation('What can I move until tomorrow?', wallClock),
+    ).toMatchObject({
       range: { from: '2026-10-15' },
       propose: false,
     })
-    expect(classifyConversation('Can we make tomorrow’s problem tomorrow’s problem?', wallClock)).toMatchObject({
+    expect(
+      classifyConversation(
+        'Can we make tomorrow’s problem tomorrow’s problem?',
+        wallClock,
+      ),
+    ).toMatchObject({
       range: { from: '2026-10-15' },
       propose: true,
     })
@@ -183,10 +214,14 @@ describe('new everyday phrasings reach real operations', () => {
     expect(parseOperation('the washing needs doing', wallClock)).toMatchObject({
       title: 'Do the washing',
     })
-    expect(parseOperation('Add washing the car to my tasks', wallClock)).toMatchObject({
+    expect(
+      parseOperation('Add washing the car to my tasks', wallClock),
+    ).toMatchObject({
       title: 'Washing the car',
     })
-    expect(parseOperation('I forgot to call the dentist', wallClock)).toMatchObject({
+    expect(
+      parseOperation('I forgot to call the dentist', wallClock),
+    ).toMatchObject({
       title: 'Call the dentist',
     })
   })
@@ -215,7 +250,9 @@ describe('user-taught expressions', () => {
 
   it('only matches whole words', () => {
     expect(
-      applyExpressions('the usualness', [{ phrase: 'the usual', meaning: 'add milk' }]).used,
+      applyExpressions('the usualness', [
+        { phrase: 'the usual', meaning: 'add milk' },
+      ]).used,
     ).toEqual([])
   })
 })
@@ -240,27 +277,51 @@ describe('reply styles', () => {
     },
   ]
   it('puts facts first in every style', () => {
-    for (const style of ['friendly', 'professional', 'chaotic', 'quiet'] as const) {
-      const reply = styleReply(parts, { style, humour: 'lots', replyLength: 'short' })
+    for (const style of [
+      'friendly',
+      'professional',
+      'chaotic',
+      'quiet',
+    ] as const) {
+      const reply = styleReply(parts, {
+        style,
+        humour: 'lots',
+        replyLength: 'short',
+      })
       expect(reply.toLowerCase()).toContain('milk added')
     }
   })
   it('quiet and professional never joke', () => {
-    expect(styleReply(parts, { style: 'quiet', humour: 'lots', replyLength: 'short' })).toBe(
-      'Milk added.',
-    )
     expect(
-      styleReply(parts, { style: 'professional', humour: 'lots', replyLength: 'detailed' }),
+      styleReply(parts, {
+        style: 'quiet',
+        humour: 'lots',
+        replyLength: 'short',
+      }),
+    ).toBe('Milk added.')
+    expect(
+      styleReply(parts, {
+        style: 'professional',
+        humour: 'lots',
+        replyLength: 'detailed',
+      }),
     ).toBe('Milk added to your shopping list.')
   })
   it('the dairy line, when humour is on', () => {
-    expect(styleReply(parts, { style: 'friendly', humour: 'lots', replyLength: 'short' })).toBe(
-      'Milk added. Another dairy emergency narrowly avoided.',
-    )
+    expect(
+      styleReply(parts, {
+        style: 'friendly',
+        humour: 'lots',
+        replyLength: 'short',
+      }),
+    ).toBe('Milk added. Another dairy emergency narrowly avoided.')
   })
   it('no humour during something sensitive', () => {
     const reply = styleReply(
-      [...parts, { tone: 'care', topic: 'none', text: 'That’s a lot to carry.' }],
+      [
+        ...parts,
+        { tone: 'care', topic: 'none', text: 'That’s a lot to carry.' },
+      ],
       { style: 'chaotic', humour: 'lots', replyLength: 'short' },
     )
     expect(reply).not.toMatch(/dairy|BEHOLD|HUMAN|RIGHT\.|SORTED\./)

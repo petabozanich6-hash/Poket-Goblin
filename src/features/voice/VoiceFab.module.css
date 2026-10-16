@@ -1,0 +1,95 @@
+.fab {
+  position: fixed;
+  right: calc(var(--space-4) + env(safe-area-inset-right));
+  bottom: calc(var(--space-5) + env(safe-area-inset-bottom));
+  z-index: 30;
+  width: 3.75rem;
+  height: 3.75rem;
+  border-radius: 50%;
+  border: 0;
+  display: grid;
+  place-items: center;
+  background: var(--color-accent);
+  color: #fff;
+  box-shadow: var(--shadow-soft);
+  cursor: pointer;
+}
+
+.fab:hover {
+  background: var(--color-accent-strong);
+}
+
+.fab:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+.live,
+.live:hover {
+  background: var(--color-danger);
+}
+
+/* Sit above the bottom tab bar on phones. */
+@media (max-width: 800px) {
+  .fab {
+    bottom: calc(5.25rem + env(safe-area-inset-bottom));
+  }
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  align-items: end;
+  justify-items: center;
+  background: color-mix(in srgb, var(--color-ink) 35%, transparent);
+}
+
+.sheet {
+  width: min(36rem, 100%);
+  max-height: 88dvh;
+  overflow-y: auto;
+  padding: var(--space-4) var(--space-4)
+    calc(var(--space-5) + env(safe-area-inset-bottom));
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--color-bg);
+  box-shadow: var(--shadow-soft);
+}
+
+.sheet:focus {
+  outline: none;
+}
+
+@media (min-width: 801px) {
+  .backdrop {
+    align-items: center;
+  }
+
+  .sheet {
+    border-radius: var(--radius-lg);
+  }
+}
+
+.sheetHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-2);
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+}
+
+.close {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+}
+
+.close:hover {
+  background: var(--color-bg-muted);
+}

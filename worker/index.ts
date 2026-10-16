@@ -173,9 +173,9 @@ async function scheduled(
       await sweepExpiredChallenges(env)
       // Voice housekeeping: replay records and expired follow-up context.
       await env.DB.batch([
-        env.DB.prepare(
-          `DELETE FROM goblin_requests WHERE created_at < ?`,
-        ).bind(new Date(Date.now() - 2 * 86_400_000).toISOString()),
+        env.DB.prepare(`DELETE FROM goblin_requests WHERE created_at < ?`).bind(
+          new Date(Date.now() - 2 * 86_400_000).toISOString(),
+        ),
         env.DB.prepare(`DELETE FROM goblin_context WHERE expires_at < ?`).bind(
           new Date().toISOString(),
         ),
