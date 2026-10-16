@@ -1,3 +1,4 @@
+import { freeQuota } from '../lib/freeQuota'
 import { Hono } from 'hono'
 
 import type { BreakdownLevel } from '../../shared/intelligence'
@@ -117,6 +118,12 @@ intelligenceRoutes.post('/breakdown/accept', async (c) => {
   if (steps.length === 0) {
     return c.json({ error: 'steps are required' }, 400)
   }
+
+  const validStepCount = steps.filter((step) =>
+    step && typeof step === 'object' && asString((step as Record<string, unknown>).title, 200),
+  ).length
+  const quota = await freeQuota(c.env.DB, user.id, 'tasks', validStepCount + (existingParentId ? 0 : 1))
+  if (quota) return c.json(quota, 403)
 
   let parentId = existingParentId
   let resolvedTitle = parentTitle
