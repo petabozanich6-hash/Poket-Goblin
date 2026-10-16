@@ -14,6 +14,7 @@ import {
 export type PathwayPreview = PathwayResult & {
   estimates: Array<{ stepId: string; minutes: number; inferred: true }>
   deadlines: Array<{ stepId: string; deadline: string }>
+  stepOrders: Array<{ stepId: string; order: number }>
   unschedulable: DocumentSuggestion[]
 }
 
