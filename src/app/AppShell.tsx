@@ -19,6 +19,7 @@ import { UpdatePrompt } from '@/features/pwa/UpdatePrompt'
 import { VoiceFab } from '@/features/voice/VoiceFab'
 import { VoiceProvider } from '@/features/voice/VoiceContext'
 import { readQueue } from '@/features/voice/offlineQueue'
+import { SupportNotice } from '@/features/support/SupportNotice'
 
 import styles from './AppShell.module.css'
 
@@ -126,6 +127,7 @@ export function AppShell() {
             </NavLink>
             <div className={styles.topActions}>
               <span className={styles.userChip}>{user?.displayName}</span>
+              <NavLink to="/support" style={{ fontWeight: 700, fontSize: "0.85rem" }}>Help & feedback</NavLink>
               <NudgeTray />
               <Button
                 variant="secondary"
@@ -151,6 +153,7 @@ export function AppShell() {
             </nav>
             <main className={styles.main} id="main" tabIndex={-1}>
               <PlatformBanner />
+              <SupportNotice />
               <Outlet />
             </main>
           </div>

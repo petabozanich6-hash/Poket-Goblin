@@ -65,6 +65,8 @@ import {
   validateSetting,
 } from '../lib/platformSettings'
 import { checkRateLimit } from '../lib/rateLimit'
+import { usdAudQuote } from '../lib/finance'
+import { newId } from '../lib/ids'
 import {
   revokeAllSessions,
   type AuthUser,
@@ -445,6 +447,101 @@ adminRoutes.get('/overview', requirePermission('metrics.read'), async (c) => {
     storage,
     health,
   })
+})
+
+// Owner-only, passkey-gated exchange-rate reference. No financial account
+// details or user content are sent to the rate provider.
+adminRoutes.get('/finance/fx', requirePermission('metrics.read'), async (c) => {
+  const quote = await usdAudQuote()
+  return c.json({
+    quote,
+    conversionAvailable: Boolean(quote),
+    // D1 currently records AI request counts, not billable token/neuron usage.
+    costCollectionStatus: 'not_configured',
+    costExplanation: 'Provider charges cannot be inferred from request counts. No actual AI cost amount is available yet.',
+  })
+})
+
+// -------------------------------------------- private customer feedback
+adminRoutes.get('/support/unread-count', requirePermission('support.read'), async (c) => {
+  const row = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM support_threads WHERE unread_for_owner = 1')
+    .first<{ n: number }>()
+  return c.json({ unread: Number(row?.n ?? 0) })
+})
+
+adminRoutes.get('/support', requirePermission('support.read'), async (c) => {
+  const rows = await c.env.DB.prepare(
+    `SELECT t.id, t.category, t.subject, t.status, t.unread_for_owner AS unreadForOwner,
+            t.created_at AS createdAt, t.updated_at AS updatedAt,
+            u.email, u.display_name AS displayName
+     FROM support_threads t JOIN users u ON u.id = t.user_id
+     ORDER BY t.updated_at DESC LIMIT 100`,
+  ).all()
+  return c.json({ reports: rows.results ?? [] })
+})
+
+adminRoutes.get('/support/:id', requirePermission('support.read'), async (c) => {
+  const report = await c.env.DB.prepare(
+    `SELECT t.id, t.category, t.subject, t.message, t.status,
+            t.internal_note AS internalNote, t.unread_for_owner AS unreadForOwner,
+            t.created_at AS createdAt, t.updated_at AS updatedAt,
+            u.email, u.display_name AS displayName
+     FROM support_threads t JOIN users u ON u.id = t.user_id WHERE t.id = ?`,
+  ).bind(c.req.param('id')).first()
+  if (!report) return c.json({ error: 'Not found' }, 404)
+  const replies = await c.env.DB.prepare(
+    'SELECT id, author, body, created_at AS createdAt FROM support_replies WHERE thread_id = ? ORDER BY created_at ASC',
+  ).bind(c.req.param('id')).all()
+  // Reading a message clears the Owner's unread marker.
+  await c.env.DB.prepare('UPDATE support_threads SET unread_for_owner = 0 WHERE id = ?')
+    .bind(c.req.param('id')).run()
+  return c.json({ report, replies: replies.results ?? [] })
+})
+
+adminRoutes.post('/support/:id/reply', requirePermission('support.write'), async (c) => {
+  const body = await readJson(c)
+  const message = typeof body.message === 'string' ? body.message.trim() : ''
+  const status = body.status === undefined ? null : String(body.status)
+  if (message.length < 2 || message.length > 4000 ||
+      (status !== null && !['received','in_progress','resolved'].includes(status))) {
+    return c.json({ error: 'Invalid reply or status' }, 400)
+  }
+  const report = await c.env.DB.prepare('SELECT id FROM support_threads WHERE id = ?')
+    .bind(c.req.param('id')).first()
+  if (!report) return c.json({ error: 'Not found' }, 404)
+  await c.env.DB.batch([
+    c.env.DB.prepare('INSERT INTO support_replies (id, thread_id, author, body) VALUES (?, ?, ?, ?)')
+      .bind(newId('sr'), c.req.param('id'), 'owner', message),
+    c.env.DB.prepare(
+      `UPDATE support_threads SET unread_for_user = 1, unread_for_owner = 0,
+       status = COALESCE(?, status), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+       WHERE id = ?`,
+    ).bind(status, c.req.param('id')),
+  ])
+  await writeAudit(c.env.DB, {
+    ...actor(c), action: 'support.reply', targetType: 'support_thread',
+    targetId: c.req.param('id'), detail: { statusChanged: status !== null },
+  })
+  return c.json({ ok: true })
+})
+
+adminRoutes.post('/support/:id/manage', requirePermission('support.write'), async (c) => {
+  const body = await readJson(c)
+  const status = String(body.status ?? '')
+  const note = typeof body.internalNote === 'string' ? body.internalNote.trim() : ''
+  if (!['received','in_progress','resolved'].includes(status) || note.length > 1000) {
+    return c.json({ error: 'Invalid status or internal note' }, 400)
+  }
+  const result = await c.env.DB.prepare(
+    `UPDATE support_threads SET status = ?, internal_note = ?,
+       updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?`,
+  ).bind(status, note, c.req.param('id')).run()
+  if (!result.meta.changes) return c.json({ error: 'Not found' }, 404)
+  await writeAudit(c.env.DB, {
+    ...actor(c), action: 'support.manage', targetType: 'support_thread',
+    targetId: c.req.param('id'), detail: { status },
+  })
+  return c.json({ ok: true })
 })
 
 // -------------------------------------------------------------- customers

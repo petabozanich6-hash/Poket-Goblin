@@ -23,11 +23,14 @@ import { SubscriptionPage } from '@/pages/SubscriptionPage'
 import { TasksPage } from '@/pages/TasksPage'
 import { TellPage } from '@/pages/TellPage'
 import { VoicePage } from '@/pages/VoicePage'
+import { HqCostsPage } from '@/pages/hq/HqCostsPage'
+import { HqFeedbackPage } from '@/pages/hq/HqFeedbackPage'
+import { SupportPage } from '@/pages/SupportPage'
 import { HqCustomerPage } from '@/pages/hq/HqCustomerPage'
 import { HqCustomersPage } from '@/pages/hq/HqCustomersPage'
 import { HqLayout } from '@/pages/hq/HqLayout'
 import { HqOverviewPage } from '@/pages/hq/HqOverviewPage'
-import { HqSecurityPage } from '@/pages/hq/HqSecurityPage'
+import { HqSecurityPage, HqAuditPage } from '@/pages/hq/HqSecurityPage'
 import { HqSettingsPage } from '@/pages/hq/HqSettingsPage'
 
 import { AppShell } from './AppShell'
@@ -92,6 +95,7 @@ export function AppRouter() {
         >
           {/* The four destinations. */}
           <Route path="/den" element={<HomePage />} />
+          <Route path="/support" element={<SupportPage />} />
           <Route path="/tell" element={<TellPage />} />
           <Route path="/life" element={<MyLifeLayout />}>
             <Route index element={<MyLifeOverview />} />
@@ -143,8 +147,11 @@ export function AppRouter() {
             <Route index element={<HqOverviewPage />} />
             <Route path="customers" element={<HqCustomersPage />} />
             <Route path="customers/:id" element={<HqCustomerPage />} />
+            <Route path="costs" element={<HqCostsPage />} />
+            <Route path="feedback" element={<HqFeedbackPage />} />
             <Route path="settings" element={<HqSettingsPage />} />
             <Route path="security" element={<HqSecurityPage />} />
+            <Route path="audit" element={<HqAuditPage />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
