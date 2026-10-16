@@ -178,12 +178,11 @@ export function recommendPathway(
   return {
     sessions,
     warnings,
-    unscheduledMinutes: warnings
-      .filter(
-        (warning) =>
-          warning.reason === 'insufficient_capacity' ||
-          warning.reason === 'invalid_deadline',
-      )
-      .reduce((total, warning) => total + warning.remainingMinutes, 0),
+    unscheduledMinutes: remaining.reduce((total, step) => {
+      const scheduled = sessions
+        .filter((session) => session.stepId === step.id)
+        .reduce((minutes, session) => minutes + session.minutes, 0)
+      return total + Math.max(0, Math.ceil(step.minutes) - scheduled)
+    }, 0),
   }
 }
