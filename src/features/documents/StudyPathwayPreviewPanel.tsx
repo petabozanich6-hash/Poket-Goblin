@@ -170,6 +170,7 @@ export function StudyPathwayPreviewPanel({
               .map((session) => (
                 <li key={session.id}>
                   <form
+                    key={`${session.date}:${session.minutes}`}
                     onSubmit={(event) => {
                       event.preventDefault()
                       const fields = new FormData(event.currentTarget)
