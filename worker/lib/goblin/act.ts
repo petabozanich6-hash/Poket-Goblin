@@ -24,7 +24,7 @@ import {
 } from '../../../shared/goblin/match'
 import { addHoursIso, localDateTimeToIso } from '../datetime'
 import { recordTaskHistory } from '../history'
-import { freeQuota } from '../freeQuota'
+import { freePlanLimitFromError, freeQuota } from '../freeQuota'
 import { newId } from '../ids'
 import { ensureDefaultShoppingList } from '../shopping'
 
@@ -1298,7 +1298,27 @@ export async function undoAction(db: D1Database, userId: string, id: string) {
     .run()
   if (!claimed.meta.changes)
     return { ok: false as const, error: 'Nothing to undo.' }
-  await revertPlan(db, userId, JSON.parse(row.plan) as Plan, row.targetId, now)
+  try {
+    await revertPlan(
+      db,
+      userId,
+      JSON.parse(row.plan) as Plan,
+      row.targetId,
+      now,
+    )
+  } catch (error) {
+    // Reopening something can hit a Free limit: put the action back so it
+    // still says what really happened, and say why.
+    await db
+      .prepare(
+        `UPDATE goblin_actions SET status = 'done', updated_at = ? WHERE id = ? AND user_id = ? AND status = 'undone'`,
+      )
+      .bind(new Date().toISOString(), id, userId)
+      .run()
+    const limit = freePlanLimitFromError(error)
+    if (limit) return { ok: false as const, error: limit.error }
+    throw error
+  }
   return { ok: true as const, message: 'Undone. ↩️' }
 }
 
@@ -1321,12 +1341,21 @@ export async function confirmAction(
     .run()
   if (!claimed.meta.changes)
     return { ok: false as const, error: 'That’s already been handled.' }
-  const targetId = await applyPlan(
-    db,
-    userId,
-    JSON.parse(row.plan) as Plan,
-    now,
-  )
+  let targetId: string
+  try {
+    targetId = await applyPlan(db, userId, JSON.parse(row.plan) as Plan, now)
+  } catch (error) {
+    // Nothing changed: leave it waiting for a yes, and say why.
+    await db
+      .prepare(
+        `UPDATE goblin_actions SET status = 'proposed', updated_at = ? WHERE id = ? AND user_id = ? AND status = 'done'`,
+      )
+      .bind(new Date().toISOString(), id, userId)
+      .run()
+    const limit = freePlanLimitFromError(error)
+    if (limit) return { ok: false as const, error: limit.error }
+    throw error
+  }
   await db
     .prepare(
       `UPDATE goblin_actions SET target_id = ? WHERE id = ? AND user_id = ?`,

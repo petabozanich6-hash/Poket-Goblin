@@ -20,6 +20,25 @@ const resources: Record<
   },
 }
 
+/**
+ * If `error` is the database's Free-plan trigger firing, the friendly reply
+ * for it; otherwise null. The triggers are the final, race-proof guard.
+ */
+export function freePlanLimitFromError(error: unknown) {
+  const match = String(error instanceof Error ? error.message : error).match(
+    /FREE_PLAN_LIMIT:(tasks|notes|reminders)/,
+  )
+  if (!match?.[1]) return null
+  const resource = match[1] as FreeResource
+  const rule = resources[resource]
+  return {
+    error: `Free includes ${rule.limit} ${rule.label}. Upgrade to Premium to add more.`,
+    code: 'FREE_PLAN_LIMIT' as const,
+    resource,
+    limit: rule.limit,
+  }
+}
+
 /** Free-plan write gate. Use on every creation or reopening path. */
 export async function freeQuota(
   db: D1Database,

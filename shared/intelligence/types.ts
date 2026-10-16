@@ -52,6 +52,8 @@ export type BreakdownResult = {
   level: BreakdownLevel
   steps: GoblinSuggestion[]
   warnings: string[]
+  /** True only when a model was actually called (counts toward the AI allowance). */
+  aiCalled?: boolean
 }
 
 export type AssistantAction = {
@@ -77,6 +79,8 @@ export type AssistantReply = {
   actions: AssistantAction[]
   groundedFacts: string[]
   warnings: string[]
+  /** True only when a model was actually called (counts toward the AI allowance). */
+  aiCalled?: boolean
 }
 
 export type PlanningAdvice = {

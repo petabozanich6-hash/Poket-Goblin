@@ -54,6 +54,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ) {
       window.dispatchEvent(new CustomEvent('pg:session-expired'))
     }
+    if (data.code === 'FREE_PLAN_LIMIT' && typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('pg:plan-limit', {
+          detail: { message: data.error ?? 'That’s the Free plan limit.' },
+        }),
+      )
+    }
     throw new ApiError(
       response.status,
       data.error ||

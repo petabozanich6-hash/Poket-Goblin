@@ -225,3 +225,122 @@ describe('friendly atomic quota errors and safe downgrade', () => {
     ).toThrow(/FREE_PLAN_LIMIT:notes/)
   })
 })
+
+describe('Free limits on indirect paths', () => {
+  const seedTasks = (n: number, status = 'open') => {
+    for (let i = 0; i < n; i++)
+      h.run(
+        'INSERT INTO tasks (id, user_id, title, status) VALUES (?, ?, ?, ?)',
+        `seed_${status}_${i}`,
+        user.id,
+        `Seed ${i}`,
+        status,
+      )
+  }
+
+  it('Goblin undo that would exceed the cap fails cleanly and keeps the record true', async () => {
+    seedTasks(9)
+    h.run(
+      "INSERT INTO tasks (id, user_id, title) VALUES ('t_milk', ?, 'Buy milk')",
+      user.id,
+    )
+    const said = (await (
+      await h.request('/api/goblin/act', {
+        cookie: user.cookie,
+        body: { text: 'I bought milk', timezoneOffsetMinutes: 0 },
+      })
+    ).json()) as { results: { kind: string; actionId: string }[] }
+    const done = said.results.find((r) => r.kind === 'done')!
+    // Fill the freed slot, then try to reopen "Buy milk" by undoing.
+    expect(
+      (await create('/api/tasks', { title: 'Something new' })).status,
+    ).toBe(201)
+    const undo = await h.request(`/api/goblin/actions/${done.actionId}/undo`, {
+      cookie: user.cookie,
+      body: {},
+    })
+    expect(undo.status).toBe(409)
+    expect(((await undo.json()) as { error: string }).error).toMatch(
+      /Free includes 10 active tasks/,
+    )
+    expect(h.query("SELECT status FROM tasks WHERE id = 't_milk'")).toEqual([
+      { status: 'completed' },
+    ])
+    expect(
+      h.query('SELECT status FROM goblin_actions WHERE id = ?', done.actionId),
+    ).toEqual([{ status: 'done' }])
+  })
+
+  it('accepting a brain-dump suggestion respects the cap', async () => {
+    seedTasks(10)
+    const created = (await (
+      await create('/api/captures', { text: 'Call the plumber tomorrow' })
+    ).json()) as {
+      capture: { id: string; items: { id: string; kind: string }[] }
+    }
+    const item = created.capture.items.find((i) => i.kind === 'task')
+    expect(item).toBeDefined()
+    if (!item) return
+    const res = await h.request(
+      `/api/captures/${created.capture.id}/items/${item.id}/accept`,
+      { cookie: user.cookie, body: {} },
+    )
+    expect(res.status).toBe(403)
+    expect(
+      h.query("SELECT COUNT(*) AS n FROM tasks WHERE status = 'open'"),
+    ).toEqual([{ n: 10 }])
+  })
+
+  it('snoozed or dismissed reminders coming back count toward the cap', () => {
+    for (let i = 0; i < 3; i++)
+      h.run(
+        "INSERT INTO reminders (id, user_id, title, remind_at) VALUES (?, ?, 'R', '2030-01-01T00:00:00.000Z')",
+        `r_${i}`,
+        user.id,
+      )
+    h.run(
+      "INSERT INTO reminders (id, user_id, title, remind_at, status) VALUES ('r_done', ?, 'Old', '2030-01-01T00:00:00.000Z', 'dismissed')",
+      user.id,
+    )
+    expect(() =>
+      h.run("UPDATE reminders SET status = 'pending' WHERE id = 'r_done'"),
+    ).toThrow(/FREE_PLAN_LIMIT:reminders/)
+  })
+
+  it('Premium is not capped', async () => {
+    h.run(
+      "INSERT INTO user_entitlements (id, user_id, entitlement, source, status) VALUES ('p', ?, 'premium', 'stripe', 'active')",
+      user.id,
+    )
+    seedTasks(10)
+    expect((await create('/api/tasks', { title: 'Eleventh' })).status).toBe(201)
+    for (let i = 0; i < 6; i++)
+      expect((await create('/api/notes', { title: `N${i}` })).status).toBe(201)
+  })
+})
+
+describe('reminder times', () => {
+  it('rejects times that could never fire, and stores UTC', async () => {
+    expect(
+      (await create('/api/reminders', { title: 'Call', remindAt: 'tomorrow' }))
+        .status,
+    ).toBe(400)
+    expect(
+      (
+        await create('/api/reminders', {
+          title: 'Call',
+          remindAt: '2030-01-01T09:00:00+10:00',
+          repeatFrequency: 'weekly',
+        })
+      ).status,
+    ).toBe(400)
+    const ok = await create('/api/reminders', {
+      title: 'Call',
+      remindAt: '2030-01-01T09:00:00+10:00',
+    })
+    expect(ok.status).toBe(201)
+    expect(h.query('SELECT remind_at AS at FROM reminders')).toEqual([
+      { at: '2029-12-31T23:00:00.000Z' },
+    ])
+  })
+})

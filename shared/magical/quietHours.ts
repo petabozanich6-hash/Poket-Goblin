@@ -29,6 +29,17 @@ export function isInQuietHours(
   return nowMinutes >= start || nowMinutes < end
 }
 
-export function localMinutes(now = new Date()): number {
-  return now.getHours() * 60 + now.getMinutes()
+/**
+ * Minutes since the person's local midnight. Pass the browser's
+ * getTimezoneOffset(): the Worker runs in UTC, so its own clock is wrong
+ * for everyone outside UTC (an Australian 9pm is 11am on the server).
+ */
+export function localMinutes(
+  now = new Date(),
+  timezoneOffsetMinutes?: number,
+): number {
+  if (timezoneOffsetMinutes === undefined)
+    return now.getHours() * 60 + now.getMinutes()
+  const local = new Date(now.getTime() - timezoneOffsetMinutes * 60_000)
+  return local.getUTCHours() * 60 + local.getUTCMinutes()
 }

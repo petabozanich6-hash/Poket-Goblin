@@ -4,6 +4,7 @@ import { Hono } from 'hono'
 import type { BreakdownLevel } from '../../shared/intelligence'
 import { isCaptureKind } from '../../shared/intelligence'
 import type { Env } from '../env'
+import { checkRateLimit } from '../lib/rateLimit'
 import { answerAssistant } from '../lib/intelligence/assistant'
 import {
   breakdownIntelligence,
@@ -87,15 +88,18 @@ intelligenceRoutes.post('/breakdown', async (c) => {
     return c.json({ error: 'Invalid breakdown level' }, 400)
   }
 
+  // Rules-only today: no model call, so it doesn't spend the daily AI
+  // allowance (a plain rate limit stops abuse instead).
+  const burst = checkRateLimit(`breakdown:${user.id}`, 30, 60_000)
+  if (!burst.ok)
+    return c.json(
+      { error: 'Slow down a moment — the goblin is catching up.' },
+      429,
+    )
   const policy = await loadAiPolicy(c.env.DB, c.env, user.id)
-  const gate = await assertUnderLimit(c.env.DB, policy, user.id)
-  if (!gate.ok) {
-    await recordAiEvent(c.env.DB, user.id, 'breakdown', '', 'limit_reached')
-    return c.json({ error: gate.error }, 429)
-  }
 
   const result = await breakdownIntelligence(policy.env, title, level)
-  await recordUsage(c.env.DB, user.id, result.provider)
+  if (result.aiCalled) await recordUsage(c.env.DB, user.id, result.provider)
   await recordAiEvent(
     c.env.DB,
     user.id,
@@ -218,15 +222,18 @@ intelligenceRoutes.post('/assist', async (c) => {
     })
   }
 
+  // Rules-only today: no model call, so it doesn't spend the daily AI
+  // allowance (a plain rate limit stops abuse instead).
+  const burst = checkRateLimit(`assist:${user.id}`, 30, 60_000)
+  if (!burst.ok)
+    return c.json(
+      { error: 'Slow down a moment — the goblin is catching up.' },
+      429,
+    )
   const policy = await loadAiPolicy(c.env.DB, c.env, user.id)
-  const gate = await assertUnderLimit(c.env.DB, policy, user.id)
-  if (!gate.ok) {
-    await recordAiEvent(c.env.DB, user.id, 'assist', '', 'limit_reached')
-    return c.json({ error: gate.error }, 429)
-  }
 
   const reply = await answerAssistant(policy.env, c.env.DB, user.id, question)
-  await recordUsage(c.env.DB, user.id, reply.provider)
+  if (reply.aiCalled) await recordUsage(c.env.DB, user.id, reply.provider)
   await recordAiEvent(
     c.env.DB,
     user.id,

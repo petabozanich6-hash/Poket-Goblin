@@ -14,6 +14,7 @@ import { useAuth } from '@/features/auth/useAuth'
 import { NudgeTray } from '@/features/magical/NudgeTray'
 import { OverwhelmMode } from '@/features/magical/OverwhelmMode'
 import { OverwhelmProvider } from '@/features/magical/OverwhelmContext'
+import { PlanLimitNotice } from '@/features/plan/PlanLimitNotice'
 import { PlatformBanner } from '@/features/platform/PlatformBanner'
 import { UpdatePrompt } from '@/features/pwa/UpdatePrompt'
 import { VoiceFab } from '@/features/voice/VoiceFab'
@@ -158,6 +159,7 @@ export function AppShell() {
             </nav>
             <main className={styles.main} id="main" tabIndex={-1}>
               <PlatformBanner />
+              <PlanLimitNotice />
               <SupportNotice />
               <Outlet />
             </main>

@@ -82,9 +82,29 @@ reminderRoutes.post('/', async (c) => {
     unknown
   > | null
   const title = asString(body?.title, 200)
-  const remindAt = asString(body?.remindAt, 40)
-  if (!title || !remindAt) {
+  const rawRemindAt = asString(body?.remindAt, 40)
+  if (!title || !rawRemindAt) {
     return c.json({ error: 'Title and remindAt are required' }, 400)
+  }
+  // Stored as a UTC ISO time, so "is it due?" comparisons always work. A
+  // value like "tomorrow" would otherwise be saved and silently never fire.
+  const when = new Date(rawRemindAt)
+  if (
+    Number.isNaN(when.getTime()) ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(rawRemindAt)
+  ) {
+    return c.json({ error: 'Choose a date and time for the reminder.' }, 400)
+  }
+  const remindAt = when.toISOString()
+  // Repeating reminders aren't delivered yet; don't store a promise we can't keep.
+  if (body?.repeatFrequency !== undefined && body.repeatFrequency !== 'none') {
+    return c.json(
+      {
+        error:
+          'Repeating reminders aren’t available yet — add a repeating task instead.',
+      },
+      400,
+    )
   }
 
   const entityType =
@@ -111,15 +131,7 @@ reminderRoutes.post('/', async (c) => {
       (id, user_id, title, remind_at, entity_type, entity_id, repeat_frequency)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
   )
-    .bind(
-      id,
-      user.id,
-      title,
-      remindAt,
-      entityType,
-      entityId,
-      typeof body?.repeatFrequency === 'string' ? body.repeatFrequency : 'none',
-    )
+    .bind(id, user.id, title, remindAt, entityType, entityId, 'none')
     .run()
 
   const row = await c.env.DB.prepare(`${SELECT} WHERE id = ? AND user_id = ?`)

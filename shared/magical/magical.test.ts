@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { buildDailyBriefing } from './briefing'
-import { isInQuietHours, parseHm } from './quietHours'
+import { isInQuietHours, localMinutes, parseHm } from './quietHours'
 import { rankTasks, scoreTaskWithReasons } from './prioritize'
 import { buildRescuePlan } from './rescue'
 import { nextTinierStep, suggestTinyFirstSteps } from './tinyStep'
@@ -163,6 +163,18 @@ describe('tiny step', () => {
   it('can go tinier', () => {
     expect(nextTinierStep('Open the document').toLowerCase()).toMatch(
       /find|icon|bookmark/,
+    )
+  })
+})
+
+describe('quiet hours use the person’s clock, not the server’s', () => {
+  it('9pm in Sydney (UTC+11) is quiet even though the server says 10am', () => {
+    const now = new Date('2026-10-16T10:00:00.000Z')
+    const sydney = localMinutes(now, -660)
+    expect(sydney).toBe(21 * 60)
+    expect(isInQuietHours(sydney, '21:00', '08:00', true)).toBe(true)
+    expect(isInQuietHours(localMinutes(now, 0), '21:00', '08:00', true)).toBe(
+      false,
     )
   })
 })
