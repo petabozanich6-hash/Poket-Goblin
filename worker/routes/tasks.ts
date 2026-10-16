@@ -1,3 +1,4 @@
+import { freeQuota } from '../lib/freeQuota'
 import { Hono } from 'hono'
 
 import { generateOccurrences } from '../../shared/recurrence'
@@ -83,6 +84,9 @@ taskRoutes.post('/', async (c) => {
     recurrenceRaw && RECURRENCE.includes(recurrenceRaw as RecurrenceFrequency)
       ? (recurrenceRaw as RecurrenceFrequency)
       : null
+
+  const quota = await freeQuota(c.env.DB, user.id, 'tasks', recurrenceFrequency ? 4 : 1)
+  if (quota) return c.json(quota, 403)
 
   if (recurrenceFrequency) {
     const startsOn = dueDate ?? new Date().toISOString().slice(0, 10)
