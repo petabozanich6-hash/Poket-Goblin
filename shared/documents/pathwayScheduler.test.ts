@@ -86,4 +86,13 @@ describe('recommendPathway', () => {
     expect(result.warnings[0]?.reason).toBe('invalid_deadline')
   })
 
+  it('does not create study time from non-finite availability values', () => {
+    const result = recommendPathway([step({ minutes: 60 })], [
+      { date: '2026-11-01', availableMinutes: Number.NaN },
+      { date: '2026-11-02', availableMinutes: 60, committedMinutes: Number.NaN },
+    ])
+    expect(result.sessions).toHaveLength(0)
+    expect(result.unscheduledMinutes).toBe(60)
+  })
+
 })
