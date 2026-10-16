@@ -1,15 +1,15 @@
 name: Format Goblin HQ feature branch
 
 on:
-  pull_request:
-    branches: [main]
+  push:
+    branches: [feature/goblin-hq-parity-aud]
 
 permissions:
   contents: write
 
 jobs:
   format:
-    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feature/goblin-hq-parity-aud'
+    if: github.ref == 'refs/heads/feature/goblin-hq-parity-aud'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
