@@ -289,3 +289,10 @@ export function approveStudyPathway(
     { availability, expectedSessions },
   )
 }
+
+/** Undo tasks created by an approved document pathway. */
+export function undoStudyPathway(documentId: string) {
+  return api.post<{ undone: number; alreadyUndone: boolean }>(
+    `/documents/${encodeURIComponent(documentId)}/pathway-undo`,
+  )
+}
