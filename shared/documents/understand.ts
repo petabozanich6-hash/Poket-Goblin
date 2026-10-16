@@ -63,6 +63,8 @@ export type DocumentSuggestion = {
   group?: string
   /** "2/5": which step of the plan. */
   step?: string
+  /** Suggested study sessions are reviewed as one plan before being applied. */
+  requiresReview?: boolean
   /** 'ai' when a model suggested it: never added without the person's OK. */
   origin?: 'ai' | 'rules'
 }
@@ -216,6 +218,9 @@ export type UnderstandOptions = {
   reference?: Date
   /** Locale writes month first (e.g. en-US), for numeric dates. */
   monthFirst?: boolean
+  dailyLoad?: Record<string, number>
+  capacityMode?: 'goblin' | 'steady' | 'quest'
+  planningApproach?: 'minimal' | 'balanced' | 'ambitious'
 }
 
 export function understandDocument(
@@ -569,6 +574,9 @@ export function withDeadlinePlan<
     reference: options.reference ?? new Date(),
     monthFirst: options.monthFirst,
     categorySlug: understanding.categorySlug,
+    dailyLoad: options.dailyLoad,
+    capacityMode: options.capacityMode,
+    planningApproach: options.planningApproach,
   })
   if (!plan) return understanding
   // Nothing dated, but worth saying what it contains (e.g. an outline).
@@ -584,7 +592,14 @@ export function withDeadlinePlan<
   const simple = ['bill', 'appointment', 'medical'].includes(
     understanding.documentType,
   )
-  if (plan.deadlines.length >= 2 || (plan.deadlines.length === 1 && !simple)) {
+  const hasStudySessions = plan.suggestions.some(
+    (s) => s.requiresReview && s.group?.startsWith('Week '),
+  )
+  if (
+    hasStudySessions ||
+    plan.deadlines.length >= 2 ||
+    (plan.deadlines.length === 1 && !simple)
+  ) {
     // When the AI read it too, its plain-language description leads, and
     // any dated item it spotted that the plan doesn't have joins "check
     // these" (AI items are never added automatically).
