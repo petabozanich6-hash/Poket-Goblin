@@ -1,11 +1,13 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router'
 
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input, TextArea } from '@/components/ui/Input'
 import { PhoneCalendarCard } from '@/features/calendar/PhoneCalendarCard'
 import { createEvent, deleteEvent, fetchEvents } from '@/features/life/lifeApi'
+import { fetchTasks } from '@/features/tasks/tasksApi'
 
 import styles from './Page.module.css'
 
@@ -43,6 +45,10 @@ export function CalendarPage() {
     queryKey: ['events', range.from, range.to],
     queryFn: () => fetchEvents(range.from, range.to),
   })
+  const tasksQuery = useQuery({
+    queryKey: ['tasks', 'calendar'],
+    queryFn: () => fetchTasks('open'),
+  })
 
   const createMutation = useMutation({
     mutationFn: createEvent,
@@ -76,6 +82,7 @@ export function CalendarPage() {
   }
 
   const events = eventsQuery.data?.events ?? []
+  const datedTasks = (tasksQuery.data?.tasks ?? []).filter((task) => task.dueDate)
   const monthLabel = cursor.toLocaleString(undefined, {
     month: 'long',
     year: 'numeric',
@@ -152,12 +159,18 @@ export function CalendarPage() {
               const dayEvents = events.filter(
                 (event) => toLocalDateInput(new Date(event.startsAt)) === key,
               )
+              const dayTasks = datedTasks.filter((task) => task.dueDate === key)
               return (
                 <div key={key} className={styles.monthCell}>
                   <strong>{day.getDate()}</strong>
                   {dayEvents.slice(0, 2).map((event) => (
                     <p key={event.id} className={styles.monthEvent}>
                       {event.title}
+                    </p>
+                  ))}
+                  {dayTasks.slice(0, 2).map((task) => (
+                    <p key={task.id} className={styles.monthEvent}>
+                      <Link to="/life/tasks">☑ {task.title}</Link>
                     </p>
                   ))}
                 </div>
@@ -168,28 +181,42 @@ export function CalendarPage() {
 
         {(view === 'agenda' || view === 'week') && (
           <ul className={styles.stack}>
-            {events.length === 0 ? (
-              <p className={styles.sub}>No upcoming appointments yet.</p>
+            {events.length === 0 && datedTasks.length === 0 ? (
+              <li className={styles.sub}>No upcoming appointments or dated tasks yet.</li>
             ) : (
-              events.map((event) => (
-                <li key={event.id} className={styles.listRow}>
-                  <div>
-                    <strong>{event.title}</strong>
-                    <p className={styles.sub}>
-                      {new Date(event.startsAt).toLocaleString()}
-                      {event.location ? ` · ${event.location}` : ''}
-                      {event.allDay ? ' · all day' : ''}
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => deleteMutation.mutate(event.id)}
-                  >
-                    Remove
-                  </Button>
-                </li>
-              ))
+              <>
+                {events.map((event) => (
+                  <li key={event.id} className={styles.listRow}>
+                    <div>
+                      <strong>{event.title}</strong>
+                      <p className={styles.sub}>
+                        {new Date(event.startsAt).toLocaleString()}
+                        {event.location ? ` · ${event.location}` : ''}
+                        {event.allDay ? ' · all day' : ''}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => deleteMutation.mutate(event.id)}
+                    >
+                      Remove
+                    </Button>
+                  </li>
+                ))}
+                {[...datedTasks]
+                  .sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? ''))
+                  .map((task) => (
+                    <li key={task.id} className={styles.listRow}>
+                      <div>
+                        <strong>☑ {task.title}</strong>
+                        <p className={styles.sub}>
+                          Planned for {task.dueDate} · <Link to="/life/tasks">View tasks</Link>
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+              </>
             )}
           </ul>
         )}
