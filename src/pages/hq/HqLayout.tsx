@@ -25,7 +25,8 @@ const tabs = [
   { to: '/hq/feedback', label: 'Feedback inbox' },
   { to: '/hq/costs', label: 'AI & Costs (AUD)' },
   { to: '/hq/settings', label: 'Platform settings' },
-  { to: '/hq/security', label: 'Security & audit' },
+  { to: '/hq/audit', label: 'Audit log' },
+  { to: '/hq/security', label: 'Security' },
 ]
 
 function describeError(error: unknown) {
