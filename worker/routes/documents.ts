@@ -440,6 +440,14 @@ documentRoutes.post('/:id/pathway-approve', async (c) => {
       409,
     )
   }
+  const existingPathway = await c.env.DB.prepare(
+    'SELECT status FROM study_pathways WHERE user_id = ? AND document_id = ?',
+  ).bind(user.id, documentId).first<{ status: string }>()
+  if (existingPathway?.status === 'cancelled') {
+    return c.json({
+      error: 'This pathway was previously undone. Create a new version before approving again.',
+    }, 409)
+  }
   const saved = await persistApprovedPathway(
     c.env.DB,
     user.id,
