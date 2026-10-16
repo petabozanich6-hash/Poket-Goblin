@@ -801,3 +801,106 @@ adminRoutes.get('/audit', requirePermission('audit.read'), async (c) => {
     page,
   })
 })
+
+
+ // -------------------------------------------------- Goblin Deals & Mischief
+// Campaign management is deliberately separate from checkout redemption.
+// All writes inherit owner, CSRF, rate-limit and passkey step-up protections.
+const dealCode = /^[A-Z0-9][A-Z0-9_-]{2,31}$/
+const dateString = (v: unknown) =>
+  typeof v === 'string' && /^\\d{4}-\\d{2}-\\d{2}T/.test(v) && !Number.isNaN(Date.parse(v))
+    ? new Date(v).toISOString() : null
+
+adminRoutes.get('/deals', requirePermission('subscriptions.read'), async (c) => {
+  const rows = await c.env.DB.prepare(
+    `SELECT p.*, 
+       COUNT(r.id) AS redemptions,
+       COALESCE(SUM(CASE WHEN r.status IN ('reserved','confirmed') THEN r.commitment_cents ELSE 0 END),0) AS committed_cents,
+       COALESCE(SUM(r.discounts_realised_cents),0) AS realised_cents,
+       COALESCE(SUM(r.revenue_paid_cents),0) AS revenue_cents
+     FROM promotion_campaigns p LEFT JOIN promotion_redemptions r ON r.campaign_id=p.id
+     GROUP BY p.id ORDER BY p.created_at DESC`,
+  ).all()
+  return c.json({campaigns: rows.results ?? [],currency:'AUD',checkoutIntegrated:false})
+})
+
+adminRoutes.post('/deals', requirePermission('settings.write'), async (c) => {
+  const body=await readJson(c)
+  const code=typeof body.code==='string' ? body.code.trim().toUpperCase() : ''
+  const name=typeof body.name==='string' ? body.name.trim() : ''
+  const kind=body.kind
+  const amount=body.amount
+  const cycles=body.billingCycles
+  const audience=body.audience
+  const verification=body.verification
+  const max=body.maxRedemptions == null || body.maxRedemptions === '' ? null : body.maxRedemptions
+  const budget=body.budgetCents == null || body.budgetCents === '' ? null : body.budgetCents
+  const start=body.startAt == null || body.startAt === '' ? null : dateString(body.startAt)
+  const end=body.expiresAt == null || body.expiresAt === '' ? null : dateString(body.expiresAt)
+  if (!dealCode.test(code) || name.length<3 || name.length>100 ||
+      !['percent','fixed'].includes(String(kind)) || !Number.isInteger(amount) ||
+      Number(amount)<=0 || (kind==='percent' && Number(amount)>100) ||
+      !Number.isInteger(cycles) || Number(cycles)<1 || Number(cycles)>36 ||
+      !['new','existing','all'].includes(String(audience)) ||
+      !['none','manual'].includes(String(verification)) ||
+      (max!==null && (!Number.isInteger(max)||Number(max)<1)) ||
+      (budget!==null && (!Number.isInteger(budget)||Number(budget)<1)) ||
+      (body.startAt && !start) || (body.expiresAt && !end) ||
+      (start && end && start>=end)) return c.json({error:'Invalid campaign details'},400)
+  const id=newId('promo')
+  try {
+    await c.env.DB.prepare(
+      `INSERT INTO promotion_campaigns
+      (id,code,name,kind,amount,billing_cycles,audience,verification,verification_note,
+       max_redemptions,budget_cents,start_at,expires_at,active)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,0)`,
+    ).bind(id,code,name,kind,amount,cycles,audience,verification,
+      verification==='manual' ? 'Requires manual verification' : '',
+      max,budget,start,end).run()
+  } catch {return c.json({error:'Campaign code already exists or database is unavailable'},409)}
+  await writeAudit(c.env.DB,{...actor(c),action:'deals.create',targetType:'promotion',targetId:id,detail:{code}})
+  return c.json({id,code,active:false},201)
+})
+
+adminRoutes.patch('/deals/:id', requirePermission('settings.write'), async (c) => {
+  const id=c.req.param('id')
+  const body=await readJson(c)
+  const row=await c.env.DB.prepare('SELECT * FROM promotion_campaigns WHERE id=?').bind(id).first<Record<string,unknown>>()
+  if (!row) return c.json({error:'Campaign not found'},404)
+  const count=await c.env.DB.prepare('SELECT COUNT(*) AS n FROM promotion_redemptions WHERE campaign_id=?').bind(id).first<{n:number}>()
+  // Never change financial terms after a campaign has issued redemptions.
+  const locked=Number(count?.n ?? 0)>0
+  const fields:Record<string,unknown>={}
+  if ('active' in body) {
+    if(typeof body.active!=='boolean') return c.json({error:'Invalid active flag'},400)
+    // Checkout is not integrated: refuse enabling until redemption is safe.
+    if(body.active===true) return c.json({error:'Campaign activation is locked until Stripe checkout integration and redemption safeguards are completed.'},409)
+    fields.active=0
+  }
+  if ('name' in body) {
+    if(typeof body.name!=='string'||body.name.trim().length<3||body.name.length>100) return c.json({error:'Invalid name'},400)
+    fields.name=body.name.trim()
+  }
+  if ('maxRedemptions' in body) {
+    if (body.maxRedemptions!==null && (!Number.isInteger(body.maxRedemptions)||Number(body.maxRedemptions)<1)) return c.json({error:'Invalid redemption limit'},400)
+    if(locked) return c.json({error:'Campaign with redemptions cannot change terms'},409)
+    fields.max_redemptions=body.maxRedemptions
+  }
+  if ('budgetCents' in body) {
+    if (body.budgetCents!==null && (!Number.isInteger(body.budgetCents)||Number(body.budgetCents)<1)) return c.json({error:'Invalid budget'},400)
+    if(locked) return c.json({error:'Campaign with redemptions cannot change terms'},409)
+    fields.budget_cents=body.budgetCents
+  }
+  if ('expiresAt' in body) {
+    const end=body.expiresAt===null?null:dateString(body.expiresAt)
+    if(body.expiresAt!==null&&!end) return c.json({error:'Invalid expiry date'},400)
+    fields.expires_at=end
+  }
+  if(Object.keys(fields).length===0) return c.json({error:'Nothing to update'},400)
+  const entries=Object.entries(fields)
+  await c.env.DB.prepare(
+    `UPDATE promotion_campaigns SET ${entries.map(([k])=>k+'=?').join(',')},updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?`,
+  ).bind(...entries.map(([,v])=>v),id).run()
+  await writeAudit(c.env.DB,{...actor(c),action:'deals.update',targetType:'promotion',targetId:id,detail:{fields:Object.keys(fields)}})
+  return c.json({ok:true})
+})
