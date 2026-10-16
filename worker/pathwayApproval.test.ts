@@ -114,10 +114,10 @@ describe('approved pathway transactions and Undo', () => {
       .bind('unrelated-task', alice.id, 'Unrelated chore', 'normal', 1)
       .run()
 
-    const response = await h.request(
-      '/api/documents/mixed-doc/pathway-undo',
-      { method: 'POST', cookie: alice.cookie },
-    )
+    const response = await h.request('/api/documents/mixed-doc/pathway-undo', {
+      method: 'POST',
+      cookie: alice.cookie,
+    })
     expect(response.status).toBe(200)
     expect(
       h.query(
@@ -129,5 +129,4 @@ describe('approved pathway transactions and Undo', () => {
       { title: 'Unrelated chore' },
     ])
   })
-
 })
