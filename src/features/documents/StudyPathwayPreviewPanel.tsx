@@ -82,7 +82,10 @@ export function StudyPathwayPreviewPanel({
         Planning window{' '}
         <select
           value={horizonDays}
-          onChange={(event) => setHorizonDays(Number(event.target.value))}
+          onChange={(event) => {
+            setHorizonDays(Number(event.target.value))
+            setPreview(null)
+          }}
         >
           <option value={21}>3 weeks</option>
           <option value={42}>6 weeks</option>
@@ -97,14 +100,20 @@ export function StudyPathwayPreviewPanel({
           max={600}
           step={15}
           value={minutes}
-          onChange={(event) => setMinutes(Number(event.target.value))}
+          onChange={(event) => {
+            setMinutes(Number(event.target.value))
+            setPreview(null)
+          }}
         />
       </label>
       <label>
         <input
           type="checkbox"
           checked={includeWeekends}
-          onChange={(event) => setIncludeWeekends(event.target.checked)}
+          onChange={(event) => {
+            setIncludeWeekends(event.target.checked)
+            setPreview(null)
+          }}
         />{' '}
         Include weekends
       </label>
