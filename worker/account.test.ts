@@ -236,6 +236,19 @@ describe('data export', () => {
     expect(text).not.toMatch(/password_hash|pbkdf2\$|token_hash/)
   })
 
+  it('exports support threads while omitting internal notes', async () => {
+    h.run(
+      `INSERT INTO support_threads (id, user_id, category, subject, message, internal_note)
+       VALUES ('thread_a', ?, 'feedback', 'Topic', 'Customer message', 'INTERNAL_ONLY')`,
+      alice.id,
+    )
+    const response = await h.request('/api/account/export', { cookie: alice.cookie })
+    expect(response.status).toBe(200)
+    const exported = await response.text()
+    expect(exported).toContain('Customer message')
+    expect(exported).not.toContain('INTERNAL_ONLY')
+  })
+
   it('exports only the caller’s own data', async () => {
     const bob = await h.register('bob@example.com')
     await h.request('/api/tasks', {
