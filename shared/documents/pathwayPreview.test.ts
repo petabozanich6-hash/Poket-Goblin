@@ -57,4 +57,17 @@ describe('previewDocumentPathway', () => {
     )
     expect(result.unscheduledMinutes).toBe(90)
   })
+  it('respects numbered phase order even when extraction returns suggestions out of order', () => {
+    const result = previewDocumentPathway(
+      'doc',
+      [suggestion('Draft essay', '2/2'), suggestion('Read brief', '1/2')],
+      [
+        { date: '2026-11-01', availableMinutes: 60 },
+        { date: '2026-11-02', availableMinutes: 120 },
+      ],
+    )
+    expect(result.sessions[0]?.title).toBe('Read brief')
+    expect(result.sessions.at(-1)?.title).toBe('Draft essay')
+  })
+
 })
