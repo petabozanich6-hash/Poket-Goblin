@@ -201,10 +201,10 @@ export function SubscriptionPage() {
                     <span className={pageStyles.sub}> / {chosen.interval}</span>
                   </p>
                   <p className={pageStyles.sub}>
-                    Base price shown in {chosen.currency.toUpperCase()}.
-                    Stripe automatically shows your supported local currency
-                    and confirms the exact recurring amount before you pay.
-                    No conversion is calculated by Pocket Goblin.
+                    Base price shown in {chosen.currency.toUpperCase()}. Stripe
+                    automatically shows your supported local currency and
+                    confirms the exact recurring amount before you pay. No
+                    conversion is calculated by Pocket Goblin.
                   </p>
                 </>
               ) : (
