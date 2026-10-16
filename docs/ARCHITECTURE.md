@@ -54,6 +54,13 @@ Preferences extend `user_settings` (migration `0005_sprint5_magical.sql`).
 
 Nudges are **in-app only**. No push/email delivery is claimed until configured and opted in.
 
+## Voice & installable app
+
+Installable PWA (manifest, service worker caching the app shell only), a
+floating microphone and `/voice`, and `POST /api/goblin/converse`, which layers
+personalised, conversational understanding over the action engine. See
+`docs/VOICE_AND_PWA.md`.
+
 ## Intelligence (Sprint 3)
 
 See `docs/INTELLIGENCE.md`.

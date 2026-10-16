@@ -54,6 +54,8 @@ export const EXPORTED_TABLES: Record<string, { omit?: string[] }> = {
   ai_request_limits: {},
   ai_events: {},
   goblin_actions: {},
+  goblin_profiles: {},
+  goblin_expressions: {},
   search_history: {},
   achievements: {},
 }
@@ -69,6 +71,9 @@ export const NOT_EXPORTED = new Set([
   'calendar_feeds',
   'user_roles',
   'processing_jobs',
+  // Short-lived machinery: record ids for follow-ups, replay protection.
+  'goblin_context',
+  'goblin_requests',
 ])
 
 accountRoutes.post('/password', async (c) => {

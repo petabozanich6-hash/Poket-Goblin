@@ -54,6 +54,15 @@ export type Plan =
       allDay: boolean
     }
   | { kind: 'event_update'; id: string; before: EventState; after: EventState }
+  | {
+      kind: 'tasks_reschedule'
+      items: {
+        id: string
+        title: string
+        before: string | null
+        after: string | null
+      }[]
+    }
 
 type ShoppingState = {
   checked: number
@@ -70,8 +79,22 @@ type EventState = {
 }
 
 export type ActResult =
-  | { kind: 'done'; actionId: string; message: string; undoable: boolean }
-  | { kind: 'confirm'; actionId: string; message: string }
+  | {
+      kind: 'done'
+      actionId: string
+      message: string
+      undoable: boolean
+      /** What kind of record changed, and its name (for replies). */
+      topic?: string
+      subject?: string
+    }
+  | {
+      kind: 'confirm'
+      actionId: string
+      message: string
+      topic?: string
+      subject?: string
+    }
   | {
       kind: 'clarify'
       message: string
@@ -87,7 +110,7 @@ export type ActResponse = {
   overwhelm: boolean
 }
 
-type Ctx = {
+export type Ctx = {
   db: D1Database
   userId: string
   offset: number
@@ -110,7 +133,7 @@ type EventRow = Candidate & { startsAt: string; endsAt: string; allDay: number }
 
 // ---------------------------------------------------------------- helpers
 
-function wallClockDate(now: Date, offset: number): Date {
+export function wallClockDate(now: Date, offset: number): Date {
   const shifted = new Date(now.getTime() - offset * 60_000)
   return new Date(
     shifted.getUTCFullYear(),
@@ -130,7 +153,11 @@ function itemLabel(entry: ShoppingEntry): string {
   return entry.quantity ? `${entry.quantity} ${entry.name}` : entry.name
 }
 
-function dayLabel(iso: string, offset: number, withTime: boolean): string {
+export function dayLabel(
+  iso: string,
+  offset: number,
+  withTime: boolean,
+): string {
   const local = new Date(new Date(iso).getTime() - offset * 60_000)
   const day = local.toLocaleDateString('en', {
     weekday: 'short',
@@ -171,7 +198,7 @@ async function loadShopping(ctx: Ctx) {
   }
 }
 
-async function loadTasks(ctx: Ctx) {
+export async function loadTasks(ctx: Ctx) {
   const rows = await ctx.db
     .prepare(
       `SELECT id, title, status, completed_at as completedAt FROM tasks
@@ -201,7 +228,7 @@ async function loadReminders(ctx: Ctx): Promise<ReminderRow[]> {
   return (rows.results ?? []).map((r) => ({ ...r, type: 'reminder' }))
 }
 
-async function loadEvents(
+export async function loadEvents(
   ctx: Ctx,
   fromDays = -1,
   toDays = 120,
@@ -349,6 +376,25 @@ async function applyPlan(
         )
         .run()
       return plan.id
+    case 'tasks_reschedule':
+      for (const item of plan.items) {
+        await db
+          .prepare(
+            `UPDATE tasks SET due_date = ?, updated_at = ? WHERE id = ? AND user_id = ? AND status = 'open'`,
+          )
+          .bind(item.after, now, item.id, userId)
+          .run()
+        await recordTaskHistory(
+          db,
+          userId,
+          item.id,
+          'rescheduled',
+          item.after
+            ? `Moved to ${item.after} by the Goblin`
+            : 'Date cleared by the Goblin',
+        )
+      }
+      return 'batch'
   }
 }
 
@@ -404,6 +450,21 @@ export async function revertPlan(
       return
     case 'event_update':
       await applyPlan(db, userId, { ...plan, after: plan.before }, now)
+      return
+    case 'tasks_reschedule':
+      await applyPlan(
+        db,
+        userId,
+        {
+          ...plan,
+          items: plan.items.map((i) => ({
+            ...i,
+            before: i.after,
+            after: i.before,
+          })),
+        },
+        now,
+      )
   }
 }
 
@@ -411,8 +472,14 @@ function targetType(plan: Plan): string {
   return plan.kind.split('_')[0]!
 }
 
+function subjectOf(plan: Plan): string | undefined {
+  if ('name' in plan) return plan.name
+  if ('title' in plan) return plan.title
+  return undefined
+}
+
 /** Record and (unless it needs a yes) carry out a plan. */
-async function act(
+export async function act(
   ctx: Ctx,
   plan: Plan,
   message: string,
@@ -440,17 +507,28 @@ async function act(
       JSON.stringify(plan),
     )
     .run()
+  const topic = targetType(plan)
+  const subject = subjectOf(plan)
   return propose
     ? {
         kind: 'confirm',
         actionId,
         message: message.replace(/\.$/, '?').replace(/^/, 'Shall I: '),
+        topic,
+        ...(subject ? { subject } : {}),
       }
-    : { kind: 'done', actionId, message, undoable: true }
+    : {
+        kind: 'done',
+        actionId,
+        message,
+        undoable: true,
+        topic,
+        ...(subject ? { subject } : {}),
+      }
 }
 
 /** Store alternatives for a one-question clarification. */
-async function choices(
+export async function choices(
   ctx: Ctx,
   question: string,
   options: { plan: Plan; label: string; message: string }[],
@@ -1186,13 +1264,16 @@ export async function undoAction(db: D1Database, userId: string, id: string) {
   if (!row || row.status !== 'done' || !row.targetId)
     return { ok: false as const, error: 'Nothing to undo.' }
   const now = new Date().toISOString()
-  await revertPlan(db, userId, JSON.parse(row.plan) as Plan, row.targetId, now)
-  await db
+  // Claim first, so a double tap (or "undo" said twice) reverts only once.
+  const claimed = await db
     .prepare(
-      `UPDATE goblin_actions SET status = 'undone', updated_at = ? WHERE id = ? AND user_id = ?`,
+      `UPDATE goblin_actions SET status = 'undone', updated_at = ? WHERE id = ? AND user_id = ? AND status = 'done'`,
     )
     .bind(now, id, userId)
     .run()
+  if (!claimed.meta.changes)
+    return { ok: false as const, error: 'Nothing to undo.' }
+  await revertPlan(db, userId, JSON.parse(row.plan) as Plan, row.targetId, now)
   return { ok: true as const, message: 'Undone. ↩️' }
 }
 

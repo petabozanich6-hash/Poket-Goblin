@@ -31,6 +31,7 @@ React + TypeScript + Vite · Cloudflare Workers · D1 · CSS Modules
 - [Deployment](docs/DEPLOYMENT.md)
 - [Production D1 migrations](docs/D1_MIGRATIONS.md)
 - [Roadmap](docs/ROADMAP.md)
+- [Talk to the Goblin & installable app](docs/VOICE_AND_PWA.md)
 
 ## Status
 

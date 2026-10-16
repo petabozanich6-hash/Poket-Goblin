@@ -95,6 +95,7 @@ const UNITS =
 
 function clean(text: string): string {
   return text
+    .replace(/[’‘]/g, "'")
     .replace(/[.!?]+$/, '')
     .replace(
       /^(?:oh|ok|okay|so|um|well|also|and|but|then|plus|actually|just|oh and)[,\s]+/i,
@@ -163,19 +164,87 @@ function splitList(text: string): string[] {
 export function splitClauses(text: string): string[] {
   const starters =
     "(?:i\\b|i'|remind|add|also|still|please|can you|could you|don'?t|do not|move|reschedule|cancel|remove|book|call|pay|buy|get|pick up|grab|need|we\\b|my\\b|did|when|what)"
-  return text
-    .split(/(?:\n+|(?<=[.!?;])\s+)/)
-    .flatMap((sentence) =>
-      sentence.split(
-        new RegExp(
-          `\\s*(?:,\\s*(?:but|and|then)?|\\s+but|\\s+and(?:\\s+then)?|\\s+then)\\s+(?=${starters})`,
-          'i',
+  return (
+    text
+      .split(/(?:\n+|(?<=[.!?;])\s+)/)
+      .flatMap((sentence) =>
+        sentence.split(
+          new RegExp(
+            `\\s*(?:,\\s*(?:but|and|then)?|\\s+but|\\s+and(?:\\s+then)?|\\s+then)\\s+(?=${starters})`,
+            'i',
+          ),
         ),
-      ),
-    )
-    .map((c) => c.trim())
-    .filter((c) => c.replace(/[^a-z0-9]/gi, '').length > 1)
+      )
+      // "…, and the washing needs doing": a new subject with its own verb.
+      .flatMap((clause) =>
+        clause.split(
+          /\s*,\s*(?:and\s+|then\s+)?(?=(?:the|my|our)\s+[\w']+(?:\s+[\w']+)?\s+(?:needs?|is|are|has|have|wants?)\b)/i,
+        ),
+      )
+      .map((c) => c.trim())
+      .filter((c) => c.replace(/[^a-z0-9]/gi, '').length > 1)
+  )
 }
+
+function cap(text: string): string {
+  const t = text.trim()
+  return t ? t.charAt(0).toUpperCase() + t.slice(1) : t
+}
+
+/** "call the dentist tomorrow" → "call the dentist" */
+function stripWhen(text: string): string {
+  return text
+    .replace(
+      /\s+(?:by|on|before)\s+(?:today|tomorrow|next\s+\w+|this\s+\w+|\w+day)\b.*$/i,
+      '',
+    )
+    .replace(/\s+(?:today|tomorrow|tonight)$/i, '')
+    .trim()
+}
+
+const TASK_VERBS: Record<string, string> = {
+  doing: 'Do',
+  done: 'Do',
+  'doing again': 'Do',
+  sorting: 'Sort',
+  sorted: 'Sort',
+  'sorting out': 'Sort out',
+  fixing: 'Fix',
+  fixed: 'Fix',
+  cleaning: 'Clean',
+  cleaned: 'Clean',
+  'a clean': 'Clean',
+  washing: 'Wash',
+  washed: 'Wash',
+  'a wash': 'Wash',
+  paying: 'Pay',
+  paid: 'Pay',
+  booking: 'Book',
+  booked: 'Book',
+  renewing: 'Renew',
+  renewed: 'Renew',
+  emptying: 'Empty',
+  emptied: 'Empty',
+  mowing: 'Mow',
+  mowed: 'Mow',
+  ironing: 'Iron',
+  ironed: 'Iron',
+  hoovering: 'Hoover',
+  hoovered: 'Hoover',
+  vacuuming: 'Vacuum',
+  tidying: 'Tidy',
+  tidied: 'Tidy',
+  changing: 'Change',
+  changed: 'Change',
+  replacing: 'Replace',
+  replaced: 'Replace',
+  'putting away': 'Put away',
+  'taking out': 'Take out',
+}
+
+// "We're out of time" is not shopping.
+const NOT_GROCERIES =
+  /^(?:time|patience|energy|ideas|money|cash|spoons|options|luck|breath|steam|space|room|battery|my depth|my mind|it|this|that|here|sorts|puff|juice in me|excuses|road)$/i
 
 const WEEK_RANGE = /\b(next week|this week|today|tomorrow)\b/i
 
@@ -368,6 +437,52 @@ export function parseOperation(rawClause: string, now: Date): Operation {
     }
   }
 
+  // Onto the to-do list: "add washing the car to my tasks", "put the bins on my to-do list".
+  const toTasks = text.match(
+    /^(?:please\s+)?(?:add|put|stick|pop|chuck|throw|bung|write)\s+(.+?)\s+(?:to|on|onto|in)\s+(?:my|the|our)\s+(?:tasks?|to-?do(?:\s+list)?|todos|jobs(?:\s+list)?|task\s+list)$/i,
+  )
+  if (toTasks?.[1]) {
+    return {
+      op: 'task_add',
+      title: cap(toTasks[1].replace(/\s+(?:today|tomorrow)$/i, '')),
+      dueDate: parseRelativeDate(text, now),
+      clause,
+    }
+  }
+
+  // "I forgot to call the dentist" — it still needs doing.
+  const forgot = text.match(
+    /^(?:i\s+|we\s+)?(?:totally\s+|completely\s+)?(?:forgot|forgotten|keep forgetting)\s+to\s+(.+)$/i,
+  )
+  if (forgot?.[1]) {
+    return {
+      op: 'task_add',
+      title: cap(stripWhen(forgot[1])),
+      dueDate: parseRelativeDate(text, now),
+      clause,
+    }
+  }
+
+  // "The washing needs doing", "the car needs cleaning", "the bins need to be done".
+  const needsDoing = text.match(
+    /^(?:the\s+|my\s+|our\s+|that\s+)?(.+?)\s+(?:needs|need|wants|is due)\s+(?:to\s+be\s+)?(doing|done|sorting|sorted|sorting out|fixing|fixed|cleaning|cleaned|washing|washed|paying|paid|booking|booked|renewing|renewed|emptying|emptied|mowing|mowed|ironing|ironed|hoovering|hoovered|vacuuming|tidying|tidied|changing|changed|replacing|replaced|putting away|taking out|doing again|a clean|a wash)(?:\s+(?:today|tomorrow|soon|asap|again))?$/i,
+  )
+  if (
+    needsDoing?.[1] &&
+    needsDoing[2] &&
+    needsDoing[1].split(/\s+/).length <= 6
+  ) {
+    const thing = needsDoing[1].trim()
+    const verb = TASK_VERBS[needsDoing[2].toLowerCase()] ?? 'Do'
+    const article = /^(?:the|my|our|that)\s/i.test(clause.trim()) ? 'the ' : ''
+    return {
+      op: 'task_add',
+      title: `${verb} ${article}${thing}`.replace(/\s+/g, ' '),
+      dueDate: parseRelativeDate(text, now),
+      clause,
+    }
+  }
+
   // Tasks: "I need to call the dentist", "I have to finish my assignment by Friday".
   const task = text.match(
     /^(?:i\s+|we\s+)?(?:still\s+)?(?:need|have|must|should|gotta|got)\s+to\s+(.+)$/i,
@@ -390,9 +505,18 @@ export function parseOperation(rawClause: string, now: Date): Operation {
 
   // Shopping: "I need milk", "I still need bread and eggs", "add two cartons of milk",
   // "buy oat milk", "milk, bread and coffee on my shopping list".
-  const toList = text.match(
-    /^(?:please\s+)?(?:add|put)\s+(.+?)\s+(?:to|on)\s+(?:my|the)\s+(?:shopping\s+)?list$/i,
-  )
+  const toList =
+    text.match(
+      /^(?:please\s+)?(?:add|put|chuck|stick|pop|throw|bung|whack|slap|jot|write)\s+(.+?)\s+(?:to|on|onto|in)\s+(?:my|the|our)\s+(?:shopping\s+|grocery\s+|groceries\s+)?(?:list|shopping)$/i,
+    ) ??
+    // "We're out of washing powder", "running low on coffee".
+    text.match(
+      /^(?:we'?re\s+|we are\s+|i'?m\s+|i am\s+|we'?ve\s+|we have\s+|i'?ve\s+|i have\s+)?(?:all\s+|completely\s+|nearly\s+|almost\s+|totally\s+|just\s+)?(?:run(?:ning)?\s+)?(?:out\s+of|low\s+on|short\s+of)\s+(.+?)(?:\s+again)?$/i,
+    ) ??
+    // "Make sure dairy products are included in my next trip to the supermarket".
+    text.match(
+      /^(?:please\s+)?(?:make\s+sure|ensure|remember)\s+(?:that\s+|i\s+get\s+|we\s+get\s+)?(.+?)\s+(?:is|are|gets?|get)\s+(?:included|added|put|on)\s+(?:in|on|to|into|for)?\s*(?:my|the|our)\s+(?:next\s+)?(?:shopping(?:\s+list|\s+trip)?|list|shop|supermarket(?:\s+run|\s+trip)?|grocery\s+(?:run|shop|list|trip)|groceries|(?:expedition|trip|run|visit)\s+to\s+the\s+(?:supermarket|shops?|store|grocer'?s?))$/i,
+    )
   const need = text.match(
     /^(?:i\s+|we\s+)?(?:still\s+|also\s+)?(?:need|want|gotta get|need to get|need to buy|must buy|should buy)\s+(?!to\b)(.+)$/i,
   )
@@ -402,6 +526,7 @@ export function parseOperation(rawClause: string, now: Date): Operation {
   const listText = toList?.[1] ?? need?.[1] ?? buy?.[1]
   if (
     listText &&
+    !NOT_GROCERIES.test(listText.trim()) &&
     !/\b(appointment|meeting|bill|call|email|haircut|dentist|doctor)\b/i.test(
       listText,
     ) &&
