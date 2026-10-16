@@ -112,38 +112,66 @@ describe('atomic Free document processing allowance', () => {
 
 describe('database-enforced Free record limits', () => {
   it('rejects direct SQL inserts at the task, note and reminder caps', () => {
-    for (let i = 0; i < 10; i++) h.run(
-      "INSERT INTO tasks (id, user_id, title) VALUES (?, ?, ?)",
-      `sql_task_${i}`, user.id, 'Task',
-    )
-    expect(() => h.run(
-      "INSERT INTO tasks (id, user_id, title) VALUES ('too_many_tasks', ?, 'Extra')", user.id,
-    )).toThrow(/FREE_PLAN_LIMIT:tasks/)
-    for (let i = 0; i < 5; i++) h.run(
-      "INSERT INTO notes (id, user_id, title) VALUES (?, ?, ?)",
-      `sql_note_${i}`, user.id, 'Note',
-    )
-    expect(() => h.run(
-      "INSERT INTO notes (id, user_id, title) VALUES ('too_many_notes', ?, 'Extra')", user.id,
-    )).toThrow(/FREE_PLAN_LIMIT:notes/)
-    for (let i = 0; i < 3; i++) h.run(
-      "INSERT INTO reminders (id, user_id, title, remind_at) VALUES (?, ?, ?, ?)",
-      `sql_rem_${i}`, user.id, 'Remind', '2027-01-01T09:00:00Z',
-    )
-    expect(() => h.run(
-      "INSERT INTO reminders (id, user_id, title, remind_at) VALUES ('too_many_rems', ?, 'Extra', '2027-01-01')", user.id,
-    )).toThrow(/FREE_PLAN_LIMIT:reminders/)
+    for (let i = 0; i < 10; i++)
+      h.run(
+        'INSERT INTO tasks (id, user_id, title) VALUES (?, ?, ?)',
+        `sql_task_${i}`,
+        user.id,
+        'Task',
+      )
+    expect(() =>
+      h.run(
+        "INSERT INTO tasks (id, user_id, title) VALUES ('too_many_tasks', ?, 'Extra')",
+        user.id,
+      ),
+    ).toThrow(/FREE_PLAN_LIMIT:tasks/)
+    for (let i = 0; i < 5; i++)
+      h.run(
+        'INSERT INTO notes (id, user_id, title) VALUES (?, ?, ?)',
+        `sql_note_${i}`,
+        user.id,
+        'Note',
+      )
+    expect(() =>
+      h.run(
+        "INSERT INTO notes (id, user_id, title) VALUES ('too_many_notes', ?, 'Extra')",
+        user.id,
+      ),
+    ).toThrow(/FREE_PLAN_LIMIT:notes/)
+    for (let i = 0; i < 3; i++)
+      h.run(
+        'INSERT INTO reminders (id, user_id, title, remind_at) VALUES (?, ?, ?, ?)',
+        `sql_rem_${i}`,
+        user.id,
+        'Remind',
+        '2027-01-01T09:00:00Z',
+      )
+    expect(() =>
+      h.run(
+        "INSERT INTO reminders (id, user_id, title, remind_at) VALUES ('too_many_rems', ?, 'Extra', '2027-01-01')",
+        user.id,
+      ),
+    ).toThrow(/FREE_PLAN_LIMIT:reminders/)
     h.run("UPDATE tasks SET status = 'completed' WHERE id = 'sql_task_0'")
-    h.run("INSERT INTO tasks (id, user_id, title) VALUES ('replacement', ?, 'Replacement')", user.id)
-    expect(() => h.run("UPDATE tasks SET status = 'open' WHERE id = 'sql_task_0'"))
-      .toThrow(/FREE_PLAN_LIMIT:tasks/)
+    h.run(
+      "INSERT INTO tasks (id, user_id, title) VALUES ('replacement', ?, 'Replacement')",
+      user.id,
+    )
+    expect(() =>
+      h.run("UPDATE tasks SET status = 'open' WHERE id = 'sql_task_0'"),
+    ).toThrow(/FREE_PLAN_LIMIT:tasks/)
   })
   it('exempts the Owner and keeps pre-existing records editable', () => {
     h.makeOwner(user.id)
-    for (let i = 0; i < 15; i++) h.run(
-      "INSERT INTO notes (id, user_id, title) VALUES (?, ?, ?)", `owner_note_${i}`, user.id, 'Owner',
-    )
-    expect(h.query("SELECT COUNT(*) as n FROM notes WHERE user_id = ?", user.id))
-      .toEqual([{ n: 15 }])
+    for (let i = 0; i < 15; i++)
+      h.run(
+        'INSERT INTO notes (id, user_id, title) VALUES (?, ?, ?)',
+        `owner_note_${i}`,
+        user.id,
+        'Owner',
+      )
+    expect(
+      h.query('SELECT COUNT(*) as n FROM notes WHERE user_id = ?', user.id),
+    ).toEqual([{ n: 15 }])
   })
 })
