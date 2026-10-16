@@ -175,3 +175,34 @@ describe('database-enforced Free record limits', () => {
     ).toEqual([{ n: 15 }])
   })
 })
+
+describe('friendly atomic quota errors and safe downgrade', () => {
+  it('returns an upgrade error rather than 500 when D1 rejects an insert', async () => {
+    for (let i = 0; i < 5; i++) h.run(
+      'INSERT INTO notes (id, user_id, title) VALUES (?, ?, ?)',
+      `preexisting_note_${i}`, user.id, 'Saved',
+    )
+    const result = await h.request('/api/notes', {
+      cookie: user.cookie, body: { title: 'Over the limit' },
+    })
+    expect(result.status).toBe(403)
+    expect(await result.json()).toMatchObject({
+      code: 'FREE_PLAN_LIMIT', resource: 'notes', limit: 5,
+    })
+  })
+  it('preserves Premium records when entitlement ends, and permits editing them', async () => {
+    h.run(
+      "INSERT INTO user_entitlements (id, user_id, entitlement, source, status, ended_at) VALUES ('upgrade', ?, 'premium', 'stripe', 'active', NULL)",
+      user.id,
+    )
+    for (let i = 0; i < 8; i++) h.run(
+      'INSERT INTO notes (id, user_id, title) VALUES (?, ?, ?)',
+      `saved_${i}`, user.id, 'Before downgrade',
+    )
+    h.run("UPDATE user_entitlements SET ended_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), status = 'canceled' WHERE id = 'upgrade'")
+    h.run("UPDATE notes SET title = 'Edited after downgrade' WHERE id = 'saved_0'")
+    expect(h.query('SELECT COUNT(*) AS n FROM notes WHERE user_id = ?', user.id)).toEqual([{ n: 8 }])
+    expect(() => h.run("INSERT INTO notes (id, user_id, title) VALUES ('extra', ?, 'Not allowed')", user.id))
+      .toThrow(/FREE_PLAN_LIMIT:notes/)
+  })
+})
