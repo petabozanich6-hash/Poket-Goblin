@@ -444,20 +444,6 @@ documentRoutes.post('/:id/pathway-approve', async (c) => {
       409,
     )
   }
-  const existingPathway = await c.env.DB.prepare(
-    'SELECT status FROM study_pathways WHERE user_id = ? AND document_id = ?',
-  )
-    .bind(user.id, documentId)
-    .first<{ status: string }>()
-  if (existingPathway?.status === 'cancelled') {
-    return c.json(
-      {
-        error:
-          'This pathway was previously undone. Create a new version before approving again.',
-      },
-      409,
-    )
-  }
   const saved = await persistApprovedPathway(
     c.env.DB,
     user.id,
@@ -476,7 +462,9 @@ documentRoutes.get('/:id/pathway', async (c) => {
   const user = c.get('user')
   const pathway = await c.env.DB.prepare(
     `SELECT id, status, approved_at as approvedAt
-     FROM study_pathways WHERE document_id = ? AND user_id = ?`,
+     FROM study_pathways WHERE document_id = ? AND user_id = ?
+     ORDER BY CASE WHEN status = 'active' THEN 0 ELSE 1 END,
+              approved_at DESC, id DESC LIMIT 1`,
   )
     .bind(c.req.param('id'), user.id)
     .first<{ id: string; status: string; approvedAt: string }>()
@@ -713,7 +701,9 @@ documentRoutes.post('/:id/pathway-undo', async (c) => {
   const documentId = c.req.param('id')
   const pathway = await c.env.DB.prepare(
     `SELECT id, status FROM study_pathways
-     WHERE user_id = ? AND document_id = ?`,
+     WHERE user_id = ? AND document_id = ?
+     ORDER BY CASE WHEN status = 'active' THEN 0 ELSE 1 END,
+              approved_at DESC, id DESC LIMIT 1`,
   )
     .bind(user.id, documentId)
     .first<{ id: string; status: string }>()
