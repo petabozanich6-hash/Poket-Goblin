@@ -193,6 +193,10 @@ export function VerifyEmailPage() {
   const [state, setState] = useState<'working' | 'done' | 'failed'>(
     token ? 'working' : 'failed',
   )
+  const [email, setEmail] = useState('')
+  const [resending, setResending] = useState(false)
+  const [resent, setResent] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const sent = useRef(false)
 
   useEffect(() => {
@@ -205,15 +209,56 @@ export function VerifyEmailPage() {
       .finally(forgetFragment)
   }, [token])
 
+  async function resend(event: FormEvent) {
+    event.preventDefault()
+    setError(null)
+    setResending(true)
+    try {
+      await api.post('/auth/verify-email/resend', { email })
+      setResent(true)
+    } catch (err) {
+      setError(errorText(err))
+    } finally {
+      setResending(false)
+    }
+  }
+
   return (
     <Shell title="Confirm your email">
       <p role="status">
         {state === 'working'
           ? 'Checking your link…'
           : state === 'done'
-            ? 'Thanks — your email is confirmed. 👹'
-            : 'That link has expired or was already used. You can send a new one from Settings.'}
+            ? 'Thanks — your email is confirmed. 👹 You can sign in now.'
+            : 'That link may have expired or already been used. You can request a new one below.'}
       </p>
+      {state === 'failed' ? (
+        <form className={styles.form} onSubmit={(e) => void resend(e)}>
+          <Input
+            label="Email address"
+            name="email"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          <Button type="submit" disabled={resending}>
+            {resending ? 'Sending…' : 'Send another confirmation link'}
+          </Button>
+          {resent ? (
+            <p role="status">
+              If that address still needs confirmation, another link is on its
+              way. Check your inbox and spam folder.
+            </p>
+          ) : null}
+          {error ? (
+            <p className={styles.error} role="alert">
+              {error}
+            </p>
+          ) : null}
+        </form>
+      ) : null}
     </Shell>
   )
 }

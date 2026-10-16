@@ -71,6 +71,18 @@ authRoutes.post('/register', async (c) => {
     )
   }
 
+  // Rollout is explicit: never start gating registrations unless sending is configured.
+  const verificationRequired = c.env.EMAIL_VERIFICATION_REQUIRED === 'true'
+  if (verificationRequired && !c.env.EMAIL) {
+    return c.json(
+      {
+        error:
+          'Registration is temporarily unavailable. Please try again later.',
+      },
+      503,
+    )
+  }
+
   const existing = await c.env.DB.prepare(
     'SELECT id FROM users WHERE email = ?',
   )
@@ -82,17 +94,42 @@ authRoutes.post('/register', async (c) => {
 
   const id = newId('user')
   const passwordHash = await hashPassword(password)
-  await c.env.DB.prepare(
-    `INSERT INTO users (id, email, password_hash, display_name)
-     VALUES (?, ?, ?, ?)`,
-  )
-    .bind(id, emailRaw, passwordHash, displayName)
-    .run()
+  if (verificationRequired) {
+    // Additive migration 0016 must be applied before enabling the flag.
+    await c.env.DB.prepare(
+      `INSERT INTO users (id, email, password_hash, display_name, email_verification_required_at)
+       VALUES (?, ?, ?, ?, ?)`,
+    )
+      .bind(id, emailRaw, passwordHash, displayName, new Date().toISOString())
+      .run()
+  } else {
+    await c.env.DB.prepare(
+      `INSERT INTO users (id, email, password_hash, display_name)
+       VALUES (?, ?, ?, ?)`,
+    )
+      .bind(id, emailRaw, passwordHash, displayName)
+      .run()
+  }
 
   await c.env.DB.prepare(`INSERT INTO user_settings (user_id) VALUES (?)`)
     .bind(id)
     .run()
 
+  if (verificationRequired) {
+    // Unverified accounts have NO usable session. Email service errors are
+    // recoverable via public, rate-limited resend rather than granting access.
+    const sent = await sendVerificationEmail(
+      c.env,
+      id,
+      emailRaw,
+      displayName,
+      c.req.url,
+    )
+    return c.json(
+      { verificationRequired: true, emailSent: sent, email: emailRaw },
+      201,
+    )
+  }
   const session = await createSession(c.env.DB, c.env, id)
   setSessionCookie(c, session.token, session.expiresAt)
   await sendVerificationEmail(c.env, id, emailRaw, displayName, c.req.url)
@@ -162,6 +199,45 @@ authRoutes.post('/login', async (c) => {
     )
   }
 
+  // Previously gated users remain protected when new signups are ungated.
+  // This fallback is only for pre-migration legacy accounts: deployment of
+  // migration 0016 and activation of the flag are separate owner approvals.
+  let pending: {
+    email_verification_required_at: string | null
+    email_verified_at: string | null
+  } | null = null
+  try {
+    pending = await c.env.DB.prepare(
+      'SELECT email_verification_required_at, email_verified_at FROM users WHERE id = ?',
+    )
+      .bind(user.id)
+      .first<{
+        email_verification_required_at: string | null
+        email_verified_at: string | null
+      }>()
+  } catch (error) {
+    const missingColumn =
+      /no such column: email_verification_required_at/i.test(String(error))
+    if (!missingColumn || c.env.EMAIL_VERIFICATION_REQUIRED === 'true') {
+      return c.json(
+        {
+          error:
+            'Email verification is temporarily unavailable. Please try again.',
+        },
+        503,
+      )
+    }
+    // No gated user could have been created before migration 0016.
+  }
+  if (pending?.email_verification_required_at && !pending.email_verified_at) {
+    return c.json(
+      {
+        error: 'Please confirm your email before signing in.',
+        code: 'email_verification_required',
+      },
+      403,
+    )
+  }
   const session = await createSession(c.env.DB, c.env, user.id)
   setSessionCookie(c, session.token, session.expiresAt)
   await recordSecurityEvent(c.env.DB, user.id, 'login_success')
@@ -191,9 +267,9 @@ export async function sendVerificationEmail(
   displayName: string,
   requestUrl: string,
 ) {
-  if (!env.EMAIL) return
+  if (!env.EMAIL) return false
   const token = await issueToken(env, userId, 'email_verify')
-  await sendEmail(
+  const result = await sendEmail(
     env,
     accountEmail({
       to: email,
@@ -211,6 +287,7 @@ export async function sendVerificationEmail(
         'If you didn’t create a Pocket Goblin account, you can ignore this email.',
     }),
   )
+  return result.sent
 }
 
 const GENERIC_RESET_REPLY = {
@@ -347,4 +424,55 @@ authRoutes.post('/verify-email', async (c) => {
     .run()
   await recordSecurityEvent(c.env.DB, userId, 'email_verified')
   return c.json({ ok: true })
+})
+
+// A pending user cannot sign in, so resending must work without a session.
+// Always use an indistinguishable reply for unknown/verified addresses.
+authRoutes.post('/verify-email/resend', async (c) => {
+  const limit = checkRateLimit(`verify-public:${clientKey(c)}`, 5, 60 * 60_000)
+  if (!limit.ok)
+    return c.json({ error: 'Please wait a while before trying again.' }, 429)
+  const body = (await c.req.json().catch(() => null)) as Record<
+    string,
+    unknown
+  > | null
+  const email = asString(body?.email, 254)?.toLowerCase()
+  if (!email || !isEmail(email)) {
+    return c.json({ error: 'Enter a valid email address.' }, 400)
+  }
+  const emailLimit = checkRateLimit(
+    `verify-public-email:${email}`,
+    3,
+    60 * 60_000,
+  )
+  const reply = {
+    ok: true,
+    message: 'If this address needs confirmation, a new link is on its way.',
+  }
+  if (!emailLimit.ok) return c.json(reply)
+  if (!c.env.EMAIL) {
+    return c.json(
+      { error: 'Email is unavailable. Please try again later.' },
+      503,
+    )
+  }
+  const row = await c.env.DB.prepare(
+    'SELECT id, display_name, email_verified_at FROM users WHERE email = ? AND status = ?',
+  )
+    .bind(email, 'active')
+    .first<{
+      id: string
+      display_name: string
+      email_verified_at: string | null
+    }>()
+  if (row && !row.email_verified_at) {
+    await sendVerificationEmail(
+      c.env,
+      row.id,
+      email,
+      row.display_name,
+      c.req.url,
+    )
+  }
+  return c.json(reply)
 })
