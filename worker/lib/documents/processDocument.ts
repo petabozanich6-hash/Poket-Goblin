@@ -293,7 +293,10 @@ export async function processDocumentForUser(
       const reviewPayload =
         understanding.documentType === 'education' &&
         suggestion.type === 'task' &&
-        suggestion.group
+        typeof suggestion.group === 'string' &&
+        /^(?:week\s+\d+\b|.*\b(?:assessment|assignment|essay|exam|research project|study plan)\b)/i.test(
+          suggestion.group,
+        )
           ? { ...suggestion, requiresReview: true }
           : suggestion
       statements.push(
