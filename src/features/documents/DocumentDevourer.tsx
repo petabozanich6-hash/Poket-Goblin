@@ -443,15 +443,15 @@ export function DevourReview({
             </h3>
             {!hasStudyPathway ? (
               <Button
-              onClick={() => void addWholePlan()}
-              disabled={adding !== null}
-            >
-              <CalendarDays size={16} aria-hidden />
-              {adding
-                ? `Adding ${adding.done} of ${adding.total}…`
-                : actedFirst
-                  ? `Add these too (${open.length})`
-                  : `Add the whole plan (${open.length})`}
+                onClick={() => void addWholePlan()}
+                disabled={adding !== null}
+              >
+                <CalendarDays size={16} aria-hidden />
+                {adding
+                  ? `Adding ${adding.done} of ${adding.total}…`
+                  : actedFirst
+                    ? `Add these too (${open.length})`
+                    : `Add the whole plan (${open.length})`}
               </Button>
             ) : null}
           </div>

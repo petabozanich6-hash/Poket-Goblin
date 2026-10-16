@@ -52,7 +52,10 @@ export type PathwayResult = {
 export function recommendPathway(
   steps: PathwayStep[],
   availability: DayAvailability[],
-  options: { sessionMinutes?: number; completedStepIds?: readonly string[] } = {},
+  options: {
+    sessionMinutes?: number
+    completedStepIds?: readonly string[]
+  } = {},
 ): PathwayResult {
   const sessionSize = Math.max(
     15,

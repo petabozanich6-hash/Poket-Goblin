@@ -251,7 +251,11 @@ export type StudyPathwayPreview = {
       minutes: number
       sequence: number
     }>
-    warnings: Array<{ stepId: string; remainingMinutes: number; reason: string }>
+    warnings: Array<{
+      stepId: string
+      remainingMinutes: number
+      reason: string
+    }>
     unscheduledMinutes: number
     estimates: Array<{ stepId: string; minutes: number; inferred: true }>
     unschedulable: unknown[]

@@ -51,8 +51,10 @@ export function previewDocumentPathway(
     })
     .sort((a, b) => {
       if (a.item.group !== b.item.group)
-        return (groupOrder.get(a.item.group!) ?? 0) -
+        return (
+          (groupOrder.get(a.item.group!) ?? 0) -
           (groupOrder.get(b.item.group!) ?? 0)
+        )
       const aStep = Number(a.item.step?.split('/')[0])
       const bStep = Number(b.item.step?.split('/')[0])
       if (Number.isFinite(aStep) && Number.isFinite(bStep))

@@ -42,9 +42,11 @@ describe('previewDocumentPathway', () => {
       ...suggestion('Check submission date', '1/1'),
       uncertain: true,
     }
-    const result = previewDocumentPathway('doc', [uncertain], [
-      { date: '2026-11-01', availableMinutes: 300 },
-    ])
+    const result = previewDocumentPathway(
+      'doc',
+      [uncertain],
+      [{ date: '2026-11-01', availableMinutes: 300 }],
+    )
     expect(result.sessions).toHaveLength(0)
     expect(result.unschedulable).toHaveLength(1)
   })
@@ -69,5 +71,4 @@ describe('previewDocumentPathway', () => {
     expect(result.sessions[0]?.title).toBe('Read brief')
     expect(result.sessions.at(-1)?.title).toBe('Draft essay')
   })
-
 })

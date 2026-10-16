@@ -197,7 +197,6 @@ documentRoutes.get('/:id', async (c) => {
   })
 })
 
-
 // Preview only: callers provide their available study minutes per day.
 // Existing tasks and appointments consume capacity. Nothing is persisted.
 documentRoutes.post('/:id/pathway-preview', async (c) => {
@@ -205,26 +204,41 @@ documentRoutes.post('/:id/pathway-preview', async (c) => {
   const documentId = c.req.param('id')
   const document = await c.env.DB.prepare(
     'SELECT id FROM documents WHERE id = ? AND user_id = ?',
-  ).bind(documentId, user.id).first()
+  )
+    .bind(documentId, user.id)
+    .first()
   if (!document) return c.json({ error: 'Document not found' }, 404)
 
-  const body = await c.req.json().catch(() => null) as {
+  const body = (await c.req.json().catch(() => null)) as {
     availability?: DayAvailability[]
     completedStepIds?: string[]
   } | null
-  if (!body || !Array.isArray(body.availability) ||
-      body.availability.length > 120 || body.availability.length === 0 ||
-      body.availability.some((day) =>
-        !day || typeof day.date !== 'string' ||
+  if (
+    !body ||
+    !Array.isArray(body.availability) ||
+    body.availability.length > 120 ||
+    body.availability.length === 0 ||
+    body.availability.some(
+      (day) =>
+        !day ||
+        typeof day.date !== 'string' ||
         !Number.isFinite(day.availableMinutes) ||
-        day.availableMinutes < 0 || day.availableMinutes > 1440 ||
+        day.availableMinutes < 0 ||
+        day.availableMinutes > 1440 ||
         (day.committedMinutes !== undefined &&
           (!Number.isFinite(day.committedMinutes) ||
             day.committedMinutes < 0 ||
             day.committedMinutes > 1440)) ||
-        (day.blocked !== undefined && typeof day.blocked !== 'boolean')
-      )) {
-    return c.json({ error: 'Provide available study minutes for each day (maximum 120 days).' }, 400)
+        (day.blocked !== undefined && typeof day.blocked !== 'boolean'),
+    )
+  ) {
+    return c.json(
+      {
+        error:
+          'Provide available study minutes for each day (maximum 120 days).',
+      },
+      400,
+    )
   }
 
   const rows = await c.env.DB.prepare(
@@ -232,43 +246,65 @@ documentRoutes.post('/:id/pathway-preview', async (c) => {
      WHERE user_id = ? AND source_type = 'document' AND source_id = ?
        AND status IN ('pending', 'snoozed', 'edited')
      ORDER BY created_at ASC, rowid ASC`,
-  ).bind(user.id, documentId).all<{ payload: string }>()
+  )
+    .bind(user.id, documentId)
+    .all<{ payload: string }>()
   const suggestions: DocumentSuggestion[] = []
   for (const row of rows.results ?? []) {
     try {
       const suggestion = JSON.parse(row.payload) as DocumentSuggestion
-      if (suggestion.type === 'task' && suggestion.group) suggestions.push(suggestion)
+      if (suggestion.type === 'task' && suggestion.group)
+        suggestions.push(suggestion)
     } catch {
       // Ignore malformed review payloads instead of trusting document content.
     }
   }
 
-  const offset = readOffsetMinutes({ timezoneOffsetMinutes: Number(c.req.query('timezoneOffsetMinutes') ?? 0) })
-  const availability = await Promise.all(body.availability.map(async (day) => {
-    const tasks = await c.env.DB.prepare(
-      `SELECT COUNT(*) AS n FROM tasks
+  const offset = readOffsetMinutes({
+    timezoneOffsetMinutes: Number(c.req.query('timezoneOffsetMinutes') ?? 0),
+  })
+  const availability = await Promise.all(
+    body.availability.map(async (day) => {
+      const tasks = await c.env.DB.prepare(
+        `SELECT COUNT(*) AS n FROM tasks
        WHERE user_id = ? AND status = 'open' AND due_date = ?`,
-    ).bind(user.id, day.date).first<{ n: number }>()
-    const start = new Date(Date.parse(day.date + 'T00:00:00Z') + offset * 60000)
-    const end = new Date(start.getTime() + 86400000)
-    const events = Number.isFinite(start.getTime())
-      ? await c.env.DB.prepare(
-          `SELECT COUNT(*) AS n FROM events
+      )
+        .bind(user.id, day.date)
+        .first<{ n: number }>()
+      const start = new Date(
+        Date.parse(day.date + 'T00:00:00Z') + offset * 60000,
+      )
+      const end = new Date(start.getTime() + 86400000)
+      const events = Number.isFinite(start.getTime())
+        ? await c.env.DB.prepare(
+            `SELECT COUNT(*) AS n FROM events
            WHERE user_id = ? AND status = 'scheduled'
            AND starts_at >= ? AND starts_at < ?`,
-        ).bind(user.id, start.toISOString(), end.toISOString()).first<{ n: number }>()
-      : null
-    return {
-      ...day,
-      committedMinutes: (day.committedMinutes ?? 0) +
-        Number(tasks?.n ?? 0) * 30 + Number(events?.n ?? 0) * 60,
-    }
-  }))
+          )
+            .bind(user.id, start.toISOString(), end.toISOString())
+            .first<{ n: number }>()
+        : null
+      return {
+        ...day,
+        committedMinutes:
+          (day.committedMinutes ?? 0) +
+          Number(tasks?.n ?? 0) * 30 +
+          Number(events?.n ?? 0) * 60,
+      }
+    }),
+  )
   const completedStepIds = Array.isArray(body.completedStepIds)
-    ? body.completedStepIds.filter((id): id is string => typeof id === 'string').slice(0, 500)
+    ? body.completedStepIds
+        .filter((id): id is string => typeof id === 'string')
+        .slice(0, 500)
     : []
   return c.json({
-    preview: previewDocumentPathway(documentId, suggestions, availability, completedStepIds),
+    preview: previewDocumentPathway(
+      documentId,
+      suggestions,
+      availability,
+      completedStepIds,
+    ),
     assumptions: {
       taskMinutes: 30,
       appointmentMinutes: 60,
