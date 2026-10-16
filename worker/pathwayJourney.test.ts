@@ -141,7 +141,9 @@ describe('document to approved study pathway journey', () => {
     })
     expect(paths.status).toBe(200)
     expect(await paths.json()).toMatchObject({
-      pathways: [{ documentId: id, openSessions: view.preview.sessions.length }],
+      pathways: [
+        { documentId: id, openSessions: view.preview.sessions.length },
+      ],
     })
     const privatePaths = await h.request('/api/documents/study-pathways', {
       cookie: stranger.cookie,
