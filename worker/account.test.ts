@@ -346,5 +346,16 @@ describe('account deletion', () => {
       body: { confirm: 'DELETE', password: 'correct horse battery' },
     })
     expect(paying.status).toBe(409)
+
+    // Once it's set to end at period end it can't charge again: deleting is allowed.
+    h.run(
+      `UPDATE user_entitlements SET cancel_at_period_end = 1 WHERE id = 'e1'`,
+    )
+    const ending = await h.request('/api/account', {
+      method: 'DELETE',
+      cookie: bob.cookie,
+      body: { confirm: 'DELETE', password: 'correct horse battery' },
+    })
+    expect(ending.status).toBe(200)
   })
 })

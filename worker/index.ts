@@ -8,6 +8,7 @@ import {
   sweepExpiredChallenges,
   sweepExpiredDocuments,
 } from './lib/documents/lifecycle'
+import { reconcileSubscriptions } from './lib/billing/reconcile'
 import { newId } from './lib/ids'
 import {
   authSecretProblem,
@@ -215,8 +216,12 @@ async function scheduled(
           new Date().toISOString(),
         ),
       ])
+      const billing = await reconcileSubscriptions(env).catch(() => ({
+        checked: 0,
+        failed: -1,
+      }))
       console.log(
-        `housekeeping: ${documents.forgotten} document(s) forgotten, ${documents.failed} retry later`,
+        `housekeeping: ${documents.forgotten} document(s) forgotten, ${documents.failed} retry later; billing ${billing.checked} checked, ${billing.failed} failed`,
       )
     })(),
   )

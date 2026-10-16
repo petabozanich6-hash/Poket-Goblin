@@ -233,6 +233,10 @@ const HANDLED = new Set([
   'customer.subscription.deleted',
   'customer.subscription.paused',
   'customer.subscription.resumed',
+  // Renewals and failed payments: re-read the subscription so a missed
+  // subscription.updated can't leave a paying customer on Free.
+  'invoice.paid',
+  'invoice.payment_failed',
 ])
 
 billingWebhookRoutes.post('/', async (c) => {
@@ -269,8 +273,11 @@ billingWebhookRoutes.post('/', async (c) => {
   try {
     const obj = event.data.object
     const subId =
-      event.type === 'checkout.session.completed'
-        ? (obj.subscription as string | null)
+      event.type === 'checkout.session.completed' ||
+      event.type.startsWith('invoice.')
+        ? typeof obj.subscription === 'string'
+          ? obj.subscription
+          : null
         : (obj.id as string)
     if (subId) {
       // Always read the latest state, so out-of-order events can't regress it.
@@ -283,7 +290,13 @@ billingWebhookRoutes.post('/', async (c) => {
         event.type === 'checkout.session.completed'
           ? ((obj.client_reference_id as string | null) ?? null)
           : null
-      await applySubscription(c.env.DB, sub, hint)
+      await applySubscription(c.env.DB, sub, hint, new Date(), (id) =>
+        stripe<StripeSubscription>(
+          config,
+          'GET',
+          `/subscriptions/${encodeURIComponent(id)}`,
+        ),
+      )
     }
   } catch (error) {
     // Let Stripe retry: forget that we saw it.

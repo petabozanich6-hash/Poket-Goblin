@@ -240,10 +240,13 @@ accountRoutes.delete('/', async (c) => {
     )
     return c.json({ error: 'Your password is incorrect.' }, 401)
   }
-  // A paying customer must cancel first, so nobody is billed for a deleted account.
+  // A subscription that will still renew or retry a payment must be
+  // cancelled first, so nobody is billed for a deleted account. One already
+  // set to end at period end can't charge again, so it doesn't block.
   const paying = await c.env.DB.prepare(
     `SELECT 1 FROM user_entitlements WHERE user_id = ? AND source = 'stripe'
-       AND status IN ('active', 'trialing', 'past_due') AND ended_at IS NULL`,
+       AND ended_at IS NULL AND cancel_at_period_end = 0
+       AND status NOT IN ('canceled', 'incomplete_expired')`,
   )
     .bind(user.id)
     .first()

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { app } from './index'
+import { reconcileSubscriptions } from './lib/billing/reconcile'
 import { applySubscription, verifyStripeSignature } from './lib/billing/stripe'
 import { createHarness, type Harness, type TestUser } from './testing/harness'
 
@@ -228,6 +229,156 @@ describe('subscription identity safety', () => {
   })
 })
 
+describe('replacement subscriptions', () => {
+  const DAY = 86_400
+  const nowS = () => Math.floor(Date.now() / 1000)
+  const event = (id: string, type: string, subId: string) => ({
+    id,
+    type,
+    livemode: false,
+    data: {
+      object: type.startsWith('invoice.')
+        ? { subscription: subId }
+        : type === 'checkout.session.completed'
+          ? { subscription: subId, client_reference_id: alice.id }
+          : { id: subId },
+    },
+  })
+  const linked = () =>
+    h.query(
+      `SELECT stripe_subscription_id AS sub, status FROM user_entitlements
+       WHERE user_id = ? AND ended_at IS NULL`,
+      alice.id,
+    )
+
+  it('re-buying after cancelling at period end activates the new one, whatever the event order', async () => {
+    // A: cancelled at period end, still paid for 10 more days.
+    sub('sub_A', 'active', alice.id, {
+      cancel_at_period_end: true,
+      created: nowS() - 20 * DAY,
+      items: {
+        data: [
+          {
+            current_period_end: nowS() + 10 * DAY,
+            price: { recurring: { interval: 'month' } },
+          },
+        ],
+      },
+    })
+    await deliver(event('evt_a1', 'customer.subscription.updated', 'sub_A'))
+    expect(linked()).toEqual([{ sub: 'sub_A', status: 'active' }])
+
+    // B: bought again, renews.
+    sub('sub_B', 'active', alice.id, { created: nowS() })
+    await deliver(event('evt_b1', 'checkout.session.completed', 'sub_B'))
+    expect(linked()).toEqual([{ sub: 'sub_B', status: 'active' }])
+
+    // Late and repeated events for A can't take B away.
+    await deliver(event('evt_a2', 'customer.subscription.updated', 'sub_A'))
+    await deliver(event('evt_a2', 'customer.subscription.updated', 'sub_A'))
+    subscriptions.set('sub_A', {
+      ...subscriptions.get('sub_A')!,
+      status: 'canceled',
+    })
+    await deliver(event('evt_a3', 'customer.subscription.deleted', 'sub_A'))
+    expect(linked()).toEqual([{ sub: 'sub_B', status: 'active' }])
+    expect((await plan(alice)).plan).toBe('premium')
+  })
+
+  it('new subscription events arriving before the old one ends still activate it', async () => {
+    sub('sub_A', 'unpaid', alice.id, { created: nowS() - 60 * DAY })
+    await deliver(event('evt_a1', 'customer.subscription.updated', 'sub_A'))
+    expect((await plan(alice)).plan).toBe('free')
+    sub('sub_B', 'active', alice.id, { created: nowS() })
+    await deliver(event('evt_b1', 'customer.subscription.created', 'sub_B'))
+    expect(linked()).toEqual([{ sub: 'sub_B', status: 'active' }])
+    expect((await plan(alice)).plan).toBe('premium')
+    // The old row is kept, closed, for the record.
+    expect(
+      h.query(
+        `SELECT status FROM user_entitlements WHERE stripe_subscription_id = 'sub_A'`,
+      ),
+    ).toEqual([{ status: 'replaced' }])
+  })
+
+  it('a lapsed old subscription (missed renewal webhook) is replaced by a paid new one', async () => {
+    h.run(
+      `INSERT INTO user_entitlements
+        (id, user_id, entitlement, source, status, stripe_customer_id,
+         stripe_subscription_id, current_period_end)
+       VALUES ('old', ?, 'premium', 'stripe', 'active', 'cus_1', 'sub_A', ?)`,
+      alice.id,
+      new Date(Date.now() - DAY * 1000).toISOString(),
+    )
+    sub('sub_A', 'canceled', alice.id)
+    sub('sub_B', 'active', alice.id, { created: nowS() })
+    await deliver(event('evt_b1', 'invoice.paid', 'sub_B'))
+    expect(linked()).toEqual([{ sub: 'sub_B', status: 'active' }])
+    expect(
+      h.query(`SELECT status FROM user_entitlements WHERE id = 'old'`),
+    ).toEqual([{ status: 'canceled' }])
+  })
+
+  it('never activates a replacement that is not paid', async () => {
+    sub('sub_A', 'active', alice.id)
+    await deliver(event('evt_a1', 'customer.subscription.updated', 'sub_A'))
+    for (const status of [
+      'incomplete',
+      'incomplete_expired',
+      'unpaid',
+      'canceled',
+    ]) {
+      sub('sub_X', status, alice.id, { created: nowS() })
+      await deliver(
+        event(`evt_${status}`, 'customer.subscription.updated', 'sub_X'),
+      )
+      expect(linked()).toEqual([{ sub: 'sub_A', status: 'active' }])
+    }
+  })
+
+  it('two paid subscriptions: follows the one that renews, and does not flip back', async () => {
+    sub('sub_A', 'active', alice.id, { created: nowS() - DAY })
+    await deliver(event('evt_a1', 'customer.subscription.updated', 'sub_A'))
+    sub('sub_B', 'active', alice.id, { created: nowS() })
+    await deliver(event('evt_b1', 'customer.subscription.updated', 'sub_B'))
+    expect(linked()).toEqual([{ sub: 'sub_B', status: 'active' }])
+    await deliver(event('evt_a2', 'customer.subscription.updated', 'sub_A'))
+    await deliver(event('evt_b2', 'customer.subscription.updated', 'sub_B'))
+    expect(linked()).toEqual([{ sub: 'sub_B', status: 'active' }])
+    // If B is cancelled, A (still paid) takes over again.
+    subscriptions.set('sub_B', {
+      ...subscriptions.get('sub_B')!,
+      status: 'canceled',
+    })
+    await deliver(event('evt_b3', 'customer.subscription.deleted', 'sub_B'))
+    await deliver(event('evt_a3', 'invoice.paid', 'sub_A'))
+    expect(linked()).toEqual([{ sub: 'sub_A', status: 'active' }])
+  })
+
+  it('a renewal invoice refreshes the period end', async () => {
+    sub('sub_A', 'active', alice.id)
+    await deliver(event('evt_a1', 'customer.subscription.updated', 'sub_A'))
+    const later = nowS() + 60 * DAY
+    sub('sub_A', 'active', alice.id, {
+      items: {
+        data: [
+          {
+            current_period_end: later,
+            price: { recurring: { interval: 'month' } },
+          },
+        ],
+      },
+    })
+    await deliver(event('evt_inv', 'invoice.paid', 'sub_A'))
+    expect(
+      h.query(
+        `SELECT current_period_end AS end FROM user_entitlements WHERE user_id = ?`,
+        alice.id,
+      ),
+    ).toEqual([{ end: new Date(later * 1000).toISOString() }])
+  })
+})
+
 describe('webhook', () => {
   it('turns a completed checkout into Premium, once', async () => {
     sub('sub_1', 'active', alice.id)
@@ -383,5 +534,61 @@ describe('signature checks', () => {
     expect(await verifyStripeSignature('{}', undefined, 'whsec_test')).toBe(
       false,
     )
+  })
+})
+
+describe('hourly reconciliation', () => {
+  it('recovers a renewal whose webhook never arrived, and ends a cancelled one', async () => {
+    const past = new Date(Date.now() - 3_600_000).toISOString()
+    h.run(
+      `INSERT INTO user_entitlements
+        (id, user_id, entitlement, source, status, stripe_customer_id,
+         stripe_subscription_id, current_period_end)
+       VALUES ('e1', ?, 'premium', 'stripe', 'active', 'cus_1', 'sub_R', ?)`,
+      alice.id,
+      past,
+    )
+    expect((await plan(alice)).plan).toBe('free')
+    sub('sub_R', 'active', alice.id) // renewed in Stripe: 30 more days
+    expect(await reconcileSubscriptions(h.env)).toEqual({
+      checked: 1,
+      failed: 0,
+    })
+    expect((await plan(alice)).plan).toBe('premium')
+
+    sub('sub_R', 'canceled', alice.id, {
+      items: {
+        data: [{ current_period_end: Math.floor(Date.now() / 1000) - 60 }],
+      },
+    })
+    h.run(
+      `UPDATE user_entitlements SET current_period_end = ? WHERE id = 'e1'`,
+      past,
+    )
+    await reconcileSubscriptions(h.env)
+    expect((await plan(alice)).plan).toBe('free')
+    expect(
+      h.query(
+        `SELECT ended_at IS NOT NULL AS ended FROM user_entitlements WHERE id = 'e1'`,
+      ),
+    ).toEqual([{ ended: 1 }])
+  })
+
+  it('does nothing when billing is off, and never fails the hourly job', async () => {
+    const off = createHarness()
+    expect(await reconcileSubscriptions(off.env)).toEqual({
+      checked: 0,
+      failed: 0,
+    })
+    h.run(
+      `INSERT INTO user_entitlements
+        (id, user_id, entitlement, source, status, stripe_customer_id, stripe_subscription_id)
+       VALUES ('e2', ?, 'premium', 'stripe', 'past_due', 'cus_1', 'sub_missing')`,
+      alice.id,
+    )
+    expect(await reconcileSubscriptions(h.env)).toEqual({
+      checked: 0,
+      failed: 1,
+    })
   })
 })
