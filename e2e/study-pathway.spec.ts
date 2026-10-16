@@ -41,14 +41,18 @@ test('a study schedule becomes a reviewable path, downloadable calendar tasks an
     ),
   })
   await page.getByRole('button', { name: 'Feed it to the goblin' }).click()
-  await expect(page.getByRole('button', { name: 'Preview my pathway' })).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Preview my pathway' }),
+  ).toBeVisible()
 
   await page.getByRole('button', { name: 'Preview my pathway' }).click()
   await expect(page.getByText(/proposed sessions/)).toBeVisible()
   await expect(
     page.getByRole('button', { name: 'Approve and add these study tasks' }),
   ).toBeEnabled()
-  await page.getByRole('button', { name: 'Approve and add these study tasks' }).click()
+  await page
+    .getByRole('button', { name: 'Approve and add these study tasks' })
+    .click()
   await expect(page.getByText('Saved study sessions')).toBeVisible()
   const calendar = await page.request.get('/api/calendar/export.ics')
   expect(calendar.status()).toBe(200)
@@ -58,20 +62,31 @@ test('a study schedule becomes a reviewable path, downloadable calendar tasks an
   expect(content).toContain('Research essay')
 
   // The uploaded original can be discarded without losing the approved plan.
-  await page.getByRole('button', { name: /Done — skip the rest and delete the file/ }).click()
+  await page
+    .getByRole('button', { name: /Done — skip the rest and delete the file/ })
+    .click()
   await expect(page.getByText('DOCUMENT DEVOURED!')).toBeVisible()
   await page.getByRole('button', { name: 'Feed me another' }).click()
-  await expect(page.getByRole('heading', { name: 'Saved study pathways' })).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: 'Saved study pathways' }),
+  ).toBeVisible()
 
   await page.getByRole('button', { name: /unfinished/ }).click()
   await expect(page.getByText('Saved study sessions')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Find new days for missed work' })).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Find new days for missed work' }),
+  ).toBeVisible()
   await page.getByRole('button', { name: 'Undo this pathway' }).click()
   await expect(page.getByText('Saved study sessions')).toHaveCount(0)
-  const afterUndo = await (await page.request.get('/api/calendar/export.ics')).text()
+  const afterUndo = await (
+    await page.request.get('/api/calendar/export.ics')
+  ).text()
   expect(afterUndo).not.toContain('SUMMARY:To do:')
 
-  for (const [width, height] of [[390, 844], [1280, 900]]) {
+  for (const [width, height] of [
+    [390, 844],
+    [1280, 900],
+  ]) {
     await page.setViewportSize({ width: width!, height: height! })
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - window.innerWidth,
