@@ -147,4 +147,55 @@ describe('missed study day replanning', () => {
     expect(result.moves.every((move) => move.date === '2030-05-03')).toBe(true)
   })
 
+
+  it('does not schedule a dependent step if its missed prerequisite cannot fit', () => {
+    const result = planMissedStudySessions(
+      '2030-05-03',
+      [
+        session('draft', {
+          goalId: 'essay',
+          stepOrder: 1,
+          deadlineDate: '2030-05-04',
+        }),
+        session('reading', {
+          goalId: 'essay',
+          stepOrder: 0,
+          deadlineDate: '2030-05-03',
+        }),
+      ],
+      [{ date: '2030-05-04', availableMinutes: 120 }],
+    )
+    expect(result.moves).toEqual([])
+    expect(result.warnings).toEqual([
+      { sessionId: 'reading', reason: 'insufficient_capacity' },
+      { sessionId: 'draft', reason: 'dependency_order' },
+    ])
+  })
+
+  it('uses consistent prerequisite order with interleaved assessment groups', () => {
+    const result = planMissedStudySessions(
+      '2030-05-03',
+      [
+        session('essay-draft', { goalId: 'essay', stepOrder: 1 }),
+        session('math-work', { goalId: 'math', stepOrder: 0 }),
+        session('essay-read', { goalId: 'essay', stepOrder: 0 }),
+      ],
+      [
+        { date: '2030-05-03', availableMinutes: 120 },
+        { date: '2030-05-04', availableMinutes: 60 },
+      ],
+    )
+    expect(result.warnings).toEqual([])
+    expect(result.moves).toContainEqual({
+      sessionId: 'essay-read',
+      date: '2030-05-03',
+      minutes: 60,
+    })
+    expect(result.moves).toContainEqual({
+      sessionId: 'essay-draft',
+      date: '2030-05-04',
+      minutes: 60,
+    })
+  })
+
 })
