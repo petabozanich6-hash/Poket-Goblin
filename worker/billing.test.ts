@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { app } from './index'
-import { verifyStripeSignature } from './lib/billing/stripe'
+import { applySubscription, verifyStripeSignature } from './lib/billing/stripe'
 import { createHarness, type Harness, type TestUser } from './testing/harness'
 
 const STRIPE = {
@@ -207,6 +207,22 @@ describe('checkout', () => {
       body: {},
     })
     expect(res.status).toBe(409)
+  })
+})
+
+describe('subscription identity safety', () => {
+  it('does not replace an active subscription with a different old subscription', async () => {
+    h.run(
+      `INSERT INTO user_entitlements
+        (id, user_id, entitlement, source, status, stripe_customer_id, stripe_subscription_id)
+       VALUES ('current', ?, 'premium', 'stripe', 'active', 'cus_1', 'sub_new')`,
+      alice.id,
+    )
+    const older = sub('sub_old', 'active', alice.id)
+    await applySubscription(h.db, older)
+    expect(h.query(
+      "SELECT stripe_subscription_id AS subscription FROM user_entitlements WHERE id = 'current'",
+    )).toEqual([{ subscription: 'sub_new' }])
   })
 })
 
