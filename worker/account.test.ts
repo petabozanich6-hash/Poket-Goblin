@@ -216,6 +216,10 @@ describe('opt-in verified email registration gate', () => {
       code: 'email_verification_required',
     })
     expect((await h.request('/api/me')).status).toBe(401)
+    // Stopping the rollout for other signups must not bypass this pending user.
+    h.env.EMAIL_VERIFICATION_REQUIRED = 'false'
+    expect((await h.login('new-verification@example.com')).status).toBe(403)
+    h.env.EMAIL_VERIFICATION_REQUIRED = 'true'
     const verifyToken = lastToken('verify-email')
     const verified = await h.request('/api/auth/verify-email', {
       body: { token: verifyToken },
