@@ -1,0 +1,42 @@
+name: Format Goblin HQ feature branch
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feature/goblin-hq-parity-aud'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/goblin-hq-parity-aud
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Format only changed HQ feature files
+        run: |
+          npx prettier --write \
+            src/app/AppShell.tsx src/app/router.tsx \
+            src/features/hq/hqApi.ts src/features/support/SupportNotice.tsx \
+            src/pages/SupportPage.tsx src/pages/hq/HqCostsPage.tsx \
+            src/pages/hq/HqFeedbackPage.tsx src/pages/hq/HqLayout.tsx \
+            src/pages/hq/HqSecurityPage.tsx worker/lib/access.ts \
+            worker/lib/finance.ts worker/routes/admin.ts \
+            worker/routes/support.ts worker/index.ts worker/support.test.ts
+      - name: Commit formatting only to feature branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/app/AppShell.tsx src/app/router.tsx src/features/hq/hqApi.ts src/features/support/SupportNotice.tsx src/pages/SupportPage.tsx src/pages/hq/HqCostsPage.tsx src/pages/hq/HqFeedbackPage.tsx src/pages/hq/HqLayout.tsx src/pages/hq/HqSecurityPage.tsx worker/lib/access.ts worker/lib/finance.ts worker/routes/admin.ts worker/routes/support.ts worker/index.ts worker/support.test.ts
+          if ! git diff --cached --quiet; then
+            git commit -m 'style: format Pocket Goblin HQ feature'
+            git push origin HEAD:feature/goblin-hq-parity-aud
+          fi
