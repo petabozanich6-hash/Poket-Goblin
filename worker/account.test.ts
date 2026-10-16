@@ -182,23 +182,22 @@ describe('email verification', () => {
 })
 
 describe('opt-in verified email registration gate', () => {
-  it(
-    'refuses gated registration without writing if email is not configured',
-    async () => {
-      const plain = createHarness({ EMAIL_VERIFICATION_REQUIRED: 'true' })
-      const res = await plain.request('/api/auth/register', {
-        body: {
-          email: 'pending@example.com',
-          password: 'correct horse battery',
-          displayName: 'Pending',
-        },
-      })
-      expect(res.status).toBe(503)
-      expect(
-        plain.query("SELECT email FROM users WHERE email = 'pending@example.com'"),
-      ).toHaveLength(0)
-    },
-  )
+  it('refuses gated registration without writing if email is not configured', async () => {
+    const plain = createHarness({ EMAIL_VERIFICATION_REQUIRED: 'true' })
+    const res = await plain.request('/api/auth/register', {
+      body: {
+        email: 'pending@example.com',
+        password: 'correct horse battery',
+        displayName: 'Pending',
+      },
+    })
+    expect(res.status).toBe(503)
+    expect(
+      plain.query(
+        "SELECT email FROM users WHERE email = 'pending@example.com'",
+      ),
+    ).toHaveLength(0)
+  })
 
   it('sends email but denies access until the proof link is used', async () => {
     h.env.EMAIL_VERIFICATION_REQUIRED = 'true'

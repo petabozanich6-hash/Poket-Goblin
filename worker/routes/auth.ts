@@ -76,7 +76,8 @@ authRoutes.post('/register', async (c) => {
   if (verificationRequired && !c.env.EMAIL) {
     return c.json(
       {
-        error: 'Registration is temporarily unavailable. Please try again later.',
+        error:
+          'Registration is temporarily unavailable. Please try again later.',
       },
       503,
     )
@@ -131,13 +132,7 @@ authRoutes.post('/register', async (c) => {
   }
   const session = await createSession(c.env.DB, c.env, id)
   setSessionCookie(c, session.token, session.expiresAt)
-  await sendVerificationEmail(
-    c.env,
-    id,
-    emailRaw,
-    displayName,
-    c.req.url,
-  )
+  await sendVerificationEmail(c.env, id, emailRaw, displayName, c.req.url)
 
   return c.json(
     {
@@ -415,10 +410,7 @@ authRoutes.post('/verify-email', async (c) => {
 authRoutes.post('/verify-email/resend', async (c) => {
   const limit = checkRateLimit(`verify-public:${clientKey(c)}`, 5, 60 * 60_000)
   if (!limit.ok)
-    return c.json(
-      { error: 'Please wait a while before trying again.' },
-      429,
-    )
+    return c.json({ error: 'Please wait a while before trying again.' }, 429)
   const body = (await c.req.json().catch(() => null)) as Record<
     string,
     unknown

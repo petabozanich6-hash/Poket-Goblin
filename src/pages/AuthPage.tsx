@@ -105,19 +105,15 @@ export function AuthPage() {
         {pendingEmail ? (
           <div className={styles.form} data-testid="email-verification-pending">
             <p role="status">
-              <strong>Check your inbox!</strong> We sent a confirmation link to
-              {' '}{pendingEmail}. You can enter the Goblin's den after confirming
+              <strong>Check your inbox!</strong> We sent a confirmation link to{' '}
+              {pendingEmail}. You can enter the Goblin's den after confirming
               that the email is yours.
             </p>
             <p>
               If it isn't there, check spam. Email delivery may take a few
               minutes.
             </p>
-            <Button
-              type="button"
-              disabled={busy}
-              onClick={() => void resend()}
-            >
+            <Button type="button" disabled={busy} onClick={() => void resend()}>
               {busy ? 'Sending…' : 'Resend confirmation email'}
             </Button>
             {resendMessage && <p role="status">{resendMessage}</p>}
