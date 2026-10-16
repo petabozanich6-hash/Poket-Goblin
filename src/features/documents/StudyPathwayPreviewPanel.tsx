@@ -58,7 +58,10 @@ export function StudyPathwayPreviewPanel({
       </p>
       <label>
         Planning window{' '}
-        <select value={horizonDays} onChange={(event) => setHorizonDays(Number(event.target.value))}>
+        <select
+          value={horizonDays}
+          onChange={(event) => setHorizonDays(Number(event.target.value))}
+        >
           <option value={21}>3 weeks</option>
           <option value={42}>6 weeks</option>
           <option value={84}>12 weeks</option>
@@ -117,7 +120,10 @@ export function StudyPathwayPreviewPanel({
             </p>
           ) : null}
           {preview.preview.unschedulable.length > 0 ? (
-            <p role="alert">{preview.preview.unschedulable.length} study steps need a confirmed deadline before they can be scheduled.</p>
+            <p role="alert">
+              {preview.preview.unschedulable.length} study steps need a
+              confirmed deadline before they can be scheduled.
+            </p>
           ) : null}
           <p>
             Nothing has been added. Approval and rescheduling are still being
