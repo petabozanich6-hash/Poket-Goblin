@@ -217,7 +217,12 @@ documentRoutes.post('/:id/pathway-preview', async (c) => {
       body.availability.some((day) =>
         !day || typeof day.date !== 'string' ||
         !Number.isFinite(day.availableMinutes) ||
-        day.availableMinutes < 0 || day.availableMinutes > 1440
+        day.availableMinutes < 0 || day.availableMinutes > 1440 ||
+        (day.committedMinutes !== undefined &&
+          (!Number.isFinite(day.committedMinutes) ||
+            day.committedMinutes < 0 ||
+            day.committedMinutes > 1440)) ||
+        (day.blocked !== undefined && typeof day.blocked !== 'boolean')
       )) {
     return c.json({ error: 'Provide available study minutes for each day (maximum 120 days).' }, 400)
   }
