@@ -1,0 +1,29 @@
+name: Format study pathway journey once
+on:
+  push:
+    branches: [feature/pathway-capacity-engine]
+    paths: [.github/workflows/pathway-journey-test-format-once.yml]
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/pathway-capacity-engine
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx prettier --write worker/pathwayJourney.test.ts
+      - name: Commit formatting
+        run: |
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add worker/pathwayJourney.test.ts
+            git commit -m "Format pathway journey acceptance test"
+            git push origin HEAD:feature/pathway-capacity-engine
+          fi
