@@ -315,16 +315,70 @@ describe('a real-world study schedule', () => {
     ).toBe(false)
   })
 
-  it('turns each week’s topic into that week’s study', () => {
-    const weekly = plan().suggestions.filter((s) => s.group === 'Week by week')
-    expect(weekly.map((s) => [s.title, s.dueDate])).toEqual([
-      ['Week 1: Module 1: Approaching the topic', '2026-10-25'],
-      ['Week 2: Module 2: Contexts', '2026-11-01'],
-      ['Week 5: Assignment preparation and writing', '2026-11-22'],
-      ['Week 6: Module 5: Practice', '2026-11-29'],
-      ['Week 10: Exam Preparation and Writing', '2027-01-10'],
+  it('splits each week into three small sessions on different days', () => {
+    const weekly = plan().suggestions.filter((s) =>
+      s.group?.startsWith('Week '),
+    )
+    expect(weekly).toHaveLength(15)
+    const week1 = weekly.filter((s) => s.group?.startsWith('Week 1:'))
+    expect(week1).toHaveLength(3)
+    expect(new Set(week1.map((s) => s.dueDate)).size).toBe(3)
+    expect(
+      week1.every(
+        (s) =>
+          s.dueDate! >= '2026-10-19' &&
+          s.dueDate! <= '2026-10-25' &&
+          s.requiresReview === true,
+      ),
+    ).toBe(true)
+    expect(week1.map((s) => s.title)).toEqual([
+      'Week 1: Read or watch the learning materials — Module 1: Approaching the topic',
+      'Week 1: Write key notes and questions — Module 1: Approaching the topic',
+      'Week 1: Practise the activities or exercises — Module 1: Approaching the topic',
     ])
-    expect(plan().summary).toMatch(/week-by-week study plan \(5 weeks\)/)
+    expect(plan().summary).toMatch(/spread 15 study sessions across 5 weeks/)
+  })
+
+  it('uses lighter days and respects capacity instead of piling on', () => {
+    const dates = [
+      '2026-10-19',
+      '2026-10-20',
+      '2026-10-21',
+      '2026-10-22',
+      '2026-10-23',
+      '2026-10-24',
+    ]
+    const dailyLoad = Object.fromEntries(dates.map((day) => [day, 5]))
+    const result = planDeadlines(SCHEDULE, {
+      reference,
+      capacityMode: 'goblin',
+      planningApproach: 'minimal',
+      dailyLoad,
+    })!
+    const week1 = result.suggestions.filter((s) =>
+      s.group?.startsWith('Week 1:'),
+    )
+    expect(week1).toHaveLength(1)
+    expect(week1[0]?.dueDate).toBe('2026-10-25')
+    expect(result.warnings).toContainEqual(
+      expect.stringMatching(/Week 1 is busy/),
+    )
+  })
+
+  it('handles weekly study schedules without assessment due dates', () => {
+    const text = [
+      'Study Schedule — semester',
+      'Week Commencing Topic',
+      '1 19 October 2026',
+      'Module 1: Research skills',
+      '2 26 October 2026',
+      'Module 2: Source evaluation',
+    ].join('\\n')
+    const base = understandDocument(text, 'schedule.pdf', { reference })
+    const result = withDeadlinePlan(base, text, { reference })
+    expect(
+      result.suggestions.filter((s) => s.group?.startsWith('Week ')),
+    ).toHaveLength(6)
   })
 
   it('summarises an outline that lists assessments but no dates', () => {
