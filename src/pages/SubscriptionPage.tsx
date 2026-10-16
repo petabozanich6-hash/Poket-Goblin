@@ -165,16 +165,16 @@ export function SubscriptionPage() {
 
           <div className={styles.plans}>
             <Card className={data.plan === 'free' ? styles.mine : undefined}>
-              <h2 className={styles.title}>Free</h2>
+              <h2 className={styles.title}>Free — Meet Your Goblin</h2>
               <p className={styles.price}>Free, always</p>
               <ul className={styles.list}>
                 <li>
-                  <Check size={16} aria-hidden /> Tell the Goblin anything —
-                  lists, tasks, reminders, appointments
+                  <Check size={16} aria-hidden /> Basic organisation: tasks,
+                  reminders, shopping and appointments
                 </li>
                 <li>
-                  <Check size={16} aria-hidden /> Documents turned into plans,
-                  and the panic button
+                  <Check size={16} aria-hidden /> A taste of document help,
+                  plus the panic button
                 </li>
                 <li>
                   <Check size={16} aria-hidden /> Your calendar on your phone
@@ -192,7 +192,7 @@ export function SubscriptionPage() {
 
             <Card className={data.plan === 'premium' ? styles.mine : undefined}>
               <h2 className={styles.title}>
-                <Crown size={20} aria-hidden /> Premium
+                <Crown size={20} aria-hidden /> Premium — Unleash the Goblin
               </h2>
               {data.billingAvailable && chosen ? (
                 <>
@@ -212,7 +212,7 @@ export function SubscriptionPage() {
               )}
               <ul className={styles.list}>
                 <li>
-                  <Check size={16} aria-hidden /> Everything in Free
+                  <Check size={16} aria-hidden /> Everything in Free, with generous fair-use allowances
                 </li>
                 <li>
                   <Check size={16} aria-hidden /> Smart help{' '}
