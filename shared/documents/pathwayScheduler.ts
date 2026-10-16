@@ -67,13 +67,13 @@ export function recommendPathway(
   const capacity = new Map<string, number>()
   for (const day of days) {
     // Duplicate availability rows must not manufacture extra time.
-    const free = day.blocked
-      ? 0
-      : Math.max(
-          0,
-          Math.floor(day.availableMinutes) -
-            Math.max(0, Math.floor(day.committedMinutes ?? 0)),
-        )
+    const available = Number.isFinite(day.availableMinutes)
+      ? Math.max(0, Math.floor(day.availableMinutes))
+      : 0
+    const committed = Number.isFinite(day.committedMinutes ?? 0)
+      ? Math.max(0, Math.floor(day.committedMinutes ?? 0))
+      : available
+    const free = day.blocked ? 0 : Math.max(0, available - committed)
     capacity.set(day.date, Math.min(capacity.get(day.date) ?? Infinity, free))
   }
   const warnings: PathwayWarning[] = []
