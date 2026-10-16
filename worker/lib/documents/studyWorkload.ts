@@ -18,7 +18,7 @@ export async function loadStudyWorkload(
   today: string,
   timezoneOffsetMinutes: number,
 ): Promise<Workload> {
-  const end = addDays(today, 62)
+  const end = addDays(today, 118)
   const [settings, tasks, events] = await Promise.all([
     db
       .prepare(
