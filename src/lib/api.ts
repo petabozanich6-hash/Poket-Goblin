@@ -22,6 +22,8 @@ const PUBLIC_PAGES = new Set([
   '/forgot-password',
   '/reset-password',
   '/verify-email',
+  '/terms',
+  '/privacy',
 ])
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {

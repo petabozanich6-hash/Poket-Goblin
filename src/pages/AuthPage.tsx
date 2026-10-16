@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input'
 import { useAuth } from '@/features/auth/useAuth'
 import { PlatformBanner } from '@/features/platform/PlatformBanner'
 import { api, ApiError } from '@/lib/api'
+import { TrustFooter } from '@/features/legal/TrustFooter'
 
 import styles from './AuthPage.module.css'
 
@@ -216,6 +217,7 @@ export function AuthPage() {
             )}
           </p>
         )}
+        <TrustFooter />
       </Card>
     </div>
   )

@@ -89,6 +89,27 @@ app.use('*', async (c, next) => {
   return next()
 })
 
+// Cross-site request forgery guard for every state-changing call. SameSite
+// cookies alone still let another site submit a plain form to /api/auth/login
+// (signing the visitor into an attacker's account). Browsers label every
+// request with Sec-Fetch-Site and send Origin on cross-origin POSTs, so a
+// request from another site is refused; server-to-server callers such as the
+// Stripe webhook send neither and are verified by their own signatures.
+app.use('*', async (c, next) => {
+  const method = c.req.method
+  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS')
+    return next()
+  const site = c.req.header('Sec-Fetch-Site')
+  const origin = c.req.header('Origin')
+  if (
+    site === 'cross-site' ||
+    (origin && !allowedOrigin(origin, c.env.ENVIRONMENT))
+  ) {
+    return c.json({ error: 'Request blocked.' }, 403)
+  }
+  return next()
+})
+
 app.route('/auth', authRoutes)
 app.route('/platform', platformRoutes)
 // Calendar apps can't sign in: the private link's token is the key.
@@ -110,7 +131,11 @@ app.use('*', async (c, next) => {
   const resolved = await resolveSession(c.env.DB, c.env, c.req.header('Cookie'))
   if (resolved.kind === 'suspended') {
     return c.json(
-      { error: 'This account is suspended.', code: 'account_suspended' },
+      {
+        error:
+          'This account is suspended. If you think that’s a mistake, write to support@pocketgoblin.org.',
+        code: 'account_suspended',
+      },
       403,
     )
   }
@@ -216,6 +241,14 @@ async function scheduled(
           new Date().toISOString(),
         ),
       ])
+      // Sign-in rate limit windows are at most an hour long. Separate, so a
+      // not-yet-applied migration can't stop the rest of housekeeping.
+      await env.DB.prepare(
+        `DELETE FROM auth_rate_limits WHERE window_start < ?`,
+      )
+        .bind(Date.now() - 2 * 3_600_000)
+        .run()
+        .catch(() => undefined)
       const billing = await reconcileSubscriptions(env).catch(() => ({
         checked: 0,
         failed: -1,

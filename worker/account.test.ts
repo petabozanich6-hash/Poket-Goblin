@@ -462,3 +462,81 @@ describe('account deletion', () => {
     expect(ending.status).toBe(200)
   })
 })
+
+describe('account email safety and branding', () => {
+  it('a password change cancels outstanding reset links and sends a notice', async () => {
+    await h.request('/api/auth/password/forgot', {
+      body: { email: 'alice@example.com' },
+    })
+    const stale = lastToken('reset-password')
+    const change = await h.request('/api/account/password', {
+      cookie: alice.cookie,
+      body: {
+        currentPassword: 'original password',
+        newPassword: 'brand new password',
+      },
+    })
+    expect(change.status).toBe(200)
+    expect(sent.at(-1)?.subject).toBe('Your Pocket Goblin password was changed')
+    const reuse = await h.request('/api/auth/password/reset', {
+      body: { token: stale, password: 'attacker password' },
+    })
+    expect(reuse.status).toBe(400)
+    expect(
+      (await h.login('alice@example.com', 'brand new password')).status,
+    ).toBe(200)
+  })
+
+  it('a reset sends a notice too', async () => {
+    await h.request('/api/auth/password/forgot', {
+      body: { email: 'alice@example.com' },
+    })
+    await h.request('/api/auth/password/reset', {
+      body: {
+        token: lastToken('reset-password'),
+        password: 'another password',
+      },
+    })
+    expect(sent.at(-1)?.text).toMatch(/was just reset/)
+  })
+
+  it('emails are branded, mobile-friendly, with a plain-text twin and a raw link', async () => {
+    await h.request('/api/auth/password/forgot', {
+      body: { email: 'alice@example.com' },
+    })
+    const mail = sent.at(-1)!
+    expect(mail.html).toContain('<meta name="viewport"')
+    expect(mail.html).toContain('<html lang="en">')
+    expect(mail.html).toContain('https://pocketgoblin.org/icons/icon-192.png')
+    expect(mail.html).toContain('copy this link into your browser')
+    expect(mail.text).toMatch(/Choose a new password: http/)
+    expect(mail.text).not.toContain('<')
+  })
+
+  it('signed-in resend: says when already confirmed, and when sending fails', async () => {
+    h.run(
+      `UPDATE users SET email_verified_at = '2026-01-01T00:00:00Z' WHERE id = ?`,
+      alice.id,
+    )
+    const done = await h.request('/api/account/verify-email/resend', {
+      cookie: alice.cookie,
+      body: {},
+    })
+    expect(await json(done)).toMatchObject({ alreadyVerified: true })
+
+    const failing = createHarness({
+      EMAIL: {
+        send: vi.fn(async () => {
+          throw Object.assign(new Error('nope'), { code: 'E_DELIVERY' })
+        }),
+      } as unknown as SendEmail,
+    })
+    const bob = await failing.register('bob@example.com')
+    const res = await failing.request('/api/account/verify-email/resend', {
+      cookie: bob.cookie,
+      body: {},
+    })
+    expect(res.status).toBe(502)
+    expect(String((await json(res)).error)).toMatch(/couldn’t be sent/)
+  })
+})

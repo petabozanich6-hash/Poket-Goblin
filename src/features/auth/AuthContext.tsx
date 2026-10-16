@@ -86,9 +86,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       forgetUser()
       queryClient.clear()
       if (
-        !['/', '/forgot-password', '/reset-password', '/verify-email'].includes(
-          window.location.pathname,
-        )
+        ![
+          '/',
+          '/forgot-password',
+          '/reset-password',
+          '/verify-email',
+          '/terms',
+          '/privacy',
+        ].includes(window.location.pathname)
       ) {
         window.location.assign('/')
       }

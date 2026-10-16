@@ -13,6 +13,7 @@ import { CalendarPage } from '@/pages/CalendarPage'
 import { CapturePage } from '@/pages/CapturePage'
 import { DocumentsPage } from '@/pages/DocumentsPage'
 import { HomePage } from '@/pages/HomePage'
+import { LegalPage } from '@/pages/LegalPage'
 import { InboxPage } from '@/pages/InboxPage'
 import { LifePage } from '@/pages/LifePage'
 import { MyLifeLayout, MyLifeOverview } from '@/pages/MyLifePage'
@@ -78,6 +79,8 @@ export function AppRouter() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/terms" element={<LegalPage doc="terms" />} />
+        <Route path="/privacy" element={<LegalPage doc="privacy" />} />
         {/* Straight to the microphone: no dashboard in the way. */}
         <Route
           path="/voice"

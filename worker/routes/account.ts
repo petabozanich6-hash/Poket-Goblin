@@ -5,11 +5,17 @@
 import { Hono } from 'hono'
 
 import type { Env } from '../env'
+import { appBaseUrl } from '../lib/accountTokens'
 import { loadAccess } from '../lib/access'
 import { recordSecurityEvent } from '../lib/audit'
+import { passwordChangedEmail, sendEmail, SUPPORT } from '../lib/email'
 import { getObjectStore } from '../lib/storage'
 import { hashPassword, verifyPassword } from '../lib/passwords'
-import { checkRateLimit } from '../lib/rateLimit'
+import {
+  checkDurableLimit,
+  checkRateLimit,
+  waitMessage,
+} from '../lib/rateLimit'
 import { SESSION_COOKIE, type AuthUser, type SessionInfo } from '../lib/session'
 import { sendVerificationEmail } from './auth'
 
@@ -122,30 +128,75 @@ accountRoutes.post('/password', async (c) => {
       user.id,
       c.get('session').id,
     ),
+    // A reset link from before the change must not undo it.
+    c.env.DB.prepare(
+      `DELETE FROM account_tokens WHERE user_id = ? AND purpose = 'password_reset'`,
+    ).bind(user.id),
   ])
   await recordSecurityEvent(c.env.DB, user.id, 'password_changed')
+  await sendEmail(
+    c.env,
+    passwordChangedEmail({
+      to: user.email,
+      displayName: user.displayName,
+      how: 'changed',
+      forgotUrl: `${appBaseUrl(c.env, c.req.url)}/forgot-password`,
+    }),
+  )
   return c.json({ ok: true })
 })
 
 accountRoutes.post('/verify-email/resend', async (c) => {
   const user = c.get('user')
-  const limit = checkRateLimit(`verify-resend:${user.id}`, 3, 60 * 60_000)
+  const verified = await c.env.DB.prepare(
+    `SELECT email_verified_at AS at FROM users WHERE id = ?`,
+  )
+    .bind(user.id)
+    .first<{ at: string | null }>()
+  if (verified?.at)
+    return c.json({
+      ok: true,
+      alreadyVerified: true,
+      message: 'Your email is already confirmed.',
+    })
+  const limit = await checkDurableLimit(
+    c.env.DB,
+    `verify-resend:${user.id}`,
+    3,
+    60 * 60_000,
+  )
   if (!limit.ok)
-    return c.json({ error: 'Please wait before asking again.' }, 429)
+    return c.json(
+      {
+        error: `You’ve asked for a few already. ${waitMessage(limit.retryAfterSec)}`,
+      },
+      429,
+      { 'Retry-After': String(limit.retryAfterSec) },
+    )
   if (!c.env.EMAIL) {
     return c.json(
       { error: 'Email isn’t set up yet. Please try again later.' },
       503,
     )
   }
-  await sendVerificationEmail(
+  const sent = await sendVerificationEmail(
     c.env,
     user.id,
     user.email,
     user.displayName,
     c.req.url,
   )
-  return c.json({ ok: true })
+  if (!sent)
+    return c.json(
+      {
+        error: `The email couldn’t be sent just now. Try again in a few minutes, or write to ${SUPPORT}.`,
+      },
+      502,
+    )
+  return c.json({
+    ok: true,
+    message: `Sent to ${user.email}. Check your inbox (and spam).`,
+  })
 })
 
 accountRoutes.get('/export', async (c) => {

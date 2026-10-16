@@ -1,0 +1,11 @@
+.footer {
+  margin-top: var(--space-3);
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--color-ink-muted);
+  overflow-wrap: anywhere;
+}
+
+.footer a {
+  color: var(--color-accent-strong);
+}

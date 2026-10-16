@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
+import { TrustFooter } from '@/features/legal/TrustFooter'
 import { api, ApiError } from '@/lib/api'
 
 import styles from './AuthPage.module.css'
@@ -44,6 +45,7 @@ function Shell({
         <p className={styles.switch}>
           <Link to="/">Back to sign in</Link>
         </p>
+        <TrustFooter />
       </Card>
     </div>
   )
@@ -205,7 +207,14 @@ export function VerifyEmailPage() {
     api
       .post('/auth/verify-email', { token })
       .then(() => setState('done'))
-      .catch(() => setState('failed'))
+      .catch((err) => {
+        // A dead link and a busy server need different advice.
+        if (err instanceof ApiError && err.status === 400) setState('failed')
+        else {
+          setState('failed')
+          setError(errorText(err))
+        }
+      })
       .finally(forgetFragment)
   }, [token])
 
@@ -232,6 +241,13 @@ export function VerifyEmailPage() {
             ? 'Thanks — your email is confirmed. 👹 You can sign in now.'
             : 'That link may have expired or already been used. You can request a new one below.'}
       </p>
+      {state === 'done' || state === 'failed' ? (
+        <p>
+          {state === 'failed' ? 'Already confirmed it? Then just ' : ''}
+          <Link to="/">Sign in</Link>
+          {state === 'failed' ? '.' : ''}
+        </p>
+      ) : null}
       {state === 'failed' ? (
         <form className={styles.form} onSubmit={(e) => void resend(e)}>
           <Input
