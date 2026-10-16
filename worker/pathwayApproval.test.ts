@@ -126,4 +126,61 @@ describe('approved pathway transactions and Undo', () => {
       ),
     ).toEqual([{ title: 'Completed reading' }, { title: 'Unrelated chore' }])
   })
+
+  it('creates a new active version after Undo without erasing cancelled history', async () => {
+    const sessions = [
+      {
+        stepId: 'doc:0:Reading',
+        goalId: 'doc:assessment',
+        title: 'Reading',
+        date: '2030-05-12',
+        minutes: 60,
+        sequence: 1,
+      },
+    ]
+    const first = await persistApprovedPathway(
+      h.env.DB,
+      alice.id,
+      'repeat-doc',
+      sessions,
+      new Map([['doc:0:Reading', '2030-05-20']]),
+    )
+    const undo = await h.request('/api/documents/repeat-doc/pathway-undo', {
+      method: 'POST',
+      cookie: alice.cookie,
+    })
+    expect(undo.status).toBe(200)
+    const next = await persistApprovedPathway(
+      h.env.DB,
+      alice.id,
+      'repeat-doc',
+      sessions,
+      new Map([['doc:0:Reading', '2030-05-20']]),
+    )
+    expect(next.alreadySaved).toBe(false)
+    expect(next.id).not.toBe(first.id)
+    expect(
+      h.query(
+        'SELECT status FROM study_pathways WHERE user_id = ? ORDER BY status',
+        alice.id,
+      ),
+    ).toEqual([{ status: 'active' }, { status: 'cancelled' }])
+    expect(
+      h.query(
+        'SELECT status FROM study_pathway_sessions WHERE user_id = ? ORDER BY status',
+        alice.id,
+      ),
+    ).toEqual([{ status: 'cancelled' }, { status: 'planned' }])
+    expect(
+      h.query('SELECT id FROM tasks WHERE user_id = ?', alice.id),
+    ).toHaveLength(1)
+    const saved = await h.request('/api/documents/repeat-doc/pathway', {
+      cookie: alice.cookie,
+    })
+    expect(saved.status).toBe(200)
+    expect(await saved.json()).toMatchObject({
+      pathway: { id: next.id, status: 'active' },
+    })
+  })
+
 })
