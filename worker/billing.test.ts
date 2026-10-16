@@ -592,3 +592,22 @@ describe('hourly reconciliation', () => {
     })
   })
 })
+
+describe('no double subscriptions', () => {
+  it('refuses a new checkout while an unpaid subscription is still open', async () => {
+    h.run(
+      `INSERT INTO user_entitlements
+        (id, user_id, entitlement, source, status, stripe_customer_id, stripe_subscription_id)
+       VALUES ('stuck', ?, 'premium', 'stripe', 'unpaid', 'cus_1', 'sub_stuck')`,
+      alice.id,
+    )
+    expect((await plan(alice)).plan).toBe('free')
+    const res = await h.request('/api/billing/checkout', {
+      cookie: alice.cookie,
+      body: { interval: 'month' },
+    })
+    expect(res.status).toBe(409)
+    expect(((await res.json()) as Json).code).toBe('subscription_open')
+    expect(calls.some((c) => c.url.includes('/checkout/sessions'))).toBe(false)
+  })
+})

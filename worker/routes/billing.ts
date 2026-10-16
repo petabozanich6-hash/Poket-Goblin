@@ -165,6 +165,26 @@ billingRoutes.post('/checkout', async (c) => {
       409,
     )
   }
+  // A subscription that hasn't given up yet (e.g. a card retry, or
+  // incomplete) would keep charging alongside a new one: fix that first.
+  const stuck = await c.env.DB.prepare(
+    `SELECT status FROM user_entitlements
+     WHERE user_id = ? AND source = 'stripe' AND ended_at IS NULL
+       AND cancel_at_period_end = 0
+       AND status NOT IN ('canceled', 'incomplete_expired')`,
+  )
+    .bind(user.id)
+    .first<{ status: string }>()
+  if (stuck) {
+    return c.json(
+      {
+        error:
+          'Your previous subscription is still open (usually a payment that needs updating). Open “Manage billing” to update your card or cancel it, then come back.',
+        code: 'subscription_open',
+      },
+      409,
+    )
+  }
   const previous = await stripeRow(c.env.DB, user.id)
   const origin = siteOrigin(c)
   try {

@@ -64,40 +64,63 @@ That needs the Owner's explicit approval.
 - Linking the price IDs does **not** require putting Stripe secrets in GitHub. Live billing must remain disabled until credentials, signing secret, webhook, portal and live checkout are verified, with explicit owner approval.
 - Existing Stripe promotion-code entry remains separate from Goblin Deals. Review this before turning on custom campaign redemptions.
 
-## Restrictive free tier rollout (pending full enforcement)
+## Free and Premium: what is enforced (verified 16 October 2026)
 
-Free should remain permanent. No automatic trial, countdown, or charge.
-Default **new** platform settings now offer Free 3 AI requests/day and 10 MB of kept documents; Premium remains 40 AI/day and 1 GB. These controls already exist in backend AI and document-storage code. Persisted Owner HQ settings in production override defaults and must be explicitly updated after review.
+Free is permanent: no trial, countdown or card. Reaching a limit never
+deletes anything; downgrading keeps every record and file.
 
-**Not yet complete: do not advertise these as enforced.** A 10-active-task, 3-reminder, 5-note, 1-list limit and 2-document-processings-per-month cap need consistent enforcement across direct CRUD, voice actions, AI-generated tasks, capture/review acceptance, document reprocessing, recurring occurrences and recovery/reopening routes, plus concurrent-write tests. The current document processor still has a daily per-plan allowance. Premium-reserved AI capacity also needs a shared global budget design. The subscription UI must not promise quotas until these paths are guarded and production settings are checked.
+| Allowance           | Free              | Premium   | Where it's enforced                                  |
+| ------------------- | ----------------- | --------- | ---------------------------------------------------- |
+| Active tasks        | 10                | no cap    | D1 triggers (migration 0016), every write path       |
+| Notes               | 5                 | no cap    | D1 triggers                                          |
+| Active reminders    | 3                 | no cap    | D1 triggers (pending/snoozed)                        |
+| Shopping lists      | 1 (items: no cap) | 1         | only one default list exists; no list-creation route |
+| AI-powered requests | 3 / day           | 40 / day  | atomic reservations before every Workers AI call     |
+| Document reads      | 2 / month         | 100 / day | atomic monthly reservation after validation          |
+| Kept documents      | 10 MB             | 1 GB      | checked on upload and on keep                        |
 
-### Quota acceptance test checklist
+- Triggers are the race-proof guard; app-level pre-checks give friendlier
+  messages. A trigger rejection becomes HTTP 403 `FREE_PLAN_LIMIT` with an
+  upgrade message, and the app shows a notice linking to the plan page.
+- Owner and active, trialing or past-due Stripe Premium (within the paid
+  period) are exempt, matching `resolvePlan` in `worker/lib/access.ts`.
+- Rule-only helpers (task breakdown, Ask the Goblin) never spend the AI
+  allowance. Over the limit, AI features fall back to the rule-based Goblin.
+- Free can use at most half of `AI_DAILY_GLOBAL_LIMIT` (production: 150 of
+  300), leaving room for Premium. External HTTP AI providers are refused in
+  production.
+- A document read is reserved after file validation, so a rejected file
+  costs nothing, and re-uploading a document that was already read
+  successfully doesn't spend another read. A read that fails after the
+  reservation (rare: storage error) does count.
+- Owner HQ settings (`platform_settings` `aiLimits`, `storageQuotas`)
+  override the defaults above. **Before launch, open Owner HQ → Platform
+  settings and confirm both say "Using the default" or the intended values.**
 
-- Direct tasks/notes/reminders: cap checks, completion, reopening, and recurring occurrences.
-- Captures and AI breakdown acceptance: count every created task and note before changes; do not partially accept.
-- Documents: test new uploads, duplicate rereads and /documents/:id/process against monthly budget; prevent concurrent retries from exceeding allowance.
-- Goblin action engine, review acceptance, document auto-add and bulk writes: still require consistent preflight quota enforcement and concurrency tests before activation.
-- Existing persisted Owner HQ settings must be reviewed and adjusted in production; code defaults cannot override configured values.
+## Subscription lifecycle (verified by tests in `worker/billing.test.ts`)
 
-### Latest validation (concurrency work)
-
-- The new **Free document monthly reservation** uses an atomic conditional upsert in `ai_request_limits` (two reservations per UTC calendar month). A failed attempt consumes its slot intentionally to cap cost; this must be disclosed plainly to users. This reservation is made before parsing/AI processing but after basic file validation for fresh uploads.
-- Automatic document suggestions flow through `acceptReviewItem`, which checks the same Free resource gates as the review inbox.
-- Shopping has only one default list managed through `ensureDefaultShoppingList`; the current authenticated shopping API has item routes but no list creation endpoint. Do not promise multi-list Premium functionality that doesn't exist.
-- **Critical release blocker:** tasks, notes and reminders still use count-then-insert checks that are _not atomic_. Simultaneous requests can exceed those quotas; implement database-level enforcement or an equivalent all-write-path atomic mechanism and regression-test it before merge.
-- **Critical release blocker:** monthly document reservations share a limit but an operation that fails or is retried consumes another reservation; confirm customer-facing wording and retry semantics before launch.
-- Confirm saved Owner HQ settings in production; defaults are not a guarantee of active settings.
-
-## Final Free/Premium release audit — 16 October 2026
-
-**Hold release pending live-settings and paid-provider checks.** Backend record caps are enforced by migration 0016, with Free limits of ten open tasks, five notes, and three pending/snoozed reminders. D1 trigger errors map to HTTP 403 FREE_PLAN_LIMIT. Owner and active paid entitlements are exempt; downgrades do not delete data. The monthly Free document allowance uses atomic ai_request_limits reservations, and the Workers AI transport reserves 50% of its configured global daily capacity against Free usage.
-
-**Must resolve before merging/deploying:**
-
-1. Verify production `platform_settings.aiLimits` and `platform_settings.storageQuotas` using authenticated Owner HQ settings API. Saved settings override defaults; the repository cannot establish live values.
-2. Audit the `openai_compatible` provider path for atomic, pre-call cost reservations. The shared atomic gate presently exists in the Workers AI binding; the separate external HTTP provider uses per-user request checks/usage recording and may not share global reservation safeguards. Either prohibit the external provider in production or bring it under the same cost controls before launch.
-3. Test customer-visible quota failures and downgrade transitions end-to-end, including document/manual reread handling. Reservations count processing **attempts**, including failed attempts after reservation, and duplicate uploads can consume another slot.
-4. Verify production billing settings/webhook safely. `STRIPE_LIVE_ENABLED` remains an explicit real-money release gate; CI green does not demonstrate checkout readiness. Do not enable without separate approval.
-5. Ensure Premium isn't described as having multi-list shopping or other functionality not provided by the current routes. The price page should reflect actual saved settings.
-
-**Product decision:** Permanent Free is limited by allowances; Premium presently offers higher quotas rather than an entirely different workflow. Keep marketing promises proportional to this distinction.
+- Every webhook re-reads the subscription from Stripe, so stale or
+  out-of-order payloads can't regress state; duplicate deliveries are
+  ignored by event id.
+- Handled: `checkout.session.completed`, `customer.subscription.*`
+  (created, updated, deleted, paused, resumed), `invoice.paid`,
+  `invoice.payment_failed`. **Add the two invoice events to the webhook
+  endpoint in the Stripe dashboard.**
+- Cancel at period end keeps Premium until the period ends; then the
+  account is Free with everything kept.
+- **Replacement subscriptions:** if the customer buys again (new
+  subscription id) the new one takes over as soon as the linked one stops
+  giving access, or immediately if it is preferred (it renews, then later
+  period end, then newer). Late events for the old subscription can never
+  take access away, and an unpaid replacement never grants access. The old
+  row is closed (`replaced` or its Stripe status) in the same batch.
+- Checkout is refused while a subscription that could still charge is open
+  (for example `unpaid` during card retries), so customers can't end up
+  paying twice. They're sent to "Manage billing".
+- **Hourly reconciliation** (cron) re-reads up to 25 linked subscriptions
+  that are due to renew within a day, lapsed, or in payment trouble, so a
+  lost webhook can't strand a paying customer on Free.
+- Account deletion is blocked only by a subscription that would still
+  renew; one already set to end at period end doesn't block it.
+- Recommended Stripe setting: after all payment retries fail, **cancel the
+  subscription** (rather than "mark unpaid").

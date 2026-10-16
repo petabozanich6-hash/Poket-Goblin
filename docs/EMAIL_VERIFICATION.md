@@ -32,3 +32,14 @@ are ready. Use the Cloudflare Worker variable
 Turning the flag off stops gating **new** registrations only. It does not
 unlock previously pending users. Restore mail delivery or assist the parent
 in verifying their email; never bypass an existing verification requirement.
+
+## Sending domain (owner)
+
+Account emails come from `no-reply@pocketgoblin.org` (replies go to
+`support@pocketgoblin.org`) through the `EMAIL` binding (Cloudflare Email
+Service). Onboarding pocketgoblin.org to Cloudflare Email Sending adds the
+SPF and DKIM records; also publish a DMARC record (start with
+`v=DMARC1; p=none; rua=mailto:support@pocketgoblin.org`, tighten to
+`quarantine` once reports look clean). Then send a real reset email to a
+Gmail and an Outlook inbox and check it isn't flagged as spam. Make sure
+`support@pocketgoblin.org` is a monitored mailbox.
