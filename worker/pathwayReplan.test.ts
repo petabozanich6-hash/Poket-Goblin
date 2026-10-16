@@ -58,16 +58,22 @@ describe('approved missed-day replan endpoint', () => {
       .bind(alice.id, 'Finished the reading')
       .run()
 
-    const foreign = await h.request('/api/documents/replan-doc/pathway-replan', {
-      cookie: bob.cookie,
-      body: { availability },
-    })
+    const foreign = await h.request(
+      '/api/documents/replan-doc/pathway-replan',
+      {
+        cookie: bob.cookie,
+        body: { availability },
+      },
+    )
     expect(foreign.status).toBe(404)
 
-    const preview = await h.request('/api/documents/replan-doc/pathway-replan', {
-      cookie: alice.cookie,
-      body: { availability },
-    })
+    const preview = await h.request(
+      '/api/documents/replan-doc/pathway-replan',
+      {
+        cookie: alice.cookie,
+        body: { availability },
+      },
+    )
     expect(preview.status).toBe(200)
     const proposal = (await preview.json()) as {
       applied: boolean
@@ -86,10 +92,13 @@ describe('approved missed-day replan endpoint', () => {
     ) as Array<{ day: string }>
     expect(before).toEqual([{ day: '2030-05-01' }])
 
-    const changed = await h.request('/api/documents/replan-doc/pathway-replan', {
-      cookie: alice.cookie,
-      body: { availability, apply: true, expectedMoves: proposal.moves },
-    })
+    const changed = await h.request(
+      '/api/documents/replan-doc/pathway-replan',
+      {
+        cookie: alice.cookie,
+        body: { availability, apply: true, expectedMoves: proposal.moves },
+      },
+    )
     expect(changed.status).toBe(200)
     expect(await changed.json()).toMatchObject({ applied: true })
     expect(
@@ -107,10 +116,13 @@ describe('approved missed-day replan endpoint', () => {
       ),
     ).toEqual([{ day: '2030-05-01' }])
 
-    const repeated = await h.request('/api/documents/replan-doc/pathway-replan', {
-      cookie: alice.cookie,
-      body: { availability, apply: true, expectedMoves: proposal.moves },
-    })
+    const repeated = await h.request(
+      '/api/documents/replan-doc/pathway-replan',
+      {
+        cookie: alice.cookie,
+        body: { availability, apply: true, expectedMoves: proposal.moves },
+      },
+    )
     expect(repeated.status).toBe(409)
   })
 
@@ -136,7 +148,10 @@ describe('approved missed-day replan endpoint', () => {
       cookie: alice.cookie,
       body: { availability: smallWindow },
     })
-    const result = (await preview.json()) as { warnings: unknown[]; moves: unknown[] }
+    const result = (await preview.json()) as {
+      warnings: unknown[]
+      moves: unknown[]
+    }
     expect(result.moves).toHaveLength(0)
     expect(result.warnings).toHaveLength(1)
     const apply = await h.request('/api/documents/full-doc/pathway-replan', {

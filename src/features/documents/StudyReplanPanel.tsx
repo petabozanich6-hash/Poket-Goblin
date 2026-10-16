@@ -54,7 +54,11 @@ export function StudyReplanPanel({
       setAvailability(proposedDays)
       setProposal(result)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not check missed study days.')
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : 'Could not check missed study days.',
+      )
     } finally {
       setBusy(false)
     }
@@ -72,10 +76,16 @@ export function StudyReplanPanel({
       )
       if (!result.applied) throw new Error('The new dates were not saved.')
       setProposal(null)
-      setMessage(`Rescheduled ${result.moves.length} unfinished study sessions.`)
+      setMessage(
+        `Rescheduled ${result.moves.length} unfinished study sessions.`,
+      )
       await onUpdated()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not save the updated study dates.')
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : 'Could not save the updated study dates.',
+      )
       setProposal(null)
     } finally {
       setBusy(false)
@@ -85,7 +95,11 @@ export function StudyReplanPanel({
   return (
     <section aria-label="Rescue missed study sessions">
       <h5>Missed a study day? The goblin can find another.</h5>
-      <p>Only overdue, unfinished study sessions are considered. Completed work and assessment deadlines stay exactly where they are. Review all changes before applying them.</p>
+      <p>
+        Only overdue, unfinished study sessions are considered. Completed work
+        and assessment deadlines stay exactly where they are. Review all changes
+        before applying them.
+      </p>
       <label>
         Search ahead{' '}
         <select
@@ -128,7 +142,9 @@ export function StudyReplanPanel({
       <Button
         variant="secondary"
         onClick={() => void preview()}
-        disabled={busy || !Number.isFinite(minutes) || minutes < 15 || minutes > 600}
+        disabled={
+          busy || !Number.isFinite(minutes) || minutes < 15 || minutes > 600
+        }
       >
         {busy ? 'Checking…' : 'Find new days for missed work'}
       </Button>
@@ -136,27 +152,33 @@ export function StudyReplanPanel({
       {message ? <p role="status">{message}</p> : null}
       {proposal ? (
         <div aria-live="polite">
-          <p>{proposal.missedCount} missed sessions found; {proposal.moves.length} can be rescheduled.</p>
+          <p>
+            {proposal.missedCount} missed sessions found;{' '}
+            {proposal.moves.length} can be rescheduled.
+          </p>
           {proposal.moves.length ? (
             <ul>
               {proposal.moves.map((move) => (
                 <li key={move.sessionId}>
-                  {sessions.find((session) => session.id === move.sessionId)?.title ??
-                    'Study session'}: {move.date} — {move.minutes} min
+                  {sessions.find((session) => session.id === move.sessionId)
+                    ?.title ?? 'Study session'}
+                  : {move.date} — {move.minutes} min
                 </li>
               ))}
             </ul>
           ) : null}
           {proposal.warnings.length ? (
             <p role="alert">
-              {proposal.warnings.length} sessions cannot safely fit before their deadlines.
-              Change your availability or check the assessment requirements.
-              No sessions have been moved.
+              {proposal.warnings.length} sessions cannot safely fit before their
+              deadlines. Change your availability or check the assessment
+              requirements. No sessions have been moved.
             </p>
           ) : null}
           <Button
             onClick={() => void apply()}
-            disabled={busy || !proposal.moves.length || proposal.warnings.length > 0}
+            disabled={
+              busy || !proposal.moves.length || proposal.warnings.length > 0
+            }
           >
             {busy ? 'Saving…' : 'Approve these new study dates'}
           </Button>

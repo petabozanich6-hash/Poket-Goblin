@@ -86,7 +86,10 @@ export function previewDocumentPathway(
   })
   return {
     ...result,
-    deadlines: steps.map((step) => ({ stepId: step.id, deadline: step.deadline })),
+    deadlines: steps.map((step) => ({
+      stepId: step.id,
+      deadline: step.deadline,
+    })),
     estimates: steps.map((step) => ({
       stepId: step.id,
       minutes: step.minutes,

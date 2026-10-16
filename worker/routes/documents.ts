@@ -3,7 +3,10 @@ import type { DocumentSuggestion } from '../../shared/documents/understand'
 import type { DayAvailability } from '../../shared/documents/pathwayScheduler'
 import { freeDocumentProcessingQuota } from '../lib/freeQuota'
 import { persistApprovedPathway } from '../lib/documents/pathwayApproval'
-import { planMissedStudySessions, type SavedSessionForReplan } from '../lib/documents/pathwayReplan'
+import {
+  planMissedStudySessions,
+  type SavedSessionForReplan,
+} from '../lib/documents/pathwayReplan'
 import { Hono } from 'hono'
 
 import type { Env } from '../env'
@@ -559,7 +562,6 @@ documentRoutes.patch('/:id/pathway-sessions/:sessionId', async (c) => {
   return c.json({ sessionId: session.id, date, minutes })
 })
 
-
 /**
  * Preview by default. Applying requires the exact, freshly recomputed moves.
  * Existing and completed sessions are untouched; the original assessment
@@ -681,7 +683,9 @@ documentRoutes.post('/:id/pathway-replan', async (c) => {
       409,
     )
   }
-  const sessionsById = new Map((saved.results ?? []).map((row) => [row.id, row]))
+  const sessionsById = new Map(
+    (saved.results ?? []).map((row) => [row.id, row]),
+  )
   const statements = []
   for (const move of result.moves) {
     const previous = sessionsById.get(move.sessionId)

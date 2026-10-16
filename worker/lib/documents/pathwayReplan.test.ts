@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { planMissedStudySessions, type SavedSessionForReplan } from './pathwayReplan'
+import {
+  planMissedStudySessions,
+  type SavedSessionForReplan,
+} from './pathwayReplan'
 
 const session = (
   id: string,
