@@ -216,12 +216,14 @@ authRoutes.post('/login', async (c) => {
         email_verified_at: string | null
       }>()
   } catch (error) {
-    const missingColumn = /no such column: email_verification_required_at/i.test(
-      String(error),
-    )
+    const missingColumn =
+      /no such column: email_verification_required_at/i.test(String(error))
     if (!missingColumn || c.env.EMAIL_VERIFICATION_REQUIRED === 'true') {
       return c.json(
-        { error: 'Email verification is temporarily unavailable. Please try again.' },
+        {
+          error:
+            'Email verification is temporarily unavailable. Please try again.',
+        },
         503,
       )
     }
