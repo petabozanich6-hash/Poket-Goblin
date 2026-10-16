@@ -808,7 +808,7 @@ adminRoutes.get('/audit', requirePermission('audit.read'), async (c) => {
 // All writes inherit owner, CSRF, rate-limit and passkey step-up protections.
 const dealCode = /^[A-Z0-9][A-Z0-9_-]{2,31}$/
 const dateString = (v: unknown) =>
-  typeof v === 'string' && /^\\d{4}-\\d{2}-\\d{2}T/.test(v) && !Number.isNaN(Date.parse(v))
+  typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v) && !Number.isNaN(Date.parse(v))
     ? new Date(v).toISOString() : null
 
 adminRoutes.get('/deals', requirePermission('subscriptions.read'), async (c) => {
