@@ -37,8 +37,32 @@ jobs:
           printf 'ENVIRONMENT=development\nAUTH_SECRET=browser-test-only-not-for-production-1234567890\nAI_PROVIDER=none\n' > .dev.vars
       - name: Prepare isolated local database
         run: npm run db:migrate:local
-      - name: Browser acceptance test
-        run: PLAYWRIGHT_WEB_SERVER=1 npx playwright test e2e/study-pathway.spec.ts --reporter=line
+      - name: Start isolated local servers and run browser acceptance
+        run: |
+          npm run dev > /tmp/pocket-goblin-dev.log 2>&1 &
+          dev_pid=$!
+          trap 'kill "$dev_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for attempt in $(seq 1 55); do
+            if curl --fail --silent http://127.0.0.1:5173/ > /dev/null &&
+               curl --fail --silent http://127.0.0.1:8787/api/health > /dev/null; then
+              ready=1
+              break
+            fi
+            if ! kill -0 "$dev_pid" 2>/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo '::error::Local browser test servers did not start.'
+            cat /tmp/pocket-goblin-dev.log
+            exit 1
+          fi
+          npx playwright test e2e/study-pathway.spec.ts --reporter=line || {
+            cat /tmp/pocket-goblin-dev.log
+            exit 1
+          }
       - name: Upload browser failure evidence
         if: failure()
         uses: actions/upload-artifact@v4
