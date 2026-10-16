@@ -2,7 +2,7 @@
 -- Keep cancelled pathway versions for history, but only one active version per document.
 CREATE TABLE IF NOT EXISTS study_pathways (
   id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   document_id TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'cancelled')),
   approved_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -18,7 +18,7 @@ CREATE INDEX IF NOT EXISTS idx_study_pathways_user
 CREATE TABLE IF NOT EXISTS study_pathway_sessions (
   id TEXT PRIMARY KEY,
   pathway_id TEXT NOT NULL REFERENCES study_pathways(id) ON DELETE CASCADE,
-  user_id TEXT NOT NULL,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   step_id TEXT NOT NULL,
   goal_id TEXT,
   step_order INTEGER,
