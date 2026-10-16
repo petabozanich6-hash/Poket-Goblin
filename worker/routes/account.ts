@@ -60,7 +60,9 @@ export const EXPORTED_TABLES: Record<string, { omit?: string[] }> = {
   achievements: {},
   // The customer's message is theirs; the Owner's private triage notes are not.
   support_threads: { omit: ['internal_note', 'unread_for_owner'] },
-  promotion_redemptions: { omit: ['stripe_subscription_id', 'stripe_checkout_session_id'] },
+  promotion_redemptions: {
+    omit: ['stripe_subscription_id', 'stripe_checkout_session_id'],
+  },
 }
 
 /** Secrets and machinery that are deliberately not exported. */
@@ -174,11 +176,13 @@ accountRoutes.get('/export', async (c) => {
   }
   // Replies are linked by thread_id, not user_id. Export only replies to
   // threads owned by the requester; never reveal another customer's messages.
-  const supportReplies = await c.env.DB.prepare(`
+  const supportReplies = await c.env.DB.prepare(
+    `
     SELECT r.* FROM support_replies r
     INNER JOIN support_threads t ON t.id = r.thread_id
     WHERE t.user_id = ? ORDER BY r.created_at ASC
-  `)
+  `,
+  )
     .bind(user.id)
     .all<Record<string, unknown>>()
   data.support_replies = supportReplies.results ?? []

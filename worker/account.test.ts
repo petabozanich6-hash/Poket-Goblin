@@ -242,7 +242,9 @@ describe('data export', () => {
        VALUES ('thread_a', ?, 'feedback', 'Topic', 'Customer message', 'INTERNAL_ONLY')`,
       alice.id,
     )
-    const response = await h.request('/api/account/export', { cookie: alice.cookie })
+    const response = await h.request('/api/account/export', {
+      cookie: alice.cookie,
+    })
     expect(response.status).toBe(200)
     const exported = await response.text()
     expect(exported).toContain('Customer message')
