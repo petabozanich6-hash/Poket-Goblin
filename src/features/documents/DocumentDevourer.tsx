@@ -440,7 +440,7 @@ export function DevourReview({
             </h3>
             {!hasStudyPathway ? (
               <Button
-              onClick={() => void addWholePlan()
+              onClick={() => void addWholePlan()}
               disabled={adding !== null}
             >
               <CalendarDays size={16} aria-hidden />
