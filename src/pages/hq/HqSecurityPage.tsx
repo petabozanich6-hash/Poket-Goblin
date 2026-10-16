@@ -230,7 +230,11 @@ export function HqSecurityPage() {
         <Passkeys />
         <Sessions />
       </div>
-      <AuditLog />
     </>
   )
+}
+
+/** The audit log has its own HQ tab, as in Side-Quest Owner HQ. */
+export function HqAuditPage() {
+  return <AuditLog />
 }
