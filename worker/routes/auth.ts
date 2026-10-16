@@ -74,7 +74,12 @@ authRoutes.post('/register', async (c) => {
   // Rollout is explicit: never start gating registrations unless sending is configured.
   const verificationRequired = c.env.EMAIL_VERIFICATION_REQUIRED === 'true'
   if (verificationRequired && !c.env.EMAIL) {
-    return c.json({ error: 'Registration is temporarily unavailable. Please try again later.' }, 503)
+    return c.json(
+      {
+        error: 'Registration is temporarily unavailable. Please try again later.',
+      },
+      503,
+    )
   }
 
   const existing = await c.env.DB.prepare(
@@ -93,7 +98,9 @@ authRoutes.post('/register', async (c) => {
     await c.env.DB.prepare(
       `INSERT INTO users (id, email, password_hash, display_name, email_verification_required_at)
        VALUES (?, ?, ?, ?, ?)`,
-    ).bind(id, emailRaw, passwordHash, displayName, new Date().toISOString()).run()
+    )
+      .bind(id, emailRaw, passwordHash, displayName, new Date().toISOString())
+      .run()
   } else {
     await c.env.DB.prepare(
       `INSERT INTO users (id, email, password_hash, display_name)
@@ -110,12 +117,27 @@ authRoutes.post('/register', async (c) => {
   if (verificationRequired) {
     // Unverified accounts have NO usable session. Email service errors are
     // recoverable via public, rate-limited resend rather than granting access.
-    const sent = await sendVerificationEmail(c.env, id, emailRaw, displayName, c.req.url)
-    return c.json({ verificationRequired: true, emailSent: sent, email: emailRaw }, 201)
+    const sent = await sendVerificationEmail(
+      c.env,
+      id,
+      emailRaw,
+      displayName,
+      c.req.url,
+    )
+    return c.json(
+      { verificationRequired: true, emailSent: sent, email: emailRaw },
+      201,
+    )
   }
   const session = await createSession(c.env.DB, c.env, id)
   setSessionCookie(c, session.token, session.expiresAt)
-  await sendVerificationEmail(c.env, id, emailRaw, displayName, c.req.url)
+  await sendVerificationEmail(
+    c.env,
+    id,
+    emailRaw,
+    displayName,
+    c.req.url,
+  )
 
   return c.json(
     {
@@ -182,14 +204,23 @@ authRoutes.post('/login', async (c) => {
     )
   }
 
-  {
-    // A previously gated user stays protected even when gating new signups is switched off.
-    const pending = await c.env.DB.prepare(
-      'SELECT email_verification_required_at, email_verified_at FROM users WHERE id = ?',
-    ).bind(user.id).first<{ email_verification_required_at: string | null; email_verified_at: string | null }>()
-    if (pending?.email_verification_required_at && !pending.email_verified_at) {
-      return c.json({ error: 'Please confirm your email before signing in.', code: 'email_verification_required' }, 403)
-    }
+  // A previously gated user stays protected even when gating new signups is off.
+  const pending = await c.env.DB.prepare(
+    'SELECT email_verification_required_at, email_verified_at FROM users WHERE id = ?',
+  )
+    .bind(user.id)
+    .first<{
+      email_verification_required_at: string | null
+      email_verified_at: string | null
+    }>()
+  if (pending?.email_verification_required_at && !pending.email_verified_at) {
+    return c.json(
+      {
+        error: 'Please confirm your email before signing in.',
+        code: 'email_verification_required',
+      },
+      403,
+    )
   }
   const session = await createSession(c.env.DB, c.env, user.id)
   setSessionCookie(c, session.token, session.expiresAt)
@@ -383,17 +414,52 @@ authRoutes.post('/verify-email', async (c) => {
 // Always use an indistinguishable reply for unknown/verified addresses.
 authRoutes.post('/verify-email/resend', async (c) => {
   const limit = checkRateLimit(`verify-public:${clientKey(c)}`, 5, 60 * 60_000)
-  if (!limit.ok) return c.json({ error: 'Please wait a while before trying again.' }, 429)
-  const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null
+  if (!limit.ok)
+    return c.json(
+      { error: 'Please wait a while before trying again.' },
+      429,
+    )
+  const body = (await c.req.json().catch(() => null)) as Record<
+    string,
+    unknown
+  > | null
   const email = asString(body?.email, 254)?.toLowerCase()
-  if (!email || !isEmail(email)) return c.json({ error: 'Enter a valid email address.' }, 400)
-  const emailLimit = checkRateLimit(`verify-public-email:${email}`, 3, 60 * 60_000)
-  const reply = { ok: true, message: 'If this address needs confirmation, a new link is on its way.' }
+  if (!email || !isEmail(email)) {
+    return c.json({ error: 'Enter a valid email address.' }, 400)
+  }
+  const emailLimit = checkRateLimit(
+    `verify-public-email:${email}`,
+    3,
+    60 * 60_000,
+  )
+  const reply = {
+    ok: true,
+    message: 'If this address needs confirmation, a new link is on its way.',
+  }
   if (!emailLimit.ok) return c.json(reply)
-  if (!c.env.EMAIL) return c.json({ error: 'Email is unavailable. Please try again later.' }, 503)
+  if (!c.env.EMAIL) {
+    return c.json(
+      { error: 'Email is unavailable. Please try again later.' },
+      503,
+    )
+  }
   const row = await c.env.DB.prepare(
     'SELECT id, display_name, email_verified_at FROM users WHERE email = ? AND status = ?',
-  ).bind(email, 'active').first<{ id: string; display_name: string; email_verified_at: string | null }>()
-  if (row && !row.email_verified_at) await sendVerificationEmail(c.env, row.id, email, row.display_name, c.req.url)
+  )
+    .bind(email, 'active')
+    .first<{
+      id: string
+      display_name: string
+      email_verified_at: string | null
+    }>()
+  if (row && !row.email_verified_at) {
+    await sendVerificationEmail(
+      c.env,
+      row.id,
+      email,
+      row.display_name,
+      c.req.url,
+    )
+  }
   return c.json(reply)
 })
