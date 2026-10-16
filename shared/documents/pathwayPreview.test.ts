@@ -70,5 +70,9 @@ describe('previewDocumentPathway', () => {
     )
     expect(result.sessions[0]?.title).toBe('Read brief')
     expect(result.sessions.at(-1)?.title).toBe('Draft essay')
+    expect(result.stepOrders).toEqual([
+      { stepId: 'doc:1:Read brief', order: 0 },
+      { stepId: 'doc:0:Draft essay', order: 1 },
+    ])
   })
 })
