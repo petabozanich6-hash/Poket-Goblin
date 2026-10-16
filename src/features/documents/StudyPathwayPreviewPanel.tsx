@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button'
 import {
   approveStudyPathway,
   previewStudyPathway,
+  undoStudyPathway,
   type StudyPathwayPreview,
   type StudyDayAvailability,
 } from '@/features/explore/exploreApi'
@@ -22,6 +23,7 @@ export function StudyPathwayPreviewPanel({
   const [availability, setAvailability] = useState<StudyDayAvailability[]>([])
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [undoing, setUndoing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function generate() {
@@ -75,6 +77,21 @@ export function StudyPathwayPreviewPanel({
       setPreview(null)
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function undo() {
+    if (!saved || undoing) return
+    setUndoing(true)
+    setError(null)
+    try {
+      await undoStudyPathway(documentId)
+      setSaved(false)
+      setPreview(null)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not undo the pathway.')
+    } finally {
+      setUndoing(false)
     }
   }
 
@@ -165,7 +182,12 @@ export function StudyPathwayPreviewPanel({
             </p>
           ) : null}
           {saved ? (
-            <p role="status">Pathway approved and saved to your tasks.</p>
+            <div>
+              <p role="status">Pathway approved and saved to your tasks.</p>
+              <Button variant="secondary" onClick={() => void undo()} disabled={undoing}>
+                {undoing ? 'Undoing…' : 'Undo this pathway'}
+              </Button>
+            </div>
           ) : (
             <Button
               onClick={() => void approve()}
