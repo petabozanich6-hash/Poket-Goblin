@@ -45,11 +45,21 @@ test('a study schedule becomes a reviewable path, downloadable calendar tasks an
     page.getByRole('button', { name: 'Preview my pathway' }),
   ).toBeVisible()
 
+  await page.getByRole('combobox', { name: 'Planning window' }).selectOption('84')
+  await page.getByRole('spinbutton', { name: 'Minutes available per study day' }).fill('240')
+  await page.getByRole('checkbox', { name: 'Include weekends' }).check()
   await page.getByRole('button', { name: 'Preview my pathway' }).click()
   await expect(page.getByText(/proposed sessions/)).toBeVisible()
-  await expect(
-    page.getByRole('button', { name: 'Approve and add these study tasks' }),
-  ).toBeEnabled()
+  const approve = page.getByRole('button', {
+    name: 'Approve and add these study tasks',
+  })
+  if (!(await approve.isEnabled())) {
+    console.log(
+      'The study pathway was not approvable:',
+      await page.locator('section[aria-label="Study pathway preview"]').innerText(),
+    )
+  }
+  await expect(approve).toBeEnabled()
   await page
     .getByRole('button', { name: 'Approve and add these study tasks' })
     .click()
