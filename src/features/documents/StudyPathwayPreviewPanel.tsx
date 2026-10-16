@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { Button } from '@/components/ui/Button'
+import { StudyReplanPanel } from './StudyReplanPanel'
 import {
   approveStudyPathway,
   editStudyPathwaySession,
@@ -215,6 +216,11 @@ export function StudyPathwayPreviewPanel({
                 </li>
               ))}
           </ul>
+          <StudyReplanPanel
+            documentId={documentId}
+            sessions={stored.sessions}
+            onUpdated={refreshSaved}
+          />
           <Button
             variant="secondary"
             onClick={() => void undo()}
