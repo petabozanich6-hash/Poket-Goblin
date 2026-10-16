@@ -89,7 +89,7 @@ export const api = {
   admin: {
     get: <T>(path: string) => request<T>(`/admin${path}`),
     send: <T>(
-      method: 'POST' | 'PUT' | 'DELETE',
+      method: 'POST' | 'PUT' | 'PATCH' | 'DELETE',
       path: string,
       body?: unknown,
     ) =>

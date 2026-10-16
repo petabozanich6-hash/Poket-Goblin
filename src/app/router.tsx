@@ -24,6 +24,7 @@ import { TasksPage } from '@/pages/TasksPage'
 import { TellPage } from '@/pages/TellPage'
 import { VoicePage } from '@/pages/VoicePage'
 import { HqCostsPage } from '@/pages/hq/HqCostsPage'
+import { HqDealsPage } from '@/pages/hq/HqDealsPage'
 import { HqFeedbackPage } from '@/pages/hq/HqFeedbackPage'
 import { SupportPage } from '@/pages/SupportPage'
 import { HqCustomerPage } from '@/pages/hq/HqCustomerPage'
@@ -148,6 +149,7 @@ export function AppRouter() {
             <Route path="customers" element={<HqCustomersPage />} />
             <Route path="customers/:id" element={<HqCustomerPage />} />
             <Route path="costs" element={<HqCostsPage />} />
+            <Route path="deals" element={<HqDealsPage />} />
             <Route path="feedback" element={<HqFeedbackPage />} />
             <Route path="settings" element={<HqSettingsPage />} />
             <Route path="security" element={<HqSecurityPage />} />

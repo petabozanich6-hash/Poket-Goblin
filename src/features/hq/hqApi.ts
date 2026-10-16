@@ -165,10 +165,22 @@ export type AuditEntry = {
   createdAt: string
 }
 
-export type FxQuote = { base: 'USD'; quote: 'AUD'; rate: number; date: string; source: 'Frankfurter' }
+export type FxQuote = {
+  base: 'USD'
+  quote: 'AUD'
+  rate: number
+  date: string
+  source: 'Frankfurter'
+}
 
 export const hq = {
-  fx: () => api.admin.get<{ quote: FxQuote | null; conversionAvailable: boolean; costCollectionStatus: string; costExplanation: string }>('/finance/fx'),
+  fx: () =>
+    api.admin.get<{
+      quote: FxQuote | null
+      conversionAvailable: boolean
+      costCollectionStatus: string
+      costExplanation: string
+    }>('/finance/fx'),
   securityStatus: () => api.admin.get<SecurityStatus>('/security/status'),
   overview: () => api.admin.get<Overview>('/overview'),
   customers: (params: URLSearchParams) =>
