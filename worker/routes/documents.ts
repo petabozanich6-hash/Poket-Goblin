@@ -342,7 +342,7 @@ documentRoutes.post('/:id/pathway-approve', async (c) => {
       body.expectedSessions.length === 0 || body.expectedSessions.length > 500 ||
       body.availability.some(day =>
         !day || typeof day.date !== 'string' ||
-        !/^\\d{4}-\\d{2}-\\d{2}$/.test(day.date) ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(day.date) ||
         !Number.isFinite(Date.parse(day.date + 'T00:00:00Z')) ||
         new Date(day.date + 'T00:00:00Z').toISOString().slice(0, 10) !== day.date ||
         !Number.isFinite(day.availableMinutes) ||
