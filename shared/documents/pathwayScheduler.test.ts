@@ -69,6 +69,7 @@ describe('recommendPathway', () => {
     ])
     expect(result.sessions).toHaveLength(0)
     expect(result.warnings[0]?.reason).toBe('missing_dependency')
+    expect(result.unscheduledMinutes).toBe(90)
   })
   it('does not add duplicate capacity for duplicate day rows', () => {
     const result = recommendPathway([step({ minutes: 120 })], [
