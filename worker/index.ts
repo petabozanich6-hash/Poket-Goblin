@@ -150,9 +150,9 @@ app.notFound((c) => c.json({ error: 'Not found' }, 404))
 // Unhandled errors: log the route and error class (never bodies) so Goblin
 // HQ can report application health, then return a generic 500.
 app.onError(async (error, c) => {
-  const quotaMatch = String(error instanceof Error ? error.message : error).match(
-    /FREE_PLAN_LIMIT:(tasks|notes|reminders)/,
-  )
+  const quotaMatch = String(
+    error instanceof Error ? error.message : error,
+  ).match(/FREE_PLAN_LIMIT:(tasks|notes|reminders)/)
   if (quotaMatch) {
     const resource = quotaMatch[1]
     const descriptions: Record<string, [number, string]> = {
@@ -161,12 +161,15 @@ app.onError(async (error, c) => {
       reminders: [3, 'active reminders'],
     }
     const [limit, label] = descriptions[resource]!
-    return c.json({
-      error: `Free includes ${limit} ${label}. Upgrade to Premium to add more.`,
-      code: 'FREE_PLAN_LIMIT',
-      resource,
-      limit,
-    }, 403)
+    return c.json(
+      {
+        error: `Free includes ${limit} ${label}. Upgrade to Premium to add more.`,
+        code: 'FREE_PLAN_LIMIT',
+        resource,
+        limit,
+      },
+      403,
+    )
   }
   console.error(error)
   try {
