@@ -327,9 +327,9 @@ export function DevourReview({
   const actedFirst = auto.added > 0
   const groups = planGroups(open)
   const hasStudyPathway =
-    doc.documentType === 'education' ||
+    doc.documentType === 'education' &&
     groups.some((group) =>
-      /^(?:week\s+\d+|.*\b(?:essay|assessment|assignment|exam|study)\b)/i.test(
+      /^(?:week\s+\d+\b|.*\b(?:assessment|assignment|essay|exam|research project|study plan)\b)/i.test(
         group.label,
       ),
     )
