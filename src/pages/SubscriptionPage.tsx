@@ -195,10 +195,18 @@ export function SubscriptionPage() {
                 <Crown size={20} aria-hidden /> Premium
               </h2>
               {data.billingAvailable && chosen ? (
-                <p className={styles.price}>
-                  {formatPrice(chosen)}
-                  <span className={pageStyles.sub}> / {chosen.interval}</span>
-                </p>
+                <>
+                  <p className={styles.price}>
+                    {formatPrice(chosen)}
+                    <span className={pageStyles.sub}> / {chosen.interval}</span>
+                  </p>
+                  <p className={pageStyles.sub}>
+                    Base price shown in {chosen.currency.toUpperCase()}.
+                    Stripe automatically shows your supported local currency
+                    and confirms the exact recurring amount before you pay.
+                    No conversion is calculated by Pocket Goblin.
+                  </p>
+                </>
               ) : (
                 <p className={styles.price}>Coming soon</p>
               )}
