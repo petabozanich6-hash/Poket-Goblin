@@ -276,9 +276,15 @@ function allocatePreparationDay(
 }
 
 function studySessionsPerWeek(options: PlanOptions): number {
-  if (options.planningApproach === 'minimal' || options.capacityMode === 'goblin')
+  if (
+    options.planningApproach === 'minimal' ||
+    options.capacityMode === 'goblin'
+  )
     return 2
-  if (options.planningApproach === 'ambitious' && options.capacityMode === 'quest')
+  if (
+    options.planningApproach === 'ambitious' &&
+    options.capacityMode === 'quest'
+  )
     return 4
   return 3
 }
