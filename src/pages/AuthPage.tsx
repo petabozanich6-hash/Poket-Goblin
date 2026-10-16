@@ -37,7 +37,27 @@ export function AuthPage() {
         if (created.verificationRequired) setPendingEmail(created.email || email)
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Something went wrong')
+      if (err instanceof ApiError && err.message.includes('confirm your email')) {
+        setPendingEmail(email)
+      } else {
+        setError(err instanceof ApiError ? err.message : 'Something went wrong')
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function resend() {
+    if (!pendingEmail) return
+    setBusy(true)
+    setError(null)
+    try {
+      await api.post('/auth/verify-email/resend', { email: pendingEmail })
+      setResendMessage('If confirmation is needed, a fresh link is on its way.')
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : 'Could not resend the email',
+      )
     } finally {
       setBusy(false)
     }
@@ -79,67 +99,96 @@ export function AuthPage() {
 
         {pendingEmail ? (
           <div className={styles.form} data-testid="email-verification-pending">
-            <p role="status"><strong>Check your inbox!</strong> We've sent a confirmation link to {pendingEmail}. You can enter the Goblin's den after verifying your address.</p>
-            <p>If it isn't there, check spam. Email delivery may take a few minutes.</p>
-            <Button type="button" disabled={busy} onClick={() => {
-              setBusy(true); setError(null);
-              void api.post('/auth/verify-email/resend', { email: pendingEmail })
-                .then(() => setResendMessage("If your address is awaiting confirmation, a fresh link is on its way."))
-                .catch((err) => setError(err instanceof ApiError ? err.message : 'Could not resend the email'))
-                .finally(() => setBusy(false));
-            }}>{busy ? 'Sending…' : 'Resend confirmation email'}</Button>
+            <p role="status">
+              <strong>Check your inbox!</strong> We sent a confirmation link to{' '}
+              {pendingEmail}. You can enter the Goblin's den after confirming
+              that the email is yours.
+            </p>
+            <p>
+              If it isn't there, check spam. Email delivery may take a few
+              minutes.
+            </p>
+            <Button
+              type="button"
+              disabled={busy}
+              onClick={() => void resend()}
+            >
+              {busy ? 'Sending…' : 'Resend confirmation email'}
+            </Button>
             {resendMessage && <p role="status">{resendMessage}</p>}
-            {error && <p className={styles.error} role="alert">{error}</p>}
-            <button type="button" onClick={() => { setPendingEmail(null); setMode('login') }}>Already verified? Sign in</button>
-            <button type="button" onClick={() => { setPendingEmail(null); setMode('register') }}>Wrong address? Register with the correct email</button>
+            {error && (
+              <p className={styles.error} role="alert">
+                {error}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setPendingEmail(null)
+                setMode('login')
+              }}
+            >
+              Already verified? Sign in
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPendingEmail(null)
+                setMode('register')
+              }}
+            >
+              Wrong address? Register with the correct email
+            </button>
           </div>
-        ) : <form className={styles.form} onSubmit={(e) => void onSubmit(e)}>
-          {mode === 'register' ? (
+        ) : (
+          <form className={styles.form} onSubmit={(e) => void onSubmit(e)}>
+            {mode === 'register' ? (
+              <Input
+                label="What should the goblin call you?"
+                name="displayName"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                autoComplete="nickname"
+                required
+              />
+            ) : null}
             <Input
-              label="What should the goblin call you?"
-              name="displayName"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              autoComplete="nickname"
+              label="Email"
+              name="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
               required
             />
-          ) : null}
-          <Input
-            label="Email"
-            name="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-            required
-          />
-          <Input
-            label="Password"
-            name="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete={
-              mode === 'login' ? 'current-password' : 'new-password'
-            }
-            minLength={8}
-            required
-          />
+            <Input
+              label="Password"
+              name="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete={
+                mode === 'login' ? 'current-password' : 'new-password'
+              }
+              minLength={8}
+              required
+            />
 
-          {error ? (
-            <p className={styles.error} role="alert">
-              {error}
-            </p>
-          ) : null}
+            {error ? (
+              <p className={styles.error} role="alert">
+                {error}
+              </p>
+            ) : null}
 
-          <Button type="submit" disabled={busy}>
-            {busy
-              ? 'Working…'
-              : mode === 'login'
-                ? 'Enter the den'
-                : 'Create account'}
-          </Button>
-        </form>}
+            <Button type="submit" disabled={busy}>
+              {busy
+                ? 'Working…'
+                : mode === 'login'
+                  ? 'Enter the den'
+                  : 'Create account'}
+            </Button>
+          </form>
+        )}
 
         {!pendingEmail && mode === 'login' ? (
           <p className={styles.switch}>
@@ -147,23 +196,25 @@ export function AuthPage() {
           </p>
         ) : null}
 
-        {!pendingEmail && <p className={styles.switch}>
-          {mode === 'login' ? (
-            <>
-              New here?{' '}
-              <button type="button" onClick={() => setMode('register')}>
-                Create an account
-              </button>
-            </>
-          ) : (
-            <>
-              Already settled in?{' '}
-              <button type="button" onClick={() => setMode('login')}>
-                Log in
-              </button>
-            </>
-          )}
-        </p>}
+        {!pendingEmail && (
+          <p className={styles.switch}>
+            {mode === 'login' ? (
+              <>
+                New here?{' '}
+                <button type="button" onClick={() => setMode('register')}>
+                  Create an account
+                </button>
+              </>
+            ) : (
+              <>
+                Already settled in?{' '}
+                <button type="button" onClick={() => setMode('login')}>
+                  Log in
+                </button>
+              </>
+            )}
+          </p>
+        )}
       </Card>
     </div>
   )
