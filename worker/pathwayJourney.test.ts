@@ -126,6 +126,31 @@ describe('document to approved study pathway journey', () => {
     })
     expect(duplicated.status).not.toBe(201)
 
+    // Finishing the default temporary upload must not hide or delete the
+    // learner's approved pathway. The original document is disposable.
+    const finished = await h.request(`/api/documents/${id}/finish`, {
+      cookie: owner.cookie,
+      method: 'POST',
+    })
+    expect(finished.status).toBe(200)
+    const paths = await h.request('/api/documents/study-pathways', {
+      cookie: owner.cookie,
+    })
+    expect(paths.status).toBe(200)
+    expect(await paths.json()).toMatchObject({
+      pathways: [{ documentId: id, openSessions: view.preview.sessions.length }],
+    })
+    const privatePaths = await h.request('/api/documents/study-pathways', {
+      cookie: stranger.cookie,
+    })
+    expect(privatePaths.status).toBe(200)
+    expect(await privatePaths.json()).toEqual({ pathways: [] })
+
+    const reopened = await h.request(`/api/documents/${id}/pathway`, {
+      cookie: owner.cookie,
+    })
+    expect(reopened.status).toBe(200)
+
     const undo = await h.request(`/api/documents/${id}/pathway-undo`, {
       cookie: owner.cookie,
       method: 'POST',
