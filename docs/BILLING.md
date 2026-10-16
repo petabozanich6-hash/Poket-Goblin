@@ -78,3 +78,12 @@ Default **new** platform settings now offer Free 3 AI requests/day and 10 MB of 
 - Documents: test new uploads, duplicate rereads and /documents/:id/process against monthly budget; prevent concurrent retries from exceeding allowance.
 - Goblin action engine, review acceptance, document auto-add and bulk writes: still require consistent preflight quota enforcement and concurrency tests before activation.
 - Existing persisted Owner HQ settings must be reviewed and adjusted in production; code defaults cannot override configured values.
+
+### Latest validation (concurrency work)
+
+- The new **Free document monthly reservation** uses an atomic conditional upsert in `ai_request_limits` (two reservations per UTC calendar month). A failed attempt consumes its slot intentionally to cap cost; this must be disclosed plainly to users. This reservation is made before parsing/AI processing but after basic file validation for fresh uploads.
+- Automatic document suggestions flow through `acceptReviewItem`, which checks the same Free resource gates as the review inbox.
+- Shopping has only one default list managed through `ensureDefaultShoppingList`; the current authenticated shopping API has item routes but no list creation endpoint. Do not promise multi-list Premium functionality that doesn't exist.
+- **Critical release blocker:** tasks, notes and reminders still use count-then-insert checks that are *not atomic*. Simultaneous requests can exceed those quotas; implement database-level enforcement or an equivalent all-write-path atomic mechanism and regression-test it before merge.
+- **Critical release blocker:** monthly document reservations share a limit but an operation that fails or is retried consumes another reservation; confirm customer-facing wording and retry semantics before launch.
+- Confirm saved Owner HQ settings in production; defaults are not a guarantee of active settings.
