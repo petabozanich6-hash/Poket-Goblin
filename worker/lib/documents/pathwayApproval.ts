@@ -49,6 +49,17 @@ export async function persistApprovedPathway(
     ) {
       throw new Error('Invalid pathway session')
     }
+    const deadline = stepDeadlines.get(session.stepId)
+    if (
+      deadline !== undefined &&
+      (!/^\d{4}-\d{2}-\d{2}$/.test(deadline) ||
+        !Number.isFinite(Date.parse(deadline + 'T00:00:00Z')) ||
+        new Date(deadline + 'T00:00:00Z').toISOString().slice(0, 10) !==
+          deadline ||
+        session.date > deadline)
+    ) {
+      throw new Error('Invalid original assessment deadline')
+    }
     const taskId = newId('task')
     const sessionId = newId('session')
     statements.push(
@@ -82,6 +93,7 @@ export async function persistApprovedPathway(
           session.minutes,
           session.sequence,
           taskId,
+          deadline ?? null,
         ),
     )
   }
