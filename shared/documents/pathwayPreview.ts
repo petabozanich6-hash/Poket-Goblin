@@ -91,6 +91,7 @@ export function previewDocumentPathway(
       stepId: step.id,
       deadline: step.deadline,
     })),
+    stepOrders: steps.map((step, order) => ({ stepId: step.id, order })),
     estimates: steps.map((step) => ({
       stepId: step.id,
       minutes: step.minutes,
