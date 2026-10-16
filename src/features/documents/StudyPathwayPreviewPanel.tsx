@@ -14,6 +14,7 @@ export function StudyPathwayPreviewPanel({
 }) {
   const [minutes, setMinutes] = useState(60)
   const [includeWeekends, setIncludeWeekends] = useState(false)
+  const [horizonDays, setHorizonDays] = useState(21)
   const [preview, setPreview] = useState<StudyPathwayPreview | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -23,7 +24,7 @@ export function StudyPathwayPreviewPanel({
     setError(null)
     setPreview(null)
     try {
-      const dates = Array.from({ length: 21 }, (_, index) => {
+      const dates = Array.from({ length: horizonDays }, (_, index) => {
         const date = new Date()
         date.setHours(12, 0, 0, 0)
         date.setDate(date.getDate() + index)
@@ -52,9 +53,17 @@ export function StudyPathwayPreviewPanel({
     <section aria-label="Study pathway preview">
       <h4>Plan my study time</h4>
       <p>
-        See how these steps could fit into your next three weeks. This is only a
+        See how these steps could fit into your available study days. This is only a
         preview and will not change your tasks or calendar.
       </p>
+      <label>
+        Planning window{' '}
+        <select value={horizonDays} onChange={(event) => setHorizonDays(Number(event.target.value))}>
+          <option value={21}>3 weeks</option>
+          <option value={42}>6 weeks</option>
+          <option value={84}>12 weeks</option>
+        </select>
+      </label>
       <label>
         Minutes available per study day{' '}
         <input
@@ -106,6 +115,9 @@ export function StudyPathwayPreviewPanel({
               Some work could not fit. Change your availability or review the
               deadlines.
             </p>
+          ) : null}
+          {preview.preview.unschedulable.length > 0 ? (
+            <p role="alert">{preview.preview.unschedulable.length} study steps need a confirmed deadline before they can be scheduled.</p>
           ) : null}
           <p>
             Nothing has been added. Approval and rescheduling are still being
