@@ -1,3 +1,4 @@
+import { freeQuota } from './freeQuota'
 /**
  * Turn one suggestion (from a brain dump, capture or document) into a real
  * task, reminder, calendar entry, note or shopping item, exactly once.
@@ -17,7 +18,7 @@ import { resolveCategoryId } from './tasks'
 import { asString } from './validate'
 
 export type AcceptResult = {
-  status: 200 | 400 | 404 | 409
+  status: 200 | 400 | 403 | 404 | 409
   body: Record<string, unknown>
 }
 
@@ -92,6 +93,19 @@ export async function acceptReviewItem(
         body: { error: duplicateMessage(existing), duplicateOf: existing },
       }
     }
+  }
+
+  const resource =
+    type === 'note'
+      ? 'notes'
+      : type === 'reminder' || type === 'follow_up'
+        ? 'reminders'
+        : type === 'shopping' || type === 'appointment'
+          ? null
+          : 'tasks'
+  if (resource) {
+    const quota = await freeQuota(db, userId, resource)
+    if (quota) return { status: 403, body: quota }
   }
 
   // Atomic claim: a double-tap, or accepting the same suggestion from
