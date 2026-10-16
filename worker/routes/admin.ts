@@ -65,6 +65,7 @@ import {
   validateSetting,
 } from '../lib/platformSettings'
 import { checkRateLimit } from '../lib/rateLimit'
+import { usdAudQuote } from '../lib/finance'
 import {
   revokeAllSessions,
   type AuthUser,
@@ -444,6 +445,19 @@ adminRoutes.get('/overview', requirePermission('metrics.read'), async (c) => {
     ai,
     storage,
     health,
+  })
+})
+
+// Owner-only, passkey-gated exchange-rate reference. No financial account
+// details or user content are sent to the rate provider.
+adminRoutes.get('/finance/fx', requirePermission('metrics.read'), async (c) => {
+  const quote = await usdAudQuote()
+  return c.json({
+    quote,
+    conversionAvailable: Boolean(quote),
+    // D1 currently records AI request counts, not billable token/neuron usage.
+    costCollectionStatus: 'not_configured',
+    costExplanation: 'Provider charges cannot be inferred from request counts. No actual AI cost amount is available yet.',
   })
 })
 
