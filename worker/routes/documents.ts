@@ -509,14 +509,25 @@ documentRoutes.patch('/:id/pathway-sessions/:sessionId', async (c) => {
     )
   }
   const session = await c.env.DB.prepare(
-    `SELECT s.id, s.task_id as taskId
+    `SELECT s.id, s.task_id as taskId, s.pathway_id as pathwayId,
+            s.deadline_date as deadlineDate, s.goal_id as goalId,
+            s.step_order as stepOrder, s.sequence, s.minutes
      FROM study_pathway_sessions s
      JOIN study_pathways p ON p.id = s.pathway_id
      WHERE p.document_id = ? AND p.user_id = ? AND p.status = 'active'
        AND s.id = ? AND s.user_id = ? AND s.status = 'planned'`,
   )
     .bind(c.req.param('id'), user.id, c.req.param('sessionId'), user.id)
-    .first<{ id: string; taskId: string | null }>()
+    .first<{
+      id: string
+      taskId: string | null
+      pathwayId: string
+      deadlineDate: string | null
+      goalId: string | null
+      stepOrder: number | null
+      sequence: number
+      minutes: number
+    }>()
   if (!session?.taskId) {
     return c.json({ error: 'Editable session not found' }, 404)
   }
@@ -538,6 +549,44 @@ documentRoutes.patch('/:id/pathway-sessions/:sessionId', async (c) => {
       { error: 'Completed or removed sessions cannot be edited.' },
       409,
     )
+  }
+  if (
+    !session.deadlineDate ||
+    date > session.deadlineDate ||
+    minutes > session.minutes
+  ) {
+    return c.json(
+      { error: 'Check the original assessment deadline and available time before increasing study workload.' },
+      409,
+    )
+  }
+  if (session.goalId && session.stepOrder !== null) {
+    const peers = await c.env.DB.prepare(
+      `SELECT s.id, s.scheduled_date as date, s.step_order as stepOrder,
+              s.sequence
+       FROM study_pathway_sessions s
+       JOIN tasks t ON t.id = s.task_id AND t.user_id = s.user_id
+       WHERE s.pathway_id = ? AND s.user_id = ? AND s.goal_id = ?
+         AND s.id != ? AND s.status = 'planned'
+         AND t.status IN ('open', 'completed')
+         AND s.step_order IS NOT NULL`,
+    )
+      .bind(session.pathwayId, user.id, session.goalId, session.id)
+      .all<{ id: string; date: string; stepOrder: number; sequence: number }>()
+    const reversed = (peers.results ?? []).some((peer) =>
+      (peer.stepOrder < session.stepOrder! && date <= peer.date) ||
+      (peer.stepOrder > session.stepOrder! && date >= peer.date) ||
+      (peer.stepOrder === session.stepOrder &&
+        peer.sequence < session.sequence && date < peer.date) ||
+      (peer.stepOrder === session.stepOrder &&
+        peer.sequence > session.sequence && date > peer.date),
+    )
+    if (reversed) {
+      return c.json(
+        { error: 'This edit would reverse the order of study steps.' },
+        409,
+      )
+    }
   }
   await c.env.DB.batch([
     c.env.DB.prepare(
