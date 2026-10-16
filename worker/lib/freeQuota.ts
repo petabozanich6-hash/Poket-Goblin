@@ -44,3 +44,20 @@ export async function freeQuota(
     limit: rule.limit,
   }
 }
+
+/** Counts document processing events in the current UTC calendar month. */
+export async function freeDocumentProcessingQuota(db: D1Database, userId: string) {
+  const access = await loadAccess(db, userId)
+  if (access.plan !== 'free') return null
+  const monthStart = new Date().toISOString().slice(0, 7) + '-01'
+  const used = await db.prepare(
+    "SELECT COUNT(*) AS n FROM ai_events WHERE user_id = ? AND feature = 'document' AND created_at >= ?",
+  ).bind(userId, monthStart).first<{ n: number }>()
+  if (Number(used?.n ?? 0) < 2) return null
+  return {
+    error: 'Free includes 2 document reads per month. Upgrade to Premium for more.',
+    code: 'FREE_PLAN_LIMIT',
+    resource: 'document_processing',
+    limit: 2,
+  }
+}
