@@ -120,7 +120,10 @@ describe('approved pathway transactions and Undo', () => {
     )
     expect(response.status).toBe(200)
     expect(
-      h.query('SELECT title FROM tasks WHERE user_id = ? ORDER BY title', alice.id),
+      h.query(
+        'SELECT title FROM tasks WHERE user_id = ? ORDER BY title',
+        alice.id,
+      ),
     ).toEqual([
       { title: 'Completed reading' },
       { title: 'Unrelated chore' },
