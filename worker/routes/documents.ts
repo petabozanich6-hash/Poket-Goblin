@@ -253,7 +253,12 @@ documentRoutes.post('/:id/pathway-preview', async (c) => {
   for (const row of rows.results ?? []) {
     try {
       const suggestion = JSON.parse(row.payload) as DocumentSuggestion
-      if (suggestion.type === 'task' && suggestion.group)
+      if (
+        suggestion.type === 'task' &&
+        suggestion.group &&
+        (suggestion as DocumentSuggestion & { requiresReview?: boolean })
+          .requiresReview === true
+      )
         suggestions.push(suggestion)
     } catch {
       // Ignore malformed review payloads instead of trusting document content.
