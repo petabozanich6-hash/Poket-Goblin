@@ -173,8 +173,12 @@ export function SubscriptionPage() {
                   reminders, shopping and appointments
                 </li>
                 <li>
-                  <Check size={16} aria-hidden /> A taste of document help, plus
-                  the panic button
+                  <Check size={16} aria-hidden /> 10 active tasks, 3 active
+                  reminders and 5 notes
+                </li>
+                <li>
+                  <Check size={16} aria-hidden /> 2 document-processing attempts
+                  per month, plus the panic button
                 </li>
                 <li>
                   <Check size={16} aria-hidden /> Your calendar on your phone
@@ -188,6 +192,10 @@ export function SubscriptionPage() {
                   {storage(data.limits.free.storageMb)} of documents
                 </li>
               </ul>
+              <p className={pageStyles.sub}>
+                Processing attempts can count even if a document cannot be read.
+                Your saved information is not deleted if you change plans.
+              </p>
             </Card>
 
             <Card className={data.plan === 'premium' ? styles.mine : undefined}>
@@ -212,8 +220,8 @@ export function SubscriptionPage() {
               )}
               <ul className={styles.list}>
                 <li>
-                  <Check size={16} aria-hidden /> Everything in Free, with
-                  generous fair-use allowances
+                  <Check size={16} aria-hidden /> Everything in Free, with more
+                  room for tasks, reminders, notes and document processing
                 </li>
                 <li>
                   <Check size={16} aria-hidden /> Smart help{' '}
