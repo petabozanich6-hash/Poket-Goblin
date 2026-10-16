@@ -342,7 +342,11 @@ export type StudyReplanResponse = {
   moves: Array<{ sessionId: string; date: string; minutes: number }>
   warnings: Array<{
     sessionId: string
-    reason: 'missing_deadline' | 'deadline_passed' | 'insufficient_capacity'
+    reason:
+      | 'missing_deadline'
+      | 'deadline_passed'
+      | 'insufficient_capacity'
+      | 'dependency_order'
   }>
   applied: boolean
 }
