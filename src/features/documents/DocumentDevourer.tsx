@@ -330,9 +330,7 @@ export function DevourReview({
   const groups = planGroups(open)
   const hasStudyPathway =
     doc.documentType === 'education' &&
-    groups.some((group) =>
-      isStudyPathwayGroup(group.label),
-    )
+    groups.some((group) => isStudyPathwayGroup(group.label))
   const loose = open.filter((s) => !s.group)
 
   if (devoured) {
@@ -564,7 +562,9 @@ export function DocumentDevourer({
   const queryClient = useQueryClient()
   const [mode, setMode] = useState<'sort' | 'keep'>('sort')
   const [result, setResult] = useState<DevourResponse | null>(null)
-  const [managedDocumentId, setManagedDocumentId] = useState<string | null>(null)
+  const [managedDocumentId, setManagedDocumentId] = useState<string | null>(
+    null,
+  )
   const pathways = useQuery({
     queryKey: ['study-pathways'],
     queryFn: listStudyPathways,
@@ -618,7 +618,10 @@ export function DocumentDevourer({
 
   if (managedDocumentId)
     return (
-      <section className={styles.review} aria-label="Manage saved study pathway">
+      <section
+        className={styles.review}
+        aria-label="Manage saved study pathway"
+      >
         <Button
           variant="secondary"
           type="button"
@@ -639,8 +642,8 @@ export function DocumentDevourer({
         <section aria-label="Saved study pathways">
           <h3>Saved study pathways</h3>
           <p className={styles.muted}>
-            Return to an approved plan to edit sessions or rescue missed study days,
-            even after the uploaded document has been deleted.
+            Return to an approved plan to edit sessions or rescue missed study
+            days, even after the uploaded document has been deleted.
           </p>
           <ul>
             {pathways.data.pathways.map((pathway) => (

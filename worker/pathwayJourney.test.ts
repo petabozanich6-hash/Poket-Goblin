@@ -60,11 +60,14 @@ describe('document to approved study pathway journey', () => {
       id,
     ) as Array<{ payload: string; status: string }>
     const weekly = rows
-      .map((row) => ({ ...row, item: JSON.parse(row.payload) as {
-        title: string
-        group?: string
-        requiresReview?: boolean
-      } }))
+      .map((row) => ({
+        ...row,
+        item: JSON.parse(row.payload) as {
+          title: string
+          group?: string
+          requiresReview?: boolean
+        },
+      }))
       .filter((row) => row.item.group === 'Week by week')
     expect(weekly.length).toBeGreaterThan(0)
     expect(weekly.every((row) => row.item.requiresReview === true)).toBe(true)
@@ -98,7 +101,9 @@ describe('document to approved study pathway journey', () => {
       }
     }
     expect(view.preview.sessions.length).toBeGreaterThan(0)
-    expect(view.preview.sessions.some((item) => item.title.includes('Week 1'))).toBe(true)
+    expect(
+      view.preview.sessions.some((item) => item.title.includes('Week 1')),
+    ).toBe(true)
     expect(view.preview.unscheduledMinutes).toBe(0)
     expect(view.preview.warnings).toEqual([])
     expect(view.preview.unschedulable).toEqual([])
