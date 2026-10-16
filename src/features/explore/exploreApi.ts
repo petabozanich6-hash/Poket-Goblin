@@ -309,3 +309,29 @@ export function editStudyPathwaySession(
     { date, minutes },
   )
 }
+
+export type SavedStudyPathway = {
+  pathway: {
+    id: string
+    status: 'active' | 'cancelled'
+    approvedAt: string
+  } | null
+  sessions: Array<{
+    id: string
+    stepId: string
+    title: string
+    date: string
+    minutes: number
+    sequence: number
+    status: string
+    taskId: string | null
+    taskStatus: string | null
+  }>
+}
+
+/** Read the actual saved sessions, including edits and task completion. */
+export function getSavedStudyPathway(documentId: string) {
+  return api.get<SavedStudyPathway>(
+    `/documents/${encodeURIComponent(documentId)}/pathway`,
+  )
+}
