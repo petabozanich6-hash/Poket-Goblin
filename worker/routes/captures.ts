@@ -1,3 +1,4 @@
+import { freeQuota } from '../lib/freeQuota'
 import { Hono } from 'hono'
 
 import { generateOccurrences } from '../../shared/recurrence'
@@ -485,6 +486,18 @@ captureRoutes.post('/:captureId/items/:itemId/accept', async (c) => {
       )
     }
   }
+  // Quotas apply to accepted suggestions too, before claiming the item.
+  const quotaChecks: { resource: 'tasks' | 'notes' | 'reminders'; adding: number }[] =
+    item.kind === 'note' ? [{ resource: 'notes', adding: 1 }] :
+    item.kind === 'reminder' ? [{ resource: 'reminders', adding: 1 }, { resource: 'tasks', adding: 1 }] :
+    item.kind === 'task' || item.kind === 'follow_up'
+      ? [{ resource: 'tasks', adding: item.recurrenceFrequency ? 4 : 1 }]
+      : []
+  for (const check of quotaChecks) {
+    const quota = await freeQuota(c.env.DB, user.id, check.resource, check.adding)
+    if (quota) return c.json(quota, 403)
+  }
+
   // Atomic: only one request (double-tap, Capture + Inbox) can create records.
   if (!(await claimCaptureItem(c.env.DB, user.id, itemId))) {
     return c.json({ error: 'Already handled' }, 409)
