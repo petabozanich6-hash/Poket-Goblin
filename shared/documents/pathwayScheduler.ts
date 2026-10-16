@@ -62,7 +62,14 @@ export function recommendPathway(
   const remaining = steps.filter((step) => !completed.has(step.id))
   const byId = new Map(steps.map((step) => [step.id, step]))
   const days = [...availability]
-    .filter((day) => /^\d{4}-\d{2}-\d{2}$/.test(day.date))
+    .filter((day) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(day.date)) return false
+      const timestamp = Date.parse(day.date + 'T00:00:00Z')
+      return (
+        Number.isFinite(timestamp) &&
+        new Date(timestamp).toISOString().slice(0, 10) === day.date
+      )
+    })
     .sort((a, b) => a.date.localeCompare(b.date))
   const capacity = new Map<string, number>()
   for (const day of days) {
