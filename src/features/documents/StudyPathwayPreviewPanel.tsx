@@ -1,12 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { Button } from '@/components/ui/Button'
 import {
   approveStudyPathway,
+  editStudyPathwaySession,
+  getSavedStudyPathway,
   previewStudyPathway,
   undoStudyPathway,
   type StudyPathwayPreview,
   type StudyDayAvailability,
+  type SavedStudyPathway,
 } from '@/features/explore/exploreApi'
 
 /** Approvals always require the backend to revalidate the displayed pathway. */
@@ -25,11 +28,37 @@ export function StudyPathwayPreviewPanel({
   const [saved, setSaved] = useState(false)
   const [undoing, setUndoing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [stored, setStored] = useState<SavedStudyPathway | null>(null)
+  const [sessionSaving, setSessionSaving] = useState<string | null>(null)
+
+  async function refreshSaved() {
+    const data = await getSavedStudyPathway(documentId)
+    setStored(data)
+    return data
+  }
+
+  useEffect(() => {
+    let active = true
+    void getSavedStudyPathway(documentId).then((data) => {
+      if (active) {
+        setStored(data)
+        setSaved(data.pathway?.status === 'active')
+      }
+    }).catch(() => {
+      if (active) setError('Could not load your saved study pathway.')
+    })
+    return () => { active = false }
+  }, [documentId])
 
   async function generate() {
     setLoading(true)
     setError(null)
     setPreview(null)
+    if (stored?.pathway?.status === 'active') {
+      setError('Undo the saved pathway before creating another preview.')
+      setLoading(false)
+      return
+    }
     setSaved(false)
     try {
       const dates = Array.from({ length: horizonDays }, (_, index) => {
@@ -70,6 +99,7 @@ export function StudyPathwayPreviewPanel({
         preview.preview.sessions,
       )
       setSaved(true)
+      await refreshSaved()
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : 'Could not save the pathway.',
@@ -88,6 +118,7 @@ export function StudyPathwayPreviewPanel({
       await undoStudyPathway(documentId)
       setSaved(false)
       setPreview(null)
+      await refreshSaved()
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : 'Could not undo the pathway.',
@@ -97,9 +128,54 @@ export function StudyPathwayPreviewPanel({
     }
   }
 
+
+  async function saveSession(
+    session: SavedStudyPathway['sessions'][number],
+    date: string,
+    minutesValue: number,
+  ) {
+    setSessionSaving(session.id)
+    setError(null)
+    try {
+      await editStudyPathwaySession(documentId, session.id, date, minutesValue)
+      await refreshSaved()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not update this session.')
+    } finally {
+      setSessionSaving(null)
+    }
+  }
+
   return (
     <section aria-label="Study pathway preview">
       <h4>Plan my study time</h4>
+      {stored?.pathway?.status === 'active' ? (
+        <div>
+          <h5>Saved study sessions</h5>
+          <p>Completed tasks cannot be changed. Moving a session later requires deadline-aware replanning, which is still being built.</p>
+          <ul>
+            {stored.sessions.filter((session) => session.status === 'planned').map((session) => (
+              <li key={session.id}>
+                <form onSubmit={(event) => {
+                  event.preventDefault()
+                  const fields = new FormData(event.currentTarget)
+                  void saveSession(session, String(fields.get('date')), Number(fields.get('minutes')))
+                }}>
+                  <strong>{session.title}</strong>{' '}
+                  <label>Date <input name="date" type="date" defaultValue={session.date} required /></label>{' '}
+                  <label>Minutes <input name="minutes" type="number" min={1} max={240} defaultValue={session.minutes} required /></label>{' '}
+                  <Button type="submit" size="sm" disabled={sessionSaving !== null || session.taskStatus !== 'open'}>
+                    {sessionSaving === session.id ? 'Saving…' : 'Save changes'}
+                  </Button>
+                </form>
+              </li>
+            ))}
+          </ul>
+          <Button variant="secondary" onClick={() => void undo()} disabled={undoing}>
+            {undoing ? 'Undoing…' : 'Undo this pathway'}
+          </Button>
+        </div>
+      ) : null}
       <p>
         See how these steps could fit into your available study days. Previewing
         does not change your tasks or calendar. Only approving a complete plan
@@ -153,7 +229,7 @@ export function StudyPathwayPreviewPanel({
         {loading ? 'Planning…' : 'Preview my pathway'}
       </Button>
       {error ? <p role="alert">{error}</p> : null}
-      {preview ? (
+      {preview && stored?.pathway?.status !== 'active' ? (
         <div aria-live="polite">
           <p>
             {preview.preview.sessions.length} proposed sessions.{' '}
