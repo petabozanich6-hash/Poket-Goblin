@@ -220,9 +220,11 @@ describe('subscription identity safety', () => {
     )
     const older = sub('sub_old', 'active', alice.id)
     await applySubscription(h.db, older)
-    expect(h.query(
-      "SELECT stripe_subscription_id AS subscription FROM user_entitlements WHERE id = 'current'",
-    )).toEqual([{ subscription: 'sub_new' }])
+    expect(
+      h.query(
+        "SELECT stripe_subscription_id AS subscription FROM user_entitlements WHERE id = 'current'",
+      ),
+    ).toEqual([{ subscription: 'sub_new' }])
   })
 })
 
