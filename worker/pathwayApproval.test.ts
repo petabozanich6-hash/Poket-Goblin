@@ -208,24 +208,37 @@ describe('approved pathway transactions and Undo', () => {
           sequence: 1,
         },
       ],
-      new Map([[first, '2030-05-10'], [second, '2030-05-10']]),
-      new Map([[first, 1], [second, 0]]),
+      new Map([
+        [first, '2030-05-10'],
+        [second, '2030-05-10'],
+      ]),
+      new Map([
+        [first, 1],
+        [second, 0],
+      ]),
     )
     const sessions = h.query(
       'SELECT id, title, step_order as stepOrder FROM study_pathway_sessions WHERE user_id = ?',
       alice.id,
     ) as Array<{ id: string; title: string; stepOrder: number }>
-    expect(sessions.find((item) => item.title === 'Read chapter')?.stepOrder).toBe(0)
+    expect(
+      sessions.find((item) => item.title === 'Read chapter')?.stepOrder,
+    ).toBe(0)
     const reading = sessions.find((item) => item.title === 'Read chapter')!
     const draft = sessions.find((item) => item.title === 'Draft essay')!
     const send = (sessionId: string, date: string, minutes = 60) =>
-      h.request(
-        `/api/documents/doc-order/pathway-sessions/${sessionId}`,
-        { method: 'PATCH', cookie: alice.cookie, body: { date, minutes } },
-      )
+      h.request(`/api/documents/doc-order/pathway-sessions/${sessionId}`, {
+        method: 'PATCH',
+        cookie: alice.cookie,
+        body: { date, minutes },
+      })
     const foreign = await h.request(
       `/api/documents/doc-order/pathway-sessions/${draft.id}`,
-      { method: 'PATCH', cookie: bob.cookie, body: { date: '2030-05-07', minutes: 60 } },
+      {
+        method: 'PATCH',
+        cookie: bob.cookie,
+        body: { date: '2030-05-07', minutes: 60 },
+      },
     )
     expect(foreign.status).toBe(404)
     expect((await send(draft.id, '2030-05-04')).status).toBe(409)
@@ -240,5 +253,4 @@ describe('approved pathway transactions and Undo', () => {
       ),
     ).toEqual([{ date: '2030-05-07', minutes: 45 }])
   })
-
 })

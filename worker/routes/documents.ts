@@ -556,7 +556,10 @@ documentRoutes.patch('/:id/pathway-sessions/:sessionId', async (c) => {
     minutes > session.minutes
   ) {
     return c.json(
-      { error: 'Check the original assessment deadline and available time before increasing study workload.' },
+      {
+        error:
+          'Check the original assessment deadline and available time before increasing study workload.',
+      },
       409,
     )
   }
@@ -573,13 +576,16 @@ documentRoutes.patch('/:id/pathway-sessions/:sessionId', async (c) => {
     )
       .bind(session.pathwayId, user.id, session.goalId, session.id)
       .all<{ id: string; date: string; stepOrder: number; sequence: number }>()
-    const reversed = (peers.results ?? []).some((peer) =>
-      (peer.stepOrder < session.stepOrder! && date <= peer.date) ||
-      (peer.stepOrder > session.stepOrder! && date >= peer.date) ||
-      (peer.stepOrder === session.stepOrder &&
-        peer.sequence < session.sequence && date < peer.date) ||
-      (peer.stepOrder === session.stepOrder &&
-        peer.sequence > session.sequence && date > peer.date),
+    const reversed = (peers.results ?? []).some(
+      (peer) =>
+        (peer.stepOrder < session.stepOrder! && date <= peer.date) ||
+        (peer.stepOrder > session.stepOrder! && date >= peer.date) ||
+        (peer.stepOrder === session.stepOrder &&
+          peer.sequence < session.sequence &&
+          date < peer.date) ||
+        (peer.stepOrder === session.stepOrder &&
+          peer.sequence > session.sequence &&
+          date > peer.date),
     )
     if (reversed) {
       return c.json(
