@@ -3,6 +3,7 @@ import type { DocumentSuggestion } from '../../shared/documents/understand'
 import type { DayAvailability } from '../../shared/documents/pathwayScheduler'
 import { freeDocumentProcessingQuota } from '../lib/freeQuota'
 import { persistApprovedPathway } from '../lib/documents/pathwayApproval'
+import { planMissedStudySessions, type SavedSessionForReplan } from '../lib/documents/pathwayReplan'
 import { Hono } from 'hono'
 
 import type { Env } from '../env'
@@ -556,6 +557,151 @@ documentRoutes.patch('/:id/pathway-sessions/:sessionId', async (c) => {
     ).bind(date, session.taskId, user.id),
   ])
   return c.json({ sessionId: session.id, date, minutes })
+})
+
+
+/**
+ * Preview by default. Applying requires the exact, freshly recomputed moves.
+ * Existing and completed sessions are untouched; the original assessment
+ * deadline is never edited. Capacity is recalculated from current records.
+ */
+documentRoutes.post('/:id/pathway-replan', async (c) => {
+  const user = c.get('user')
+  const documentId = c.req.param('id')
+  const pathway = await c.env.DB.prepare(
+    `SELECT id FROM study_pathways
+     WHERE user_id = ? AND document_id = ? AND status = 'active'`,
+  )
+    .bind(user.id, documentId)
+    .first<{ id: string }>()
+  if (!pathway) return c.json({ error: 'Active pathway not found' }, 404)
+
+  const body = (await c.req.json().catch(() => null)) as {
+    availability?: DayAvailability[]
+    apply?: boolean
+    expectedMoves?: unknown[]
+  } | null
+  if (
+    !body ||
+    !Array.isArray(body.availability) ||
+    body.availability.length < 1 ||
+    body.availability.length > 120 ||
+    (body.apply !== undefined && typeof body.apply !== 'boolean') ||
+    body.availability.some(
+      (day) =>
+        !day ||
+        typeof day.date !== 'string' ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(day.date) ||
+        !Number.isFinite(Date.parse(day.date + 'T00:00:00Z')) ||
+        new Date(day.date + 'T00:00:00Z').toISOString().slice(0, 10) !==
+          day.date ||
+        !Number.isFinite(day.availableMinutes) ||
+        day.availableMinutes < 0 ||
+        day.availableMinutes > 1440 ||
+        (day.committedMinutes !== undefined &&
+          (!Number.isFinite(day.committedMinutes) ||
+            day.committedMinutes < 0 ||
+            day.committedMinutes > 1440)) ||
+        (day.blocked !== undefined && typeof day.blocked !== 'boolean'),
+    )
+  ) {
+    return c.json({ error: 'Invalid available study days.' }, 400)
+  }
+  const saved = await c.env.DB.prepare(
+    `SELECT s.id, s.scheduled_date as date,
+            s.deadline_date as deadlineDate, s.minutes, s.status,
+            s.task_id as taskId, t.status as taskStatus
+     FROM study_pathway_sessions s
+     LEFT JOIN tasks t ON t.id = s.task_id AND t.user_id = s.user_id
+     WHERE s.pathway_id = ? AND s.user_id = ?`,
+  )
+    .bind(pathway.id, user.id)
+    .all<SavedSessionForReplan>()
+  const offset = readOffsetMinutes({
+    timezoneOffsetMinutes: Number(c.req.query('timezoneOffsetMinutes') ?? 0),
+  })
+  const today = new Date(Date.now() - offset * 60000).toISOString().slice(0, 10)
+  const availability = await Promise.all(
+    body.availability.map(async (day) => {
+      const tasks = await c.env.DB.prepare(
+        `SELECT COUNT(*) AS count FROM tasks t
+         WHERE t.user_id = ? AND t.status = 'open' AND t.due_date = ?
+           AND NOT EXISTS (
+             SELECT 1 FROM study_pathway_sessions s
+             WHERE s.task_id = t.id AND s.user_id = t.user_id
+               AND s.status = 'planned'
+           )`,
+      )
+        .bind(user.id, day.date)
+        .first<{ count: number }>()
+      const study = await c.env.DB.prepare(
+        `SELECT COALESCE(SUM(s.minutes), 0) AS minutes
+         FROM study_pathway_sessions s
+         JOIN tasks t ON t.id = s.task_id AND t.user_id = s.user_id
+         WHERE s.user_id = ? AND s.scheduled_date = ?
+           AND s.status = 'planned' AND t.status = 'open'`,
+      )
+        .bind(user.id, day.date)
+        .first<{ minutes: number }>()
+      const start = new Date(
+        Date.parse(day.date + 'T00:00:00Z') + offset * 60000,
+      )
+      const end = new Date(start.getTime() + 86400000)
+      const events = await c.env.DB.prepare(
+        `SELECT COUNT(*) AS count FROM events
+         WHERE user_id = ? AND status = 'scheduled'
+           AND starts_at >= ? AND starts_at < ?`,
+      )
+        .bind(user.id, start.toISOString(), end.toISOString())
+        .first<{ count: number }>()
+      return {
+        ...day,
+        committedMinutes:
+          (day.committedMinutes ?? 0) +
+          Number(tasks?.count ?? 0) * 30 +
+          Number(study?.minutes ?? 0) +
+          Number(events?.count ?? 0) * 60,
+      }
+    }),
+  )
+  const result = planMissedStudySessions(
+    today,
+    saved.results ?? [],
+    availability,
+  )
+  if (!body.apply) return c.json({ ...result, applied: false, today })
+  if (
+    !Array.isArray(body.expectedMoves) ||
+    result.moves.length === 0 ||
+    result.warnings.length > 0 ||
+    JSON.stringify(body.expectedMoves) !== JSON.stringify(result.moves)
+  ) {
+    return c.json(
+      { error: 'The pathway has changed or cannot fit. Preview it again.' },
+      409,
+    )
+  }
+  const sessionsById = new Map((saved.results ?? []).map((row) => [row.id, row]))
+  const statements = []
+  for (const move of result.moves) {
+    const previous = sessionsById.get(move.sessionId)
+    if (!previous?.taskId) {
+      return c.json({ error: 'The pathway changed. Preview it again.' }, 409)
+    }
+    statements.push(
+      c.env.DB.prepare(
+        `UPDATE study_pathway_sessions SET scheduled_date = ?
+         WHERE id = ? AND pathway_id = ? AND user_id = ?
+           AND scheduled_date = ? AND status = 'planned'`,
+      ).bind(move.date, move.sessionId, pathway.id, user.id, previous.date),
+      c.env.DB.prepare(
+        `UPDATE tasks SET due_date = ?
+         WHERE id = ? AND user_id = ? AND status = 'open' AND due_date = ?`,
+      ).bind(move.date, previous.taskId, user.id, previous.date),
+    )
+  }
+  await c.env.DB.batch(statements)
+  return c.json({ ...result, applied: true, today })
 })
 
 documentRoutes.post('/:id/pathway-undo', async (c) => {
