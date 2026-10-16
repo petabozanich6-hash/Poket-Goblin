@@ -15,7 +15,13 @@ let lastFetched = 0
 const SIX_HOURS = 6 * 60 * 60 * 1000
 
 export function convertUsdToAud(usd: number, quote: FxQuote): number | null {
-  if (!Number.isFinite(usd) || usd < 0 || !Number.isFinite(quote.rate) || quote.rate <= 0) return null
+  if (
+    !Number.isFinite(usd) ||
+    usd < 0 ||
+    !Number.isFinite(quote.rate) ||
+    quote.rate <= 0
+  )
+    return null
   return Math.round(usd * quote.rate * 100) / 100
 }
 
@@ -32,8 +38,13 @@ export async function usdAudQuote(): Promise<FxQuote | null> {
     const data = obj as Record<string, unknown>
     const rate = Number(data.rate)
     const date = String(data.date ?? '')
-    if (data.base !== 'USD' || data.quote !== 'AUD' ||
-        !Number.isFinite(rate) || rate <= 0 || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    if (
+      data.base !== 'USD' ||
+      data.quote !== 'AUD' ||
+      !Number.isFinite(rate) ||
+      rate <= 0 ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(date)
+    ) {
       return lastQuote
     }
     lastQuote = { base: 'USD', quote: 'AUD', rate, date, source: 'Frankfurter' }

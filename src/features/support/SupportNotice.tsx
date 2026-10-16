@@ -11,13 +11,27 @@ export function SupportNotice() {
     retry: false,
   })
   if (!q.data?.unread) return null
-  return <div role="status" style={{
-    marginBottom: '1rem', padding: '0.9rem 1rem', borderRadius: '0.8rem',
-    background: 'var(--color-warm-soft)', border: '1px solid var(--color-border)',
-  }}>
-    🧌 <strong>Your Goblin has reported back from HQ!</strong>{' '}
-    <Link to="/support" style={{ textDecoration: 'underline', fontWeight: 700 }}>
-      Read {q.data.unread === 1 ? 'your message' : `your ${q.data.unread} messages`}
-    </Link>
-  </div>
+  return (
+    <div
+      role="status"
+      style={{
+        marginBottom: '1rem',
+        padding: '0.9rem 1rem',
+        borderRadius: '0.8rem',
+        background: 'var(--color-warm-soft)',
+        border: '1px solid var(--color-border)',
+      }}
+    >
+      🧌 <strong>Your Goblin has reported back from HQ!</strong>{' '}
+      <Link
+        to="/support"
+        style={{ textDecoration: 'underline', fontWeight: 700 }}
+      >
+        Read{' '}
+        {q.data.unread === 1
+          ? 'your message'
+          : `your ${q.data.unread} messages`}
+      </Link>
+    </div>
+  )
 }

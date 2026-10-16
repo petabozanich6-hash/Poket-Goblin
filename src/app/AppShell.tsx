@@ -127,7 +127,12 @@ export function AppShell() {
             </NavLink>
             <div className={styles.topActions}>
               <span className={styles.userChip}>{user?.displayName}</span>
-              <NavLink to="/support" style={{ fontWeight: 700, fontSize: "0.85rem" }}>Help & feedback</NavLink>
+              <NavLink
+                to="/support"
+                style={{ fontWeight: 700, fontSize: '0.85rem' }}
+              >
+                Help & feedback
+              </NavLink>
               <NudgeTray />
               <Button
                 variant="secondary"
