@@ -102,7 +102,7 @@ export function HqFeedbackPage() {
         <TextArea name="hqReply" label="Reply to customer" minLength={2} maxLength={4000} rows={5} value={reply} onChange={e => setReply(e.target.value)} />
         <Button type="button" disabled={busy || reply.trim().length < 2} onClick={() => void perform('reply')}>Send reply to customer</Button>
       </div>}
-      {error && <HqError error={error} />}
+      {error !== null && <HqError error={error} />}
     </Card>}
   </div>
 }
