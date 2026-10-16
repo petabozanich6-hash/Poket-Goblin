@@ -500,10 +500,18 @@ documentRoutes.patch('/:id/pathway-sessions/:sessionId', async (c) => {
     return c.json({ error: 'Editable session not found' }, 404)
   }
   const task = await c.env.DB.prepare(
-    'SELECT status FROM tasks WHERE id = ? AND user_id = ?',
+    'SELECT status, due_date as dueDate FROM tasks WHERE id = ? AND user_id = ?',
   )
     .bind(session.taskId, user.id)
-    .first<{ status: string }>()
+    .first<{ status: string; dueDate: string | null }>()
+  // The original assessment deadline is not stored separately yet.
+  // Until it is, only allow earlier moves to avoid crossing that deadline.
+  if (task?.status === 'open' && task.dueDate && date > task.dueDate) {
+    return c.json(
+      { error: 'Moving a session later requires deadline verification.' },
+      409,
+    )
+  }
   if (task?.status !== 'open') {
     return c.json({ error: 'Completed or removed sessions cannot be edited.' }, 409)
   }
