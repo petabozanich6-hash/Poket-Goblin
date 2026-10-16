@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Bell,
   CalendarDays,
@@ -17,6 +17,7 @@ import {
   dismissReviewItem,
   finishDevouring,
   keepDocumentInstead,
+  listStudyPathways,
   undoAutoAdded,
   type DevourResponse,
   type DocumentSuggestion,
@@ -563,6 +564,11 @@ export function DocumentDevourer({
   const queryClient = useQueryClient()
   const [mode, setMode] = useState<'sort' | 'keep'>('sort')
   const [result, setResult] = useState<DevourResponse | null>(null)
+  const [managedDocumentId, setManagedDocumentId] = useState<string | null>(null)
+  const pathways = useQuery({
+    queryKey: ['study-pathways'],
+    queryFn: listStudyPathways,
+  })
   const [error, setError] = useState<string | null>(null)
 
   const upload = useMutation({
@@ -599,10 +605,61 @@ export function DocumentDevourer({
   }
 
   if (result)
-    return <DevourReview result={result} onClose={() => setResult(null)} />
+    return (
+      <DevourReview
+        result={result}
+        onClose={() => {
+          setResult(null)
+          onReviewing?.(null)
+          void queryClient.invalidateQueries({ queryKey: ['study-pathways'] })
+        }}
+      />
+    )
+
+  if (managedDocumentId)
+    return (
+      <section className={styles.review} aria-label="Manage saved study pathway">
+        <Button
+          variant="secondary"
+          type="button"
+          onClick={() => {
+            setManagedDocumentId(null)
+            void queryClient.invalidateQueries({ queryKey: ['study-pathways'] })
+          }}
+        >
+          Back to documents
+        </Button>
+        <StudyPathwayPreviewPanel documentId={managedDocumentId} />
+      </section>
+    )
 
   return (
     <form className={styles.form} onSubmit={submit}>
+      {pathways.data?.pathways.length ? (
+        <section aria-label="Saved study pathways">
+          <h3>Saved study pathways</h3>
+          <p className={styles.muted}>
+            Return to an approved plan to edit sessions or rescue missed study days,
+            even after the uploaded document has been deleted.
+          </p>
+          <ul>
+            {pathways.data.pathways.map((pathway) => (
+              <li key={pathway.id}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setManagedDocumentId(pathway.documentId)}
+                >
+                  {pathway.title} · {pathway.openSessions} unfinished
+                  {pathway.completedSessions > 0
+                    ? ` · ${pathway.completedSessions} completed`
+                    : ''}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       <fieldset className={styles.modes}>
         <legend className={styles.legend}>
           What should the goblin do with it?
