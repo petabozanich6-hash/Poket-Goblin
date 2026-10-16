@@ -296,3 +296,16 @@ export function undoStudyPathway(documentId: string) {
     `/documents/${encodeURIComponent(documentId)}/pathway-undo`,
   )
 }
+
+/** Change a saved study session's planned day and effort, not its assessment deadline. */
+export function editStudyPathwaySession(
+  documentId: string,
+  sessionId: string,
+  date: string,
+  minutes: number,
+) {
+  return api.patch<{ sessionId: string; date: string; minutes: number }>(
+    `/documents/${encodeURIComponent(documentId)}/pathway-sessions/${encodeURIComponent(sessionId)}`,
+    { date, minutes },
+  )
+}
