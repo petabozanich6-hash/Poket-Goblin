@@ -33,7 +33,7 @@ export async function usdAudQuote(): Promise<FxQuote | null> {
     const rate = Number(data.rate)
     const date = String(data.date ?? '')
     if (data.base !== 'USD' || data.quote !== 'AUD' ||
-        !Number.isFinite(rate) || rate <= 0 || !/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) {
+        !Number.isFinite(rate) || rate <= 0 || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return lastQuote
     }
     lastQuote = { base: 'USD', quote: 'AUD', rate, date, source: 'Frankfurter' }
