@@ -60,6 +60,8 @@ export async function persistApprovedPathway(
     ) {
       throw new Error('Invalid original assessment deadline')
     }
+    const match = session.stepId.match(/^[^:]+:(\d+):/)
+    const stepOrder = match ? Number(match[1]) : null
     const taskId = newId('task')
     const sessionId = newId('session')
     statements.push(
