@@ -59,8 +59,9 @@ export async function freeDocumentProcessingQuota(
   if (access.plan !== 'free') return null
   const now = new Date()
   const month = now.getUTCFullYear() * 12 + now.getUTCMonth()
-  const row = await db.prepare(
-    `INSERT INTO ai_request_limits (scope, user_id, window_start, request_count)
+  const row = await db
+    .prepare(
+      `INSERT INTO ai_request_limits (scope, user_id, window_start, request_count)
      VALUES (?, ?, ?, 1)
      ON CONFLICT(scope) DO UPDATE SET
        window_start = excluded.window_start,
@@ -68,10 +69,13 @@ export async function freeDocumentProcessingQuota(
          THEN 1 ELSE request_count + 1 END
      WHERE window_start < excluded.window_start
        OR (window_start = excluded.window_start AND request_count < 2)`,
-  ).bind(`document-month:${userId}`, userId, month).run()
+    )
+    .bind(`document-month:${userId}`, userId, month)
+    .run()
   if (row.meta.changes === 1) return null
   return {
-    error: 'Free includes 2 document reads per month. Upgrade to Premium for more.',
+    error:
+      'Free includes 2 document reads per month. Upgrade to Premium for more.',
     code: 'FREE_PLAN_LIMIT',
     resource: 'document_processing',
     limit: 2,

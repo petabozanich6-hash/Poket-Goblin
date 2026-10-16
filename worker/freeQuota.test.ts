@@ -99,9 +99,13 @@ describe('permanent Free quotas — direct routes', () => {
 describe('atomic Free document processing allowance', () => {
   it('allows only two simultaneous reservations per UTC month', async () => {
     const attempts = await Promise.all(
-      Array.from({ length: 8 }, () => freeDocumentProcessingQuota(h.db, user.id)),
+      Array.from({ length: 8 }, () =>
+        freeDocumentProcessingQuota(h.db, user.id),
+      ),
     )
     expect(attempts.filter((result) => result === null)).toHaveLength(2)
-    expect(attempts.filter((result) => result?.code === 'FREE_PLAN_LIMIT')).toHaveLength(6)
+    expect(
+      attempts.filter((result) => result?.code === 'FREE_PLAN_LIMIT'),
+    ).toHaveLength(6)
   })
 })
