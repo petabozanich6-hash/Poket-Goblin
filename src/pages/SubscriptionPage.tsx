@@ -165,7 +165,9 @@ export function SubscriptionPage() {
 
           <div className={styles.plans}>
             <Card className={data.plan === 'free' ? styles.mine : undefined}>
-              <h2 className={styles.title}>Free — Meet Your Goblin</h2>
+              <h2 className={styles.title}>
+                Free — Meet Your Goblin
+              </h2>
               <p className={styles.price}>Free, always</p>
               <ul className={styles.list}>
                 <li>
@@ -212,7 +214,8 @@ export function SubscriptionPage() {
               )}
               <ul className={styles.list}>
                 <li>
-                  <Check size={16} aria-hidden /> Everything in Free, with generous fair-use allowances
+                  <Check size={16} aria-hidden /> Everything in Free, with
+                  generous fair-use allowances
                 </li>
                 <li>
                   <Check size={16} aria-hidden /> Smart help{' '}
