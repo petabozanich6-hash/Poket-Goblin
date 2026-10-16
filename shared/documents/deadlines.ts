@@ -235,7 +235,140 @@ function formatDay(iso: string): string {
   return `${d.getUTCDate()} ${d.toLocaleString('en', { month: 'long', timeZone: 'UTC' })}`
 }
 
-export type PlanOptions = { reference: Date; monthFirst?: boolean }
+export type PlanOptions = {
+  reference: Date
+  monthFirst?: boolean
+  /** Number of existing tasks/appointments already occupying each local day. */
+  dailyLoad?: Record<string, number>
+  capacityMode?: 'goblin' | 'steady' | 'quest'
+  planningApproach?: 'minimal' | 'balanced' | 'ambitious'
+}
+
+/**
+ * Find the gentlest nearby day for preparation. The date of the real
+ * assessment never moves; only its preparatory task can move.
+ */
+function allocatePreparationDay(
+  target: string,
+  earliest: string,
+  latest: string,
+  load: Record<string, number>,
+  maxDaily: number,
+): string {
+  let best = target
+  let bestScore = Number.POSITIVE_INFINITY
+  for (let date = earliest; date <= latest; date = addDays(date, 1)) {
+    const n = load[date] ?? 0
+    const offset = Math.abs(daysBetween(target, date))
+    const weekday = new Date(`${date}T12:00:00Z`).getUTCDay()
+    const score =
+      (n >= maxDaily ? 100 : 0) +
+      n * 8 +
+      offset * 2 +
+      (weekday === 0 || weekday === 6 ? 1 : 0)
+    if (score < bestScore) {
+      bestScore = score
+      best = date
+    }
+  }
+  load[best] = (load[best] ?? 0) + 1
+  return best
+}
+
+function studySessionsPerWeek(options: PlanOptions): number {
+  if (
+    options.planningApproach === 'minimal' ||
+    options.capacityMode === 'goblin'
+  )
+    return 2
+  if (
+    options.planningApproach === 'ambitious' &&
+    options.capacityMode === 'quest'
+  )
+    return 4
+  return 3
+}
+
+function dailyCapacity(options: PlanOptions): number {
+  return options.capacityMode === 'goblin'
+    ? 2
+    : options.capacityMode === 'quest'
+      ? 6
+      : 4
+}
+
+/**
+ * Small, paced sessions; each is a real dated task instead of one vague
+ * "study this week" task. Never invent a deadline or a specific study hour.
+ */
+function allocateStudyWeek(
+  week: WeekTopic,
+  today: string,
+  options: PlanOptions,
+  load: Record<string, number>,
+): DocumentSuggestion[] {
+  const start = week.iso > today ? week.iso : today
+  const end = addDays(week.iso, 6)
+  if (start > end) return []
+  const count = studySessionsPerWeek(options)
+  const labels = [
+    'Read or watch the learning materials',
+    'Write key notes and questions',
+    'Practise the activities or exercises',
+    'Review and check your understanding',
+  ]
+  const sessionLabels =
+    count === 2
+      ? [labels[0]!, labels[2]!]
+      : count === 3
+        ? [labels[0]!, labels[1]!, labels[2]!]
+        : labels
+  const available = daysBetween(start, end) + 1
+  const planned: DocumentSuggestion[] = []
+  const chosen = new Set<string>()
+  for (const [index, label] of sessionLabels.entries()) {
+    const offset = Math.round(
+      (index * (available - 1)) / Math.max(1, sessionLabels.length - 1),
+    )
+    const target = addDays(start, offset)
+    let day = ''
+    let best = Number.POSITIVE_INFINITY
+    for (let date = start; date <= end; date = addDays(date, 1)) {
+      if (chosen.has(date)) continue
+      const current = load[date] ?? 0
+      if (current >= dailyCapacity(options)) continue
+      const weekday = new Date(`${date}T12:00:00Z`).getUTCDay()
+      const score =
+        current * 8 +
+        Math.abs(daysBetween(target, date)) * 2 +
+        (weekday === 0 || weekday === 6 ? 1 : 0)
+      if (score < best) {
+        best = score
+        day = date
+      }
+    }
+    if (!day) break
+    chosen.add(day)
+    load[day] = (load[day] ?? 0) + 1
+    planned.push({
+      kind: 'suggestion',
+      type: 'task',
+      title: `Week ${week.week}: ${label} — ${shorten(week.topic, 65)}`,
+      details: `A manageable study session (allow about 30–60 minutes). Part ${index + 1} of ${sessionLabels.length}; adjust the day or duration to suit you.`,
+      dueDate: day,
+      confidence: 'high',
+      uncertain: false,
+      missingInformation: [],
+      sourceExcerpt: week.topic,
+      categorySlug: 'work_study',
+      priority: 'normal',
+      group: `Week ${week.week}: ${week.topic}`,
+      step: `${index + 1}/${sessionLabels.length}`,
+      requiresReview: true,
+    })
+  }
+  return planned
+}
 
 export function findDeadlines(text: string, options: PlanOptions): Deadline[] {
   const today = options.reference.toISOString().slice(0, 10)
@@ -699,6 +832,7 @@ export function planDeadlines(
   const category = options.categorySlug ?? null
   const suggestions: DocumentSuggestion[] = []
   const warnings: string[] = []
+  const load = { ...(options.dailyLoad ?? {}) }
 
   for (const d of deadlines) {
     const days = daysBetween(today, d.iso)
@@ -772,8 +906,22 @@ export function planDeadlines(
         lead === 0 ? 0 : Math.round((step.daysBefore / lead) * room)
       let due = addDays(d.iso, -before)
       if (due < today) due = today
-      // One step per day per deadline: nudge collisions later, up to the due date.
-      while (usedDates.has(due) && due < d.iso) due = addDays(due, 1)
+      // Spread preparation away from existing tasks and appointments when known.
+      // Keep the actual submission date fixed.
+      if (options.dailyLoad && step.daysBefore > 0) {
+        const earliest = addDays(due, -3) < today ? today : addDays(due, -3)
+        const latest = addDays(due, 2) > d.iso ? d.iso : addDays(due, 2)
+        due = allocatePreparationDay(
+          due,
+          earliest,
+          latest,
+          load,
+          dailyCapacity(options),
+        )
+      } else {
+        while (usedDates.has(due) && due < d.iso) due = addDays(due, 1)
+        load[due] = (load[due] ?? 0) + 1
+      }
       usedDates.add(due)
       const first = i === 0
       const urgentStart = first && d.urgent
@@ -787,6 +935,7 @@ export function planDeadlines(
             priority: urgentStart || days <= 7 ? 'high' : 'normal',
             urgent: urgentStart,
             step: `${i + 1}/${steps.length}`,
+            requiresReview: category === 'work_study',
           },
           d,
           category,
@@ -897,24 +1046,21 @@ export function planDeadlines(
     )
   }
 
-  // A week-by-week schedule: each week's topic becomes that week's study.
+  // A weekly study schedule becomes several short, specific sessions on
+  // different, comparatively free days. Cap at a semester so multi-year schedules do not overwhelm the account.
   const weeks = findWeeklyTopics(text, options).filter(
-    (w) => addDays(w.iso, 6) >= today,
+    (w) => addDays(w.iso, 6) >= today && w.iso <= addDays(today, 111),
   )
+  let studySessions = 0
   for (const w of weeks) {
-    suggestions.push({
-      kind: 'suggestion',
-      type: 'task',
-      title: `Week ${w.week}: ${w.topic}`,
-      details: `Study for the week starting ${formatDay(w.iso)}.`,
-      dueDate: addDays(w.iso, 6),
-      confidence: 'high',
-      uncertain: false,
-      missingInformation: [],
-      sourceExcerpt: w.topic,
-      categorySlug: category,
-      group: 'Week by week',
-    })
+    const sessions = allocateStudyWeek(w, today, options, load)
+    studySessions += sessions.length
+    suggestions.push(...sessions)
+    if (sessions.length < studySessionsPerWeek(options)) {
+      warnings.push(
+        `Week ${w.week} is busy; only ${sessions.length} study sessions fit. You can move tasks or adjust your capacity.`,
+      )
+    }
   }
 
   const urgentCount = suggestions.filter(
@@ -936,7 +1082,7 @@ export function planDeadlines(
     )
   if (weeks.length)
     parts.push(
-      `I’ve also made a week-by-week study plan (${weeks.length} week${weeks.length === 1 ? '' : 's'}).`,
+      `I’ve spread ${studySessions} study sessions across ${weeks.length} week${weeks.length === 1 ? '' : 's'}, allowing room for your other commitments. Review the suggested days before adding them.`,
     )
   if (overdue)
     parts.push(

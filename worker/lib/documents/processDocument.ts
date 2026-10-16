@@ -42,6 +42,7 @@ import {
   type FetchLike,
 } from './aiDocument'
 import { deleteOriginal } from './lifecycle'
+import { loadStudyWorkload } from './studyWorkload'
 
 export type ProcessOptions = {
   timezoneOffsetMinutes?: number
@@ -213,10 +214,27 @@ export async function processDocumentForUser(
       }
     }
     if (understanding && extracted.text) {
+      // The planner sees what is already on the calendar before choosing
+      // dates for study sessions. Other document categories keep their
+      // established, deadline-based handling.
+      const isStudyDocument =
+        understanding.documentType === 'education' ||
+        /\\b(?:study\\s+schedule|week\\s+commencing|assessment\\s+schedule)\\b/i.test(
+          extracted.text,
+        )
+      const workload = isStudyDocument
+        ? await loadStudyWorkload(
+            env.DB,
+            userId,
+            today,
+            options.timezoneOffsetMinutes ?? 0,
+          )
+        : null
       understanding = withDeadlinePlan(understanding, extracted.text, {
         reference: local,
         monthFirst: options.monthFirst,
         fromAi: mode === 'ai',
+        ...(workload ?? {}),
       })
     }
     await recordAiEvent(
