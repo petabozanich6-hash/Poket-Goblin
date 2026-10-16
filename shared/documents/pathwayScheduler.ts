@@ -115,9 +115,11 @@ export function recommendPathway(
       state.set(step.id, 'failed')
       return false
     }
+    const deadlineTimestamp = Date.parse(step.deadline + 'T00:00:00Z')
     const validDate =
       /^\d{4}-\d{2}-\d{2}$/.test(step.deadline) &&
-      !Number.isNaN(Date.parse(step.deadline + 'T00:00:00Z'))
+      Number.isFinite(deadlineTimestamp) &&
+      new Date(deadlineTimestamp).toISOString().slice(0, 10) === step.deadline
     if (!validDate) {
       warnings.push({
         stepId: step.id,
