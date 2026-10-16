@@ -149,6 +149,7 @@ export function AppRouter() {
             <Route path="customers" element={<HqCustomersPage />} />
             <Route path="customers/:id" element={<HqCustomerPage />} />
             <Route path="costs" element={<HqCostsPage />} />
+            <Route path="deals" element={<HqDealsPage />} />
             <Route path="feedback" element={<HqFeedbackPage />} />
             <Route path="settings" element={<HqSettingsPage />} />
             <Route path="security" element={<HqSecurityPage />} />
