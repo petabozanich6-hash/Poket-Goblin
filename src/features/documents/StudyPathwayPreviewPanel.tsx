@@ -39,15 +39,19 @@ export function StudyPathwayPreviewPanel({
 
   useEffect(() => {
     let active = true
-    void getSavedStudyPathway(documentId).then((data) => {
-      if (active) {
-        setStored(data)
-        setSaved(data.pathway?.status === 'active')
-      }
-    }).catch(() => {
-      if (active) setError('Could not load your saved study pathway.')
-    })
-    return () => { active = false }
+    void getSavedStudyPathway(documentId)
+      .then((data) => {
+        if (active) {
+          setStored(data)
+          setSaved(data.pathway?.status === 'active')
+        }
+      })
+      .catch(() => {
+        if (active) setError('Could not load your saved study pathway.')
+      })
+    return () => {
+      active = false
+    }
   }, [documentId])
 
   async function generate() {
@@ -128,7 +132,6 @@ export function StudyPathwayPreviewPanel({
     }
   }
 
-
   async function saveSession(
     session: SavedStudyPathway['sessions'][number],
     date: string,
@@ -140,7 +143,11 @@ export function StudyPathwayPreviewPanel({
       await editStudyPathwaySession(documentId, session.id, date, minutesValue)
       await refreshSaved()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not update this session.')
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : 'Could not update this session.',
+      )
     } finally {
       setSessionSaving(null)
     }
@@ -152,26 +159,67 @@ export function StudyPathwayPreviewPanel({
       {stored?.pathway?.status === 'active' ? (
         <div>
           <h5>Saved study sessions</h5>
-          <p>Completed tasks cannot be changed. Moving a session later requires deadline-aware replanning, which is still being built.</p>
+          <p>
+            Completed tasks cannot be changed. Moving a session later requires
+            deadline-aware replanning, which is still being built.
+          </p>
           <ul>
-            {stored.sessions.filter((session) => session.status === 'planned').map((session) => (
-              <li key={session.id}>
-                <form onSubmit={(event) => {
-                  event.preventDefault()
-                  const fields = new FormData(event.currentTarget)
-                  void saveSession(session, String(fields.get('date')), Number(fields.get('minutes')))
-                }}>
-                  <strong>{session.title}</strong>{' '}
-                  <label>Date <input name="date" type="date" defaultValue={session.date} required /></label>{' '}
-                  <label>Minutes <input name="minutes" type="number" min={1} max={240} defaultValue={session.minutes} required /></label>{' '}
-                  <Button type="submit" size="sm" disabled={sessionSaving !== null || session.taskStatus !== 'open'}>
-                    {sessionSaving === session.id ? 'Saving…' : 'Save changes'}
-                  </Button>
-                </form>
-              </li>
-            ))}
+            {stored.sessions
+              .filter((session) => session.status === 'planned')
+              .map((session) => (
+                <li key={session.id}>
+                  <form
+                    onSubmit={(event) => {
+                      event.preventDefault()
+                      const fields = new FormData(event.currentTarget)
+                      void saveSession(
+                        session,
+                        String(fields.get('date')),
+                        Number(fields.get('minutes')),
+                      )
+                    }}
+                  >
+                    <strong>{session.title}</strong>{' '}
+                    <label>
+                      Date{' '}
+                      <input
+                        name="date"
+                        type="date"
+                        defaultValue={session.date}
+                        required
+                      />
+                    </label>{' '}
+                    <label>
+                      Minutes{' '}
+                      <input
+                        name="minutes"
+                        type="number"
+                        min={1}
+                        max={240}
+                        defaultValue={session.minutes}
+                        required
+                      />
+                    </label>{' '}
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={
+                        sessionSaving !== null || session.taskStatus !== 'open'
+                      }
+                    >
+                      {sessionSaving === session.id
+                        ? 'Saving…'
+                        : 'Save changes'}
+                    </Button>
+                  </form>
+                </li>
+              ))}
           </ul>
-          <Button variant="secondary" onClick={() => void undo()} disabled={undoing}>
+          <Button
+            variant="secondary"
+            onClick={() => void undo()}
+            disabled={undoing}
+          >
             {undoing ? 'Undoing…' : 'Undo this pathway'}
           </Button>
         </div>
