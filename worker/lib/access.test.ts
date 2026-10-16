@@ -158,14 +158,14 @@ describe('resolvePlan and PLAN_SQL agree', () => {
 describe('platform settings', () => {
   const env = { DB: {} as D1Database, ENVIRONMENT: 'production' }
 
-  it('defaults preserve current behaviour', () => {
+  it('defaults keep Premium generous while restricting Free', () => {
     const d = defaultSettings(env)
     expect(d.features).toEqual({
       registrationsOpen: true,
       documentUploads: true,
       aiProvider: true,
     })
-    expect(d.aiLimits.free).toBe(40)
+    expect(d.aiLimits.free).toBe(3)
     expect(d.aiLimits.premium).toBe(40)
     expect(d.aiLimits.owner).toBe(200)
   })
