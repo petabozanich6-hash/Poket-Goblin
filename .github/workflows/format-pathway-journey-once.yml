@@ -1,0 +1,38 @@
+name: Format pathway journey files once
+on:
+  push:
+    branches: [feature/pathway-capacity-engine]
+    paths: [.github/workflows/format-pathway-journey-once.yml]
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/pathway-capacity-engine
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Format pathway journey
+        run: |
+          npx prettier --write \
+            shared/documents/studyPathwayGroups.ts \
+            shared/documents/studyPathwayGroups.test.ts \
+            src/features/documents/DocumentDevourer.tsx \
+            src/features/explore/exploreApi.ts \
+            worker/lib/documents/processDocument.ts \
+            worker/routes/documents.ts \
+            worker/pathwayJourney.test.ts
+      - name: Commit corrected formatting
+        run: |
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add shared/documents/studyPathwayGroups.ts shared/documents/studyPathwayGroups.test.ts src/features/documents/DocumentDevourer.tsx src/features/explore/exploreApi.ts worker/lib/documents/processDocument.ts worker/routes/documents.ts worker/pathwayJourney.test.ts
+            git commit -m "Format document to pathway integration"
+            git push origin HEAD:feature/pathway-capacity-engine
+          fi
