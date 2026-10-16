@@ -466,6 +466,30 @@ documentRoutes.post('/:id/pathway-approve', async (c) => {
   )
 })
 
+/** Load approved pathway sessions for ongoing management. */
+documentRoutes.get('/:id/pathway', async (c) => {
+  const user = c.get('user')
+  const pathway = await c.env.DB.prepare(
+    `SELECT id, status, approved_at as approvedAt
+     FROM study_pathways WHERE document_id = ? AND user_id = ?`,
+  )
+    .bind(c.req.param('id'), user.id)
+    .first<{ id: string; status: string; approvedAt: string }>()
+  if (!pathway) return c.json({ pathway: null, sessions: [] })
+  const sessions = await c.env.DB.prepare(
+    `SELECT s.id, s.step_id as stepId, s.title, s.scheduled_date as date,
+            s.minutes, s.sequence, s.status, s.task_id as taskId,
+            t.status as taskStatus
+     FROM study_pathway_sessions s
+     LEFT JOIN tasks t ON t.id = s.task_id AND t.user_id = s.user_id
+     WHERE s.pathway_id = ? AND s.user_id = ?
+     ORDER BY s.scheduled_date, s.sequence`,
+  )
+    .bind(pathway.id, user.id)
+    .all()
+  return c.json({ pathway, sessions: sessions.results ?? [] })
+})
+
 /** Edit a saved study session without changing the original assessment deadline. */
 documentRoutes.patch('/:id/pathway-sessions/:sessionId', async (c) => {
   const user = c.get('user')
