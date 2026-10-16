@@ -95,4 +95,12 @@ describe('recommendPathway', () => {
     expect(result.unscheduledMinutes).toBe(60)
   })
 
+  it('rejects impossible availability dates rather than inventing a study day', () => {
+    const result = recommendPathway([step({ minutes: 60 })], [
+      { date: '2026-02-30', availableMinutes: 90 },
+    ])
+    expect(result.sessions).toHaveLength(0)
+    expect(result.unscheduledMinutes).toBe(60)
+  })
+
 })
