@@ -60,9 +60,9 @@ describe('missed study day replanning', () => {
     )
     expect(result.moves).toEqual([])
     expect(result.warnings).toEqual([
+      { sessionId: 'unknown', reason: 'missing_deadline' },
       { sessionId: 'expired', reason: 'deadline_passed' },
       { sessionId: 'full', reason: 'insufficient_capacity' },
-      { sessionId: 'unknown', reason: 'missing_deadline' },
     ])
   })
 
