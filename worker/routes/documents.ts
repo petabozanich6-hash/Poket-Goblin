@@ -466,6 +466,59 @@ documentRoutes.post('/:id/pathway-approve', async (c) => {
   )
 })
 
+/** Edit a saved study session without changing the original assessment deadline. */
+documentRoutes.patch('/:id/pathway-sessions/:sessionId', async (c) => {
+  const user = c.get('user')
+  const body = (await c.req.json().catch(() => null)) as {
+    date?: unknown
+    minutes?: unknown
+  } | null
+  const date = body?.date
+  const minutes = body?.minutes
+  if (
+    typeof date !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+    !Number.isFinite(Date.parse(date + 'T00:00:00Z')) ||
+    new Date(date + 'T00:00:00Z').toISOString().slice(0, 10) !== date ||
+    typeof minutes !== 'number' ||
+    !Number.isInteger(minutes) ||
+    minutes < 1 ||
+    minutes > 240
+  ) {
+    return c.json({ error: 'Provide a valid study date and 1–240 minutes.' }, 400)
+  }
+  const session = await c.env.DB.prepare(
+    `SELECT s.id, s.task_id as taskId
+     FROM study_pathway_sessions s
+     JOIN study_pathways p ON p.id = s.pathway_id
+     WHERE p.document_id = ? AND p.user_id = ? AND p.status = 'active'
+       AND s.id = ? AND s.user_id = ? AND s.status = 'planned'`,
+  )
+    .bind(c.req.param('id'), user.id, c.req.param('sessionId'), user.id)
+    .first<{ id: string; taskId: string | null }>()
+  if (!session?.taskId) {
+    return c.json({ error: 'Editable session not found' }, 404)
+  }
+  const task = await c.env.DB.prepare(
+    'SELECT status FROM tasks WHERE id = ? AND user_id = ?',
+  )
+    .bind(session.taskId, user.id)
+    .first<{ status: string }>()
+  if (task?.status !== 'open') {
+    return c.json({ error: 'Completed or removed sessions cannot be edited.' }, 409)
+  }
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `UPDATE study_pathway_sessions SET scheduled_date = ?, minutes = ?
+       WHERE id = ? AND user_id = ? AND status = 'planned'`,
+    ).bind(date, minutes, session.id, user.id),
+    c.env.DB.prepare(
+      `UPDATE tasks SET due_date = ? WHERE id = ? AND user_id = ? AND status = 'open'`,
+    ).bind(date, session.taskId, user.id),
+  ])
+  return c.json({ sessionId: session.id, date, minutes })
+})
+
 documentRoutes.post('/:id/pathway-undo', async (c) => {
   const user = c.get('user')
   const documentId = c.req.param('id')
