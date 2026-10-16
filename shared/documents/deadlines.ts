@@ -1041,10 +1041,9 @@ export function planDeadlines(
   }
 
   // A weekly study schedule becomes several short, specific sessions on
-  // different, comparatively free days. Limit the advance horizon so an
-  // entire semester doesn't overwhelm the person's account in one upload.
+  // different, comparatively free days. Cap at a semester so multi-year schedules do not overwhelm the account.
   const weeks = findWeeklyTopics(text, options).filter(
-    (w) => addDays(w.iso, 6) >= today && w.iso <= addDays(today, 55),
+    (w) => addDays(w.iso, 6) >= today && w.iso <= addDays(today, 111),
   )
   let studySessions = 0
   for (const w of weeks) {
