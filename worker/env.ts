@@ -28,6 +28,8 @@ export type Env = {
   STRIPE_PRICE_YEARLY?: string
   /** Must be "true" before live keys are used: real charges need approval. */
   STRIPE_LIVE_ENABLED?: string
+  /** Opt-in after Cloudflare email sending is verified; legacy users stay unchanged. */
+  EMAIL_VERIFICATION_REQUIRED?: string
   /** Cloudflare Email Service binding for account emails (optional). */
   EMAIL?: SendEmail
 }
