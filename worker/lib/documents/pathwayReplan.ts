@@ -54,6 +54,15 @@ export function planMissedStudySessions(
   warnings: ReplanWarning[]
 } {
   if (!validDate(today)) throw new Error('Invalid current local date')
+  const groupDeadlines = new Map<string, string>()
+  for (const session of sessions) {
+    if (!session.goalId) continue
+    const deadline = session.deadlineDate ?? ''
+    const current = groupDeadlines.get(session.goalId)
+    if (current === undefined || deadline < current) {
+      groupDeadlines.set(session.goalId, deadline)
+    }
+  }
   const missed = sessions
     .filter(
       (session) =>
@@ -64,23 +73,31 @@ export function planMissedStudySessions(
         session.date < today,
     )
     .sort((a, b) => {
-      // Keep prerequisite steps in their source order within an assessment.
-      if (
-        a.goalId &&
-        a.goalId === b.goalId &&
-        a.stepOrder != null &&
-        b.stepOrder != null
-      ) {
-        const stepDifference = a.stepOrder - b.stepOrder
-        if (stepDifference) return stepDifference
-        const sequenceDifference = (a.sequence ?? 1) - (b.sequence ?? 1)
-        if (sequenceDifference) return sequenceDifference
+      const deadlineA = a.goalId
+        ? (groupDeadlines.get(a.goalId) ?? '')
+        : (a.deadlineDate ?? '')
+      const deadlineB = b.goalId
+        ? (groupDeadlines.get(b.goalId) ?? '')
+        : (b.deadlineDate ?? '')
+      const byDeadline = deadlineA.localeCompare(deadlineB)
+      if (byDeadline) return byDeadline
+      const groupA = a.goalId ?? a.id
+      const groupB = b.goalId ?? b.id
+      // Compare groups before ordering their steps: a transitive comparator
+      // prevents dependency order from depending on input extraction order.
+      if (groupA !== groupB) {
+        if (!a.goalId && !b.goalId)
+          return a.date.localeCompare(b.date) || a.id.localeCompare(b.id)
+        return groupA.localeCompare(groupB)
       }
-      return (
-        (a.deadlineDate ?? '').localeCompare(b.deadlineDate ?? '') ||
-        a.date.localeCompare(b.date) ||
-        a.id.localeCompare(b.id)
-      )
+      if (a.goalId && b.goalId) {
+        const orderA = a.stepOrder ?? Number.MAX_SAFE_INTEGER
+        const orderB = b.stepOrder ?? Number.MAX_SAFE_INTEGER
+        if (orderA !== orderB) return orderA - orderB
+        if ((a.sequence ?? 1) !== (b.sequence ?? 1))
+          return (a.sequence ?? 1) - (b.sequence ?? 1)
+      }
+      return a.date.localeCompare(b.date) || a.id.localeCompare(b.id)
     })
   const capacity = new Map<string, number>()
   for (const day of availability) {
@@ -132,6 +149,18 @@ export function planMissedStudySessions(
         (other.stepOrder === session.stepOrder &&
           (other.sequence ?? 1) > (session.sequence ?? 1)),
     )
+    // Never schedule a dependent step if its missed prerequisite could not
+    // be allocated. A warning is safer than an impossible reversed pathway.
+    if (
+      prerequisites.some(
+        (item) =>
+          item.date < today &&
+          !moves.some((move) => move.sessionId === item.id),
+      )
+    ) {
+      warnings.push({ sessionId: session.id, reason: 'dependency_order' })
+      continue
+    }
     const earliest = prerequisites.reduce((boundary, item) => {
       const planned = moves.find((move) => move.sessionId === item.id)
       const date = planned?.date ?? item.date
