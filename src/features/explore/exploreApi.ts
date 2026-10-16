@@ -233,3 +233,42 @@ export function connectProvider(provider: string) {
 export function disconnectProvider(provider: string) {
   return api.post<{ ok: boolean }>(`/connections/${provider}/disconnect`)
 }
+
+export type StudyDayAvailability = {
+  date: string
+  availableMinutes: number
+  committedMinutes?: number
+  blocked?: boolean
+}
+
+export type StudyPathwayPreview = {
+  preview: {
+    sessions: Array<{
+      stepId: string
+      goalId: string
+      title: string
+      date: string
+      minutes: number
+      sequence: number
+    }>
+    warnings: Array<{ stepId: string; remainingMinutes: number; reason: string }>
+    unscheduledMinutes: number
+    estimates: Array<{ stepId: string; minutes: number; inferred: true }>
+    unschedulable: unknown[]
+  }
+  assumptions: { taskMinutes: number; appointmentMinutes: number; note: string }
+  applied: false
+}
+
+/** Returns a proposal only; never creates or changes tasks or calendar entries. */
+export function previewStudyPathway(
+  documentId: string,
+  availability: StudyDayAvailability[],
+  completedStepIds: string[] = [],
+) {
+  const offset = new Date().getTimezoneOffset()
+  return api.post<StudyPathwayPreview>(
+    `/documents/${encodeURIComponent(documentId)}/pathway-preview?timezoneOffsetMinutes=${offset}`,
+    { availability, completedStepIds },
+  )
+}
