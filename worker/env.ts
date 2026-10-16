@@ -8,7 +8,11 @@ export type Env = {
   AI?: Ai
   AI_DAILY_GLOBAL_LIMIT?: string
   /** Internal request context, set only by loadAiPolicy; never dashboard vars. */
-  aiRequest?: { userId: string; dailyLimit: number; plan?: 'free' | 'premium' | 'owner_premium' }
+  aiRequest?: {
+    userId: string
+    dailyLimit: number
+    plan?: 'free' | 'premium' | 'owner_premium'
+  }
   AI_PROVIDER?: string
   AI_API_KEY?: string
   AI_BASE_URL?: string
