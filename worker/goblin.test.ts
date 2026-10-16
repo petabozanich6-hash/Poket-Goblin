@@ -344,7 +344,11 @@ describe('Free plan protects Goblin voice actions', () => {
     const response = await say('I need to call the dentist.')
     expect(response.results[0]).toMatchObject({ kind: 'info' })
     expect(response.results[0]?.message).toContain('Upgrade to Premium')
-    expect(h.query("SELECT COUNT(*) AS n FROM tasks WHERE user_id = ? AND status = 'open'", user.id))
-      .toEqual([{ n: 10 }])
+    expect(
+      h.query(
+        "SELECT COUNT(*) AS n FROM tasks WHERE user_id = ? AND status = 'open'",
+        user.id,
+      ),
+    ).toEqual([{ n: 10 }])
   })
 })
