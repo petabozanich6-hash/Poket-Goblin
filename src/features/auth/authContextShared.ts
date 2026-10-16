@@ -16,7 +16,7 @@ export type AuthContextValue = {
     email: string
     password: string
     displayName: string
-  }) => Promise<void>
+  }) => Promise<{ verificationRequired?: boolean; emailSent?: boolean; email?: string }>
   logout: () => Promise<void>
   saveSettings: (input: Partial<UserSettings>) => Promise<void>
 }
