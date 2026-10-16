@@ -21,6 +21,9 @@ beforeEach(async () => {
   h = createHarness()
   owner = await h.register('study-journey-owner@example.com')
   stranger = await h.register('study-journey-stranger@example.com')
+  // A full term's study pathway can exceed the deliberately restrictive
+  // Free-plan task allowance. Verify the legitimate Premium workflow.
+  h.makeOwner(owner.id)
 })
 
 async function uploadSchedule() {
