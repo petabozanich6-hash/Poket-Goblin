@@ -291,7 +291,9 @@ export async function processDocumentForUser(
       // the complete pathway. Ordinary document reminders still follow
       // the existing auto-add settings.
       const reviewPayload =
-        suggestion.type === 'task' && suggestion.group
+        understanding.documentType === 'education' &&
+        suggestion.type === 'task' &&
+        suggestion.group
           ? { ...suggestion, requiresReview: true }
           : suggestion
       statements.push(
