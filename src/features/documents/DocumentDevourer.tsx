@@ -325,6 +325,7 @@ export function DevourReview({
 
   const actedFirst = auto.added > 0
   const groups = planGroups(open)
+  const studySessions = open.filter((s) => s.group?.startsWith('Week '))
   const loose = open.filter((s) => !s.group)
 
   if (devoured) {
@@ -431,7 +432,11 @@ export function DevourReview({
         <section className={styles.plan} aria-labelledby="plan-heading">
           <div className={styles.planTop}>
             <h3 id="plan-heading">
-              {actedFirst ? 'Check these — I wasn’t sure' : 'Your plan'}
+              {studySessions.length
+                ? 'Your study plan'
+                : actedFirst
+                  ? 'Check these — I wasn’t sure'
+                  : 'Your plan'}
             </h3>
             <Button
               onClick={() => void addWholePlan()}
@@ -446,8 +451,9 @@ export function DevourReview({
             </Button>
           </div>
           <p className={styles.muted}>
-            Steps go on your task list, due dates go in your calendar. Skip
-            anything you don’t want first.
+            {studySessions.length
+              ? `I’ve split your weekly topics into ${studySessions.length} manageable sessions, spread around the tasks and appointments already in your calendar. The suggested day is editable. Review it, skip anything unnecessary, then choose Add the whole plan.`
+              : 'Steps go on your task list, due dates go in your calendar. Skip anything you don’t want first.'}
           </p>
           {groups.map((group) => (
             <div key={group.label} className={styles.planGroup}>
