@@ -165,9 +165,7 @@ export function SubscriptionPage() {
 
           <div className={styles.plans}>
             <Card className={data.plan === 'free' ? styles.mine : undefined}>
-              <h2 className={styles.title}>
-                Free — Meet Your Goblin
-              </h2>
+              <h2 className={styles.title}>Free — Meet Your Goblin</h2>
               <p className={styles.price}>Free, always</p>
               <ul className={styles.list}>
                 <li>
@@ -175,8 +173,8 @@ export function SubscriptionPage() {
                   reminders, shopping and appointments
                 </li>
                 <li>
-                  <Check size={16} aria-hidden /> A taste of document help,
-                  plus the panic button
+                  <Check size={16} aria-hidden /> A taste of document help, plus
+                  the panic button
                 </li>
                 <li>
                   <Check size={16} aria-hidden /> Your calendar on your phone
