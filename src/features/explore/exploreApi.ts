@@ -276,3 +276,16 @@ export function previewStudyPathway(
     { availability, completedStepIds },
   )
 }
+
+/** Approve exactly the sessions displayed in the most recent preview. */
+export function approveStudyPathway(
+  documentId: string,
+  availability: StudyDayAvailability[],
+  expectedSessions: StudyPathwayPreview['preview']['sessions'],
+) {
+  const offset = new Date().getTimezoneOffset()
+  return api.post<{ pathwayId: string; alreadySaved: boolean }>(
+    `/documents/${encodeURIComponent(documentId)}/pathway-approve?timezoneOffsetMinutes=${offset}`,
+    { availability, expectedSessions },
+  )
+}
