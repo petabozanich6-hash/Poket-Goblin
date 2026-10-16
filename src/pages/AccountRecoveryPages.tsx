@@ -248,8 +248,8 @@ export function VerifyEmailPage() {
           </Button>
           {resent ? (
             <p role="status">
-              If that address still needs confirmation, another link is on
-              its way. Check your inbox and spam folder.
+              If that address still needs confirmation, another link is on its
+              way. Check your inbox and spam folder.
             </p>
           ) : null}
           {error ? (
