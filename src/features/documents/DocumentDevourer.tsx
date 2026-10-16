@@ -325,11 +325,13 @@ export function DevourReview({
 
   const actedFirst = auto.added > 0
   const groups = planGroups(open)
-  const hasStudyPathway = groups.some((group) =>
-    /^(?:week\s+\d+|.*\b(?:essay|assessment|assignment|exam|study)\b)/i.test(
-      group.label,
-    ),
-  )
+  const hasStudyPathway =
+    doc.documentType === 'education' ||
+    groups.some((group) =>
+      /^(?:week\s+\d+|.*\b(?:essay|assessment|assignment|exam|study)\b)/i.test(
+        group.label,
+      ),
+    )
   const loose = open.filter((s) => !s.group)
 
   if (devoured) {
