@@ -81,6 +81,8 @@ export function AppRouter() {
         <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/terms" element={<LegalPage doc="terms" />} />
         <Route path="/privacy" element={<LegalPage doc="privacy" />} />
+        <Route path="/refunds" element={<LegalPage doc="refunds" />} />
+        <Route path="/data-and-ai" element={<LegalPage doc="data-and-ai" />} />
         {/* Straight to the microphone: no dashboard in the way. */}
         <Route
           path="/voice"

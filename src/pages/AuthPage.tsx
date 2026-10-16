@@ -182,6 +182,13 @@ export function AuthPage() {
               </p>
             ) : null}
 
+            {mode === 'register' ? (
+              <p className={styles.switch}>
+                By creating an account, you confirm you are 18 or over and
+                agree to the <Link to="/terms">Terms of Service</Link> and
+                acknowledge the <Link to="/privacy">Privacy Policy</Link>.
+              </p>
+            ) : null}
             <Button type="submit" disabled={busy}>
               {busy
                 ? 'Working…'
