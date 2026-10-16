@@ -30,7 +30,11 @@ export type ScheduledSession = {
 export type PathwayWarning = {
   stepId: string
   remainingMinutes: number
-  reason: 'insufficient_capacity' | 'invalid_deadline' | 'missing_dependency' | 'cyclic_dependency'
+  reason:
+    | 'insufficient_capacity'
+    | 'invalid_deadline'
+    | 'missing_dependency'
+    | 'cyclic_dependency'
 }
 export type PathwayResult = {
   sessions: ScheduledSession[]
@@ -50,7 +54,10 @@ export function recommendPathway(
   availability: DayAvailability[],
   options: { sessionMinutes?: number; completedStepIds?: readonly string[] } = {},
 ): PathwayResult {
-  const sessionSize = Math.max(15, Math.min(240, Math.floor(options.sessionMinutes ?? 60)))
+  const sessionSize = Math.max(
+    15,
+    Math.min(240, Math.floor(options.sessionMinutes ?? 60)),
+  )
   const completed = new Set(options.completedStepIds ?? [])
   const remaining = steps.filter((step) => !completed.has(step.id))
   const byId = new Map(steps.map((step) => [step.id, step]))
@@ -60,8 +67,13 @@ export function recommendPathway(
   const capacity = new Map<string, number>()
   for (const day of days) {
     // Duplicate availability rows must not manufacture extra time.
-    const free = day.blocked ? 0 : Math.max(0,
-      Math.floor(day.availableMinutes) - Math.max(0, Math.floor(day.committedMinutes ?? 0)))
+    const free = day.blocked
+      ? 0
+      : Math.max(
+          0,
+          Math.floor(day.availableMinutes) -
+            Math.max(0, Math.floor(day.committedMinutes ?? 0)),
+        )
     capacity.set(day.date, Math.min(capacity.get(day.date) ?? Infinity, free))
   }
   const warnings: PathwayWarning[] = []
@@ -73,7 +85,11 @@ export function recommendPathway(
     if (current === 'done') return true
     if (current === 'failed') return false
     if (current === 'visiting') {
-      warnings.push({stepId: step.id, remainingMinutes: Math.max(0, step.minutes), reason: 'cyclic_dependency'})
+      warnings.push({
+        stepId: step.id,
+        remainingMinutes: Math.max(0, step.minutes),
+        reason: 'cyclic_dependency',
+      })
       state.set(step.id, 'failed')
       return false
     }
@@ -85,7 +101,11 @@ export function recommendPathway(
       const dependency = byId.get(dependencyId)
       if (!dependency || !schedule(dependency)) {
         dependenciesOk = false
-        warnings.push({ stepId: step.id, remainingMinutes: Math.max(0, step.minutes), reason: 'missing_dependency' })
+        warnings.push({
+          stepId: step.id,
+          remainingMinutes: Math.max(0, step.minutes),
+          reason: 'missing_dependency',
+        })
         break
       }
       const ending = lastDay.get(dependencyId)
@@ -95,10 +115,15 @@ export function recommendPathway(
       state.set(step.id, 'failed')
       return false
     }
-    const validDate = /^\d{4}-\d{2}-\d{2}$/.test(step.deadline) &&
+    const validDate =
+      /^\d{4}-\d{2}-\d{2}$/.test(step.deadline) &&
       !Number.isNaN(Date.parse(step.deadline + 'T00:00:00Z'))
     if (!validDate) {
-      warnings.push({stepId: step.id, remainingMinutes: Math.max(0, step.minutes), reason: 'invalid_deadline'})
+      warnings.push({
+        stepId: step.id,
+        remainingMinutes: Math.max(0, step.minutes),
+        reason: 'invalid_deadline',
+      })
       state.set(step.id, 'failed')
       return false
     }
@@ -111,24 +136,52 @@ export function recommendPathway(
       while (free > 0 && left > 0) {
         const minutes = Math.min(free, left, sessionSize)
         sequence += 1
-        sessions.push({ stepId: step.id, goalId: step.goalId, title: step.title,
-          date: day.date, minutes, sequence })
+        sessions.push({
+          stepId: step.id,
+          goalId: step.goalId,
+          title: step.title,
+          date: day.date,
+          minutes,
+          sequence,
+        })
         left -= minutes
         free -= minutes
         lastDay.set(step.id, day.date)
       }
       capacity.set(day.date, free)
     }
-    if (left > 0) warnings.push({stepId: step.id, remainingMinutes: left, reason: 'insufficient_capacity'})
+    if (left > 0)
+      warnings.push({
+        stepId: step.id,
+        remainingMinutes: left,
+        reason: 'insufficient_capacity',
+      })
     state.set(step.id, left === 0 ? 'done' : 'failed')
     return left === 0
   }
-  remaining.sort((a, b) => a.deadline.localeCompare(b.deadline) ||
-    (b.priority ?? 0) - (a.priority ?? 0) || a.id.localeCompare(b.id))
+  remaining.sort(
+    (a, b) =>
+      a.deadline.localeCompare(b.deadline) ||
+      (b.priority ?? 0) - (a.priority ?? 0) ||
+      a.id.localeCompare(b.id),
+  )
   for (const step of remaining) schedule(step)
-  sessions.sort((a, b) => a.date.localeCompare(b.date) || a.goalId.localeCompare(b.goalId) ||
-    a.stepId.localeCompare(b.stepId) || a.sequence - b.sequence)
-  return { sessions, warnings, unscheduledMinutes: warnings
-    .filter((warning) => warning.reason === 'insufficient_capacity' || warning.reason === 'invalid_deadline')
-    .reduce((total, warning) => total + warning.remainingMinutes, 0) }
+  sessions.sort(
+    (a, b) =>
+      a.date.localeCompare(b.date) ||
+      a.goalId.localeCompare(b.goalId) ||
+      a.stepId.localeCompare(b.stepId) ||
+      a.sequence - b.sequence,
+  )
+  return {
+    sessions,
+    warnings,
+    unscheduledMinutes: warnings
+      .filter(
+        (warning) =>
+          warning.reason === 'insufficient_capacity' ||
+          warning.reason === 'invalid_deadline',
+      )
+      .reduce((total, warning) => total + warning.remainingMinutes, 0),
+  }
 }
