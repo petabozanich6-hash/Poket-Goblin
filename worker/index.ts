@@ -38,6 +38,7 @@ import { reminderRoutes } from './routes/reminders'
 import { reviewRoutes } from './routes/review'
 import { searchRoutes } from './routes/search'
 import { shoppingRoutes } from './routes/shopping'
+import { supportRoutes } from './routes/support'
 import { taskRoutes } from './routes/tasks'
 
 type Vars = { user: AuthUser; session: SessionInfo }
@@ -138,6 +139,7 @@ app.route('/documents', documentRoutes)
 app.route('/review', reviewRoutes)
 app.route('/connections', connectionRoutes)
 app.route('/magical', magicalRoutes)
+app.route('/support', supportRoutes)
 app.route('/billing', billingRoutes)
 app.route('/admin', adminRoutes)
 
