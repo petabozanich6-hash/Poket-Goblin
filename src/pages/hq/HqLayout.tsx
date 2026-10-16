@@ -22,6 +22,7 @@ import styles from './Hq.module.css'
 const tabs = [
   { to: '/hq', label: 'Overview', end: true },
   { to: '/hq/customers', label: 'Customers' },
+  { to: '/hq/costs', label: 'AI & Costs (AUD)' },
   { to: '/hq/settings', label: 'Platform settings' },
   { to: '/hq/security', label: 'Security & audit' },
 ]
