@@ -89,7 +89,9 @@ export function StudyPathwayPreviewPanel({
       setSaved(false)
       setPreview(null)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not undo the pathway.')
+      setError(
+        cause instanceof Error ? cause.message : 'Could not undo the pathway.',
+      )
     } finally {
       setUndoing(false)
     }
@@ -184,7 +186,11 @@ export function StudyPathwayPreviewPanel({
           {saved ? (
             <div>
               <p role="status">Pathway approved and saved to your tasks.</p>
-              <Button variant="secondary" onClick={() => void undo()} disabled={undoing}>
+              <Button
+                variant="secondary"
+                onClick={() => void undo()}
+                disabled={undoing}
+              >
                 {undoing ? 'Undoing…' : 'Undo this pathway'}
               </Button>
             </div>

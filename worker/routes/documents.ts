@@ -442,11 +442,17 @@ documentRoutes.post('/:id/pathway-approve', async (c) => {
   }
   const existingPathway = await c.env.DB.prepare(
     'SELECT status FROM study_pathways WHERE user_id = ? AND document_id = ?',
-  ).bind(user.id, documentId).first<{ status: string }>()
+  )
+    .bind(user.id, documentId)
+    .first<{ status: string }>()
   if (existingPathway?.status === 'cancelled') {
-    return c.json({
-      error: 'This pathway was previously undone. Create a new version before approving again.',
-    }, 409)
+    return c.json(
+      {
+        error:
+          'This pathway was previously undone. Create a new version before approving again.',
+      },
+      409,
+    )
   }
   const saved = await persistApprovedPathway(
     c.env.DB,
@@ -466,32 +472,46 @@ documentRoutes.post('/:id/pathway-undo', async (c) => {
   const pathway = await c.env.DB.prepare(
     `SELECT id, status FROM study_pathways
      WHERE user_id = ? AND document_id = ?`,
-  ).bind(user.id, documentId).first<{ id: string; status: string }>()
+  )
+    .bind(user.id, documentId)
+    .first<{ id: string; status: string }>()
   if (!pathway) return c.json({ error: 'Pathway not found' }, 404)
-  if (pathway.status === 'cancelled') return c.json({ undone: 0, alreadyUndone: true })
+  if (pathway.status === 'cancelled')
+    return c.json({ undone: 0, alreadyUndone: true })
 
   const sessions = await c.env.DB.prepare(
     `SELECT id, task_id as taskId FROM study_pathway_sessions
      WHERE pathway_id = ? AND user_id = ? AND status = 'planned'`,
-  ).bind(pathway.id, user.id).all<{ id: string; taskId: string | null }>()
+  )
+    .bind(pathway.id, user.id)
+    .all<{ id: string; taskId: string | null }>()
   const statements = []
   for (const session of sessions.results ?? []) {
     if (session.taskId) {
-      statements.push(c.env.DB.prepare(
-        `DELETE FROM tasks WHERE id = ? AND user_id = ? AND status = 'open'`,
-      ).bind(session.taskId, user.id))
+      statements.push(
+        c.env.DB.prepare(
+          `DELETE FROM tasks WHERE id = ? AND user_id = ? AND status = 'open'`,
+        ).bind(session.taskId, user.id),
+      )
     }
   }
-  statements.push(c.env.DB.prepare(
-    `UPDATE study_pathway_sessions SET status = 'cancelled'
+  statements.push(
+    c.env.DB.prepare(
+      `UPDATE study_pathway_sessions SET status = 'cancelled'
      WHERE pathway_id = ? AND user_id = ? AND status = 'planned'`,
-  ).bind(pathway.id, user.id))
-  statements.push(c.env.DB.prepare(
-    `UPDATE study_pathways SET status = 'cancelled', cancelled_at = datetime('now')
+    ).bind(pathway.id, user.id),
+  )
+  statements.push(
+    c.env.DB.prepare(
+      `UPDATE study_pathways SET status = 'cancelled', cancelled_at = datetime('now')
      WHERE id = ? AND user_id = ? AND status = 'active'`,
-  ).bind(pathway.id, user.id))
+    ).bind(pathway.id, user.id),
+  )
   await c.env.DB.batch(statements)
-  return c.json({ undone: (sessions.results ?? []).length, alreadyUndone: false })
+  return c.json({
+    undone: (sessions.results ?? []).length,
+    alreadyUndone: false,
+  })
 })
 
 documentRoutes.post('/', async (c) => {
