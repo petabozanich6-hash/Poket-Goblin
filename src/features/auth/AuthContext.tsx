@@ -138,7 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await loginMutation.mutateAsync(input)
       },
       register: async (input) => {
-        await registerMutation.mutateAsync(input)
+        return await registerMutation.mutateAsync(input)
       },
       logout: async () => {
         await logoutMutation.mutateAsync()
