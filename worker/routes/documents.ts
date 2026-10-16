@@ -246,7 +246,12 @@ documentRoutes.post('/', async (c) => {
      ORDER BY created_at DESC LIMIT 1`,
   )
     .bind(user.id, hash)
-    .first<{ id: string; retention: string; status: string; storageKey: string }>()
+    .first<{
+      id: string
+      retention: string
+      status: string
+      storageKey: string
+    }>()
   if (duplicate) {
     // Nothing from it added yet? Read it again: the reader may have improved
     // (or the AI was busy) since last time.

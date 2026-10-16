@@ -876,10 +876,12 @@ describe('Free document allowance retry experience', () => {
     const again = await upload(alice, BILL)
     expect(again.status).toBe(200)
     expect(again.body.duplicate).toBe(true)
-    expect(h.query(
-      "SELECT request_count AS n FROM ai_request_limits WHERE scope = ?",
-      `document-month:${alice.id}`,
-    )).toEqual([{ n: 1 }])
+    expect(
+      h.query(
+        'SELECT request_count AS n FROM ai_request_limits WHERE scope = ?',
+        `document-month:${alice.id}`,
+      ),
+    ).toEqual([{ n: 1 }])
   })
 
   it('does not consume a document read when storage is rejected', async () => {
@@ -888,9 +890,11 @@ describe('Free document allowance retry experience', () => {
       JSON.stringify({ freeMb: 0, premiumMb: 1024, ownerMb: 5120 }),
     )
     expect((await upload(alice, BILL, { mode: 'keep' })).status).toBe(413)
-    expect(h.query(
-      "SELECT request_count FROM ai_request_limits WHERE scope = ?",
-      `document-month:${alice.id}`,
-    )).toEqual([])
+    expect(
+      h.query(
+        'SELECT request_count FROM ai_request_limits WHERE scope = ?',
+        `document-month:${alice.id}`,
+      ),
+    ).toEqual([])
   })
 })
