@@ -367,3 +367,19 @@ export function replanMissedStudySessions(
     },
   )
 }
+
+export type StudyPathwayListItem = {
+  id: string
+  documentId: string
+  approvedAt: string
+  title: string
+  openSessions: number
+  completedSessions: number
+}
+
+/** Access approved study plans independently of the uploaded source file. */
+export function listStudyPathways() {
+  return api.get<{ pathways: StudyPathwayListItem[] }>(
+    '/documents/study-pathways',
+  )
+}
