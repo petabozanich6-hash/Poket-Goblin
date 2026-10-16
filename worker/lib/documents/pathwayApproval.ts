@@ -12,6 +12,7 @@ export async function persistApprovedPathway(
   documentId: string,
   sessions: ScheduledSession[],
   stepDeadlines: ReadonlyMap<string, string> = new Map(),
+  stepOrders: ReadonlyMap<string, number> = new Map(),
 ) {
   if (!sessions.length || sessions.length > 500) {
     throw new Error('A pathway needs between 1 and 500 sessions')
@@ -60,8 +61,9 @@ export async function persistApprovedPathway(
     ) {
       throw new Error('Invalid original assessment deadline')
     }
-    const match = session.stepId.match(/^[^:]+:(\d+):/)
-    const stepOrder = match ? Number(match[1]) : null
+    // The extraction index embedded in the ID is not necessarily the
+    // pedagogical order. Approved plans supply their reviewed step ordering.
+    const stepOrder = stepOrders.get(session.stepId) ?? null
     const taskId = newId('task')
     const sessionId = newId('session')
     statements.push(
