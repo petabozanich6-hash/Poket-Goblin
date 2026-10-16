@@ -97,9 +97,7 @@ export async function persistApprovedPathway(
           taskId,
           deadline ?? null,
           session.goalId,
-          Number.isFinite(Number(session.stepId.match(/^.+?:(\\d+):/)?.[1]))
-            ? Number(session.stepId.match(/^.+?:(\\d+):/)?.[1])
-            : null,
+          stepOrder,
         ),
     )
   }
