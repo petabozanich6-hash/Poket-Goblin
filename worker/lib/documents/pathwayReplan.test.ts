@@ -147,7 +147,6 @@ describe('missed study day replanning', () => {
     expect(result.moves.every((move) => move.date === '2030-05-03')).toBe(true)
   })
 
-
   it('does not schedule a dependent step if its missed prerequisite cannot fit', () => {
     const result = planMissedStudySessions(
       '2030-05-03',
@@ -197,5 +196,4 @@ describe('missed study day replanning', () => {
       minutes: 60,
     })
   })
-
 })

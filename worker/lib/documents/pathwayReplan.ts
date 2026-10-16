@@ -173,7 +173,9 @@ export function planMissedStudySessions(
       // Other missed steps will be replanned after the current prerequisite.
       if (item.date < today) return boundary
       const before =
-        item.stepOrder === session.stepOrder ? item.date : previousDay(item.date)
+        item.stepOrder === session.stepOrder
+          ? item.date
+          : previousDay(item.date)
       return before < boundary ? before : boundary
     }, deadline)
     const target = days.find(
@@ -190,8 +192,12 @@ export function planMissedStudySessions(
         sessionId: session.id,
         reason:
           earliest > latest ||
-          (days.some((date) => date >= today && date <= deadline &&
-            (capacity.get(date) ?? 0) >= minutes) &&
+          (days.some(
+            (date) =>
+              date >= today &&
+              date <= deadline &&
+              (capacity.get(date) ?? 0) >= minutes,
+          ) &&
             (earliest > today || latest < deadline))
             ? 'dependency_order'
             : 'insufficient_capacity',

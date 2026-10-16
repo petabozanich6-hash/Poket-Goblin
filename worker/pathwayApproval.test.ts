@@ -182,5 +182,4 @@ describe('approved pathway transactions and Undo', () => {
       pathway: { id: next.id, status: 'active' },
     })
   })
-
 })
