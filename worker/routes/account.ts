@@ -7,6 +7,7 @@ import { Hono } from 'hono'
 import type { Env } from '../env'
 import { appBaseUrl } from '../lib/accountTokens'
 import { loadAccess } from '../lib/access'
+import { billingConfig, listCustomerSubscriptions } from '../lib/billing/stripe'
 import { recordSecurityEvent } from '../lib/audit'
 import { passwordChangedEmail, sendEmail, SUPPORT } from '../lib/email'
 import { getObjectStore } from '../lib/storage'
@@ -309,6 +310,43 @@ accountRoutes.delete('/', async (c) => {
       },
       409,
     )
+  }
+  // Ask Stripe too: a second subscription we don't follow could still bill.
+  const billing = billingConfig(c.env)
+  if (billing.enabled) {
+    const customers = await c.env.DB.prepare(
+      `SELECT DISTINCT stripe_customer_id AS id FROM user_entitlements
+       WHERE user_id = ? AND stripe_customer_id IS NOT NULL`,
+    )
+      .bind(user.id)
+      .all<{ id: string }>()
+    try {
+      for (const customer of customers.results ?? []) {
+        const subs = await listCustomerSubscriptions(billing)(customer.id)
+        if (
+          subs.some(
+            (s) =>
+              !['canceled', 'incomplete_expired'].includes(s.status) &&
+              !s.cancel_at_period_end,
+          )
+        )
+          return c.json(
+            {
+              error:
+                'A subscription is still set to renew. Cancel it in Settings → Plan → Manage billing first.',
+            },
+            409,
+          )
+      }
+    } catch {
+      return c.json(
+        {
+          error:
+            'I couldn’t check your billing just now, so nothing was deleted. Try again in a minute.',
+        },
+        503,
+      )
+    }
   }
 
   const docs = await c.env.DB.prepare(

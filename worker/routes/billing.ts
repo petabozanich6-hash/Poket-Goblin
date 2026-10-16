@@ -11,7 +11,9 @@ import { Hono } from 'hono'
 import type { Env } from '../env'
 import { loadAccess, PLAN_LABELS } from '../lib/access'
 import {
+  adoptRemainingSubscription,
   applySubscription,
+  listCustomerSubscriptions,
   billingConfig,
   stripe,
   StripeError,
@@ -310,13 +312,28 @@ billingWebhookRoutes.post('/', async (c) => {
         event.type === 'checkout.session.completed'
           ? ((obj.client_reference_id as string | null) ?? null)
           : null
-      await applySubscription(c.env.DB, sub, hint, new Date(), (id) =>
+      const fetchSub = (id: string) =>
         stripe<StripeSubscription>(
           config,
           'GET',
           `/subscriptions/${encodeURIComponent(id)}`,
-        ),
+        )
+      const userId = await applySubscription(
+        c.env.DB,
+        sub,
+        hint,
+        new Date(),
+        fetchSub,
       )
+      if (userId)
+        await adoptRemainingSubscription(
+          c.env.DB,
+          userId,
+          sub,
+          listCustomerSubscriptions(config),
+          new Date(),
+          fetchSub,
+        )
     }
   } catch (error) {
     // Let Stripe retry: forget that we saw it.

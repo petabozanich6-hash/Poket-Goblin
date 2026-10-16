@@ -10,7 +10,7 @@ Nothing here is merged, deployed or switched to live payments.
   - replacement subscriptions activate correctly
   - `invoice.paid` and `invoice.payment_failed` events are handled
   - an hourly reconciliation re-checks subscriptions with Stripe
-  - no double subscriptions
+  - no double subscriptions; if someone pays twice, the second is followed when the first ends
   - account deletion follows the real billing state
 - **Free plan:**
   - rule-only helpers no longer use up the 3 AI requests a day
@@ -23,7 +23,7 @@ Nothing here is merged, deployed or switched to live payments.
   - no copy promises push notifications
 - **Auth:**
   - rate limits are stored in D1 (migration 0018)
-  - the per-email lockout is enforced
+  - a per-account lockout on repeated wrong passwords that strangers can't use to lock the owner out
   - a cross-site request guard is in place
   - registration is atomic and race-safe
   - changing a password revokes old reset links
@@ -37,7 +37,7 @@ Nothing here is merged, deployed or switched to live payments.
 
 ## Evidence
 
-- `npm run check` passes: typecheck, lint, format, 39 test files / 563
+- `npm run check` passes: typecheck, lint, format, 39 test files / 568
   tests, production build. `wrangler deploy --dry-run` passes.
 - Browser (Playwright, production build on `wrangler dev`): 25 journeys pass.
   They cover first run, the action Goblin, voice/PWA install and offline

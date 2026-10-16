@@ -308,22 +308,26 @@ describe('cross-site request forgery guard', () => {
 })
 
 describe('durable sign-in limits', () => {
-  it('pauses an account after 10 wrong passwords, whatever the IP', async () => {
+  it('pauses guessing from one network, without letting strangers lock the owner out', async () => {
     const h = createHarness()
     await h.register('target@example.com')
-    for (let i = 0; i < 10; i++) {
-      const res = await h.request('/api/auth/login', {
-        body: { email: 'target@example.com', password: `wrong-${i}-password` },
-        headers: { 'CF-Connecting-IP': `203.0.113.${i}` },
+    const attempt = (password: string, ip: string) =>
+      h.request('/api/auth/login', {
+        body: { email: 'target@example.com', password },
+        headers: { 'CF-Connecting-IP': ip },
       })
-      expect(res.status).toBe(401)
-    }
-    const right = await h.request('/api/auth/login', {
-      body: { email: 'target@example.com', password: 'correct horse battery' },
-      headers: { 'CF-Connecting-IP': '198.51.100.7' },
-    })
-    expect(right.status).toBe(429)
-    expect(right.headers.get('Retry-After')).toBe('900')
+    for (let i = 0; i < 10; i++)
+      expect((await attempt(`wrong-${i}-password`, '203.0.113.9')).status).toBe(
+        401,
+      )
+    // The guesser's network is paused, even with the right password…
+    const paused = await attempt('correct horse battery', '203.0.113.9')
+    expect(paused.status).toBe(429)
+    expect(paused.headers.get('Retry-After')).toBe('900')
+    // …but the real owner, elsewhere, still gets in.
+    expect(
+      (await attempt('correct horse battery', '198.51.100.7')).status,
+    ).toBe(200)
     // Unknown accounts get the same treatment (no enumeration).
     for (let i = 0; i < 10; i++)
       await h.request('/api/auth/login', {
@@ -336,10 +340,47 @@ describe('durable sign-in limits', () => {
         })
       ).status,
     ).toBe(429)
-    // Counters are stored hashed, never as email addresses.
+    // Counters are stored hashed, never as email addresses or IPs.
     expect(
       JSON.stringify(h.query('SELECT * FROM auth_rate_limits')),
-    ).not.toMatch(/example\.com/)
+    ).not.toMatch(/example\.com|203\.0/)
+  })
+
+  it('caps distributed guessing per account', async () => {
+    const h = createHarness()
+    await h.register('target@example.com')
+    for (let i = 0; i < 100; i++)
+      await h.request('/api/auth/login', {
+        body: { email: 'target@example.com', password: `wrong-${i}-password` },
+        headers: { 'CF-Connecting-IP': `10.0.${Math.floor(i / 5)}.${i % 5}` },
+      })
+    const res = await h.request('/api/auth/login', {
+      body: { email: 'target@example.com', password: 'correct horse battery' },
+      headers: { 'CF-Connecting-IP': '198.51.100.7' },
+    })
+    expect(res.status).toBe(429)
+  })
+
+  it('same-origin requests on any host pass the cross-site guard', async () => {
+    const h = createHarness()
+    await h.register('host@example.com')
+    const res = await app.request(
+      'https://pocket-goblin.example.workers.dev/api/auth/login',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: 'https://pocket-goblin.example.workers.dev',
+          'Sec-Fetch-Site': 'same-origin',
+        },
+        body: JSON.stringify({
+          email: 'host@example.com',
+          password: 'correct horse battery',
+        }),
+      },
+      h.env,
+    )
+    expect(res.status).toBe(200)
   })
 
   it('a racing duplicate sign-up gets a 409, never a 500 or a half account', async () => {

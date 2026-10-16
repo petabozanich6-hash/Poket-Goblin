@@ -9,6 +9,7 @@ import { hashPassword, verifyPassword } from '../lib/passwords'
 import { loadPlatformSettings } from '../lib/platformSettings'
 import {
   checkDurableLimit,
+  clearDurable,
   durableCount,
   waitMessage,
   type LimitResult,
@@ -35,8 +36,14 @@ function clientKey(c: { req: { header: (n: string) => string | undefined } }) {
 }
 
 const MINUTE = 60_000
-/** Failed sign-ins per email before that account is paused for a while. */
-const LOGIN_FAILS_PER_EMAIL = 10
+/**
+ * Failed sign-ins before sign-in pauses for 15 minutes: per account from
+ * one network (stops guessing), and a much higher cap per account from
+ * everywhere (stops distributed guessing). Keying the low cap on the
+ * network means a stranger can't lock someone else out of their account.
+ */
+const LOGIN_FAILS_PER_EMAIL_AND_IP = 10
+const LOGIN_FAILS_PER_EMAIL = 100
 
 function tooMany(
   c: { json: (b: unknown, s: 429, h: Record<string, string>) => Response },
@@ -196,12 +203,15 @@ authRoutes.post('/login', async (c) => {
     return c.json({ error: 'Invalid login details' }, 400)
   }
 
-  // Many wrong passwords for one account, from anywhere: pause that account's
-  // sign-in for a while (the same answer whether or not it exists).
+  // Many wrong passwords for one account: pause sign-in for a while (the
+  // same answer whether or not the account exists).
   const failKey = `login-fail:${emailRaw}`
+  const failHereKey = `login-fail:${emailRaw}:${clientKey(c)}`
   if (
+    (await durableCount(c.env.DB, failHereKey, 15 * MINUTE)) >=
+      LOGIN_FAILS_PER_EMAIL_AND_IP ||
     (await durableCount(c.env.DB, failKey, 15 * MINUTE)) >=
-    LOGIN_FAILS_PER_EMAIL
+      LOGIN_FAILS_PER_EMAIL
   ) {
     return c.json(
       {
@@ -229,6 +239,12 @@ authRoutes.post('/login', async (c) => {
     }>()
 
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
+    await checkDurableLimit(
+      c.env.DB,
+      failHereKey,
+      LOGIN_FAILS_PER_EMAIL_AND_IP,
+      15 * MINUTE,
+    )
     await checkDurableLimit(
       c.env.DB,
       failKey,
@@ -291,6 +307,7 @@ authRoutes.post('/login', async (c) => {
       403,
     )
   }
+  await clearDurable(c.env.DB, failHereKey)
   const session = await createSession(c.env.DB, c.env, user.id)
   setSessionCookie(c, session.token, session.expiresAt)
   await recordSecurityEvent(c.env.DB, user.id, 'login_success')
@@ -459,6 +476,10 @@ authRoutes.post('/password/reset', async (c) => {
   )
     .bind(userId)
     .first<{ email: string; displayName: string }>()
+  if (who) {
+    // A fresh password means a fresh start for sign-in limits.
+    await clearDurable(c.env.DB, `login-fail:${who.email}`)
+  }
   if (who)
     await sendEmail(
       c.env,

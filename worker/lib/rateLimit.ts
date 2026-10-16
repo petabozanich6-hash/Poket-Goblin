@@ -102,6 +102,18 @@ export async function durableCount(
   }
 }
 
+/** Forget a durable counter (e.g. after a successful sign-in). */
+export async function clearDurable(db: D1Database, key: string): Promise<void> {
+  try {
+    await db
+      .prepare(`DELETE FROM auth_rate_limits WHERE key = ?`)
+      .bind(await hashKey(key))
+      .run()
+  } catch {
+    /* table not migrated yet: nothing to clear */
+  }
+}
+
 /** "Try again in about 12 minutes." */
 export function waitMessage(retryAfterSec: number): string {
   const minutes = Math.ceil(retryAfterSec / 60)

@@ -101,9 +101,10 @@ app.use('*', async (c, next) => {
     return next()
   const site = c.req.header('Sec-Fetch-Site')
   const origin = c.req.header('Origin')
+  const sameOrigin = origin === new URL(c.req.url).origin
   if (
     site === 'cross-site' ||
-    (origin && !allowedOrigin(origin, c.env.ENVIRONMENT))
+    (origin && !sameOrigin && !allowedOrigin(origin, c.env.ENVIRONMENT))
   ) {
     return c.json({ error: 'Request blocked.' }, 403)
   }

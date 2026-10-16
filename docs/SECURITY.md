@@ -33,7 +33,7 @@ Pocket Goblin stores personal life data (tasks, notes, documents, reminders). Pr
 
 - CSRF: SameSite=Lax plus a server-side refusal of cross-site state-changing requests. Requests without browser headers (curl, Stripe) are left to their own checks (signatures, sessions).
 - Auth limits are durable in D1 (migration 0018). Other limits (AI bursts aside, which are atomic in D1) are still per-isolate memory and act as abuse brakes only.
-- The per-email lockout can be triggered by someone who knows an address (it pauses sign-in for 15 minutes; password reset still works).
+- The overall per-account cap (100 wrong passwords in 15 minutes from many networks) could be used to pause someone's sign-in briefly; the low cap is per network, so ordinary guessing can't lock the owner out.
 - The `AUTH_SECRET` fallback is used only outside production; production refuses to serve without a real secret.
 - HSTS is not set yet (domain-wide decision, pending owner approval).
 - OAuth token storage schema exists; live Google/Microsoft exchange not configured — do not claim OAuth secure-complete until tested.

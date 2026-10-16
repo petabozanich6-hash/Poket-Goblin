@@ -7,7 +7,9 @@
  */
 import type { Env } from '../../env'
 import {
+  adoptRemainingSubscription,
   applySubscription,
+  listCustomerSubscriptions,
   billingConfig,
   stripe,
   StripeError,
@@ -45,6 +47,14 @@ export async function reconcileSubscriptions(
     try {
       const sub = await fetchSub(row.subId)
       await applySubscription(env.DB, sub, row.userId, now, fetchSub)
+      await adoptRemainingSubscription(
+        env.DB,
+        row.userId,
+        sub,
+        listCustomerSubscriptions(config),
+        now,
+        fetchSub,
+      )
       // Mark it looked at, so the oldest-checked rows go first next hour.
       await env.DB.prepare(
         `UPDATE user_entitlements SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')

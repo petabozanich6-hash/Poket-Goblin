@@ -43,6 +43,14 @@ function fakeStripe() {
         return json({ url: 'https://checkout.stripe.com/c/pay/cs_test_1' })
       if (path === '/v1/billing_portal/sessions')
         return json({ url: 'https://billing.stripe.com/p/session/test_1' })
+      if (path === '/v1/subscriptions') {
+        const customer = new URL(url).searchParams.get('customer')
+        return json({
+          data: [...subscriptions.values()].filter(
+            (s) => s.customer === customer,
+          ),
+        })
+      }
       if (path.startsWith('/v1/subscriptions/')) {
         const sub = subscriptions.get(path.split('/').pop()!)
         return sub ? json(sub) : json({ error: { message: 'No such' } }, 404)
@@ -336,23 +344,44 @@ describe('replacement subscriptions', () => {
     }
   })
 
-  it('two paid subscriptions: follows the one that renews, and does not flip back', async () => {
+  it('two renewing subscriptions: keeps following the first, never marks a billing one replaced', async () => {
     sub('sub_A', 'active', alice.id, { created: nowS() - DAY })
     await deliver(event('evt_a1', 'customer.subscription.updated', 'sub_A'))
     sub('sub_B', 'active', alice.id, { created: nowS() })
     await deliver(event('evt_b1', 'customer.subscription.updated', 'sub_B'))
-    expect(linked()).toEqual([{ sub: 'sub_B', status: 'active' }])
-    await deliver(event('evt_a2', 'customer.subscription.updated', 'sub_A'))
-    await deliver(event('evt_b2', 'customer.subscription.updated', 'sub_B'))
-    expect(linked()).toEqual([{ sub: 'sub_B', status: 'active' }])
-    // If B is cancelled, A (still paid) takes over again.
-    subscriptions.set('sub_B', {
-      ...subscriptions.get('sub_B')!,
+    await deliver(event('evt_b2', 'invoice.paid', 'sub_B'))
+    expect(linked()).toEqual([{ sub: 'sub_A', status: 'active' }])
+    expect(
+      h.query(
+        `SELECT COUNT(*) AS n FROM user_entitlements WHERE status = 'replaced'`,
+      ),
+    ).toEqual([{ n: 0 }])
+  })
+
+  it('cancelling the followed one of two paid subscriptions adopts the other at once', async () => {
+    sub('sub_A', 'active', alice.id, { created: nowS() - DAY })
+    await deliver(event('evt_a1', 'customer.subscription.updated', 'sub_A'))
+    sub('sub_B', 'active', alice.id, { created: nowS() })
+    await deliver(event('evt_b1', 'customer.subscription.updated', 'sub_B'))
+    subscriptions.set('sub_A', {
+      ...subscriptions.get('sub_A')!,
       status: 'canceled',
     })
-    await deliver(event('evt_b3', 'customer.subscription.deleted', 'sub_B'))
-    await deliver(event('evt_a3', 'invoice.paid', 'sub_A'))
-    expect(linked()).toEqual([{ sub: 'sub_A', status: 'active' }])
+    await deliver(event('evt_a2', 'customer.subscription.deleted', 'sub_A'))
+    expect(linked()).toEqual([{ sub: 'sub_B', status: 'active' }])
+    expect((await plan(alice)).plan).toBe('premium')
+  })
+
+  it('a racing second swap is a no-op, not an error', async () => {
+    sub('sub_A', 'active', alice.id, { cancel_at_period_end: true })
+    await deliver(event('evt_a1', 'customer.subscription.updated', 'sub_A'))
+    sub('sub_B', 'active', alice.id, { created: nowS() })
+    const [r1, r2] = await Promise.all([
+      deliver(event('evt_b1', 'customer.subscription.created', 'sub_B')),
+      deliver(event('evt_b2', 'checkout.session.completed', 'sub_B')),
+    ])
+    expect([r1.status, r2.status]).toEqual([200, 200])
+    expect(linked()).toEqual([{ sub: 'sub_B', status: 'active' }])
   })
 
   it('a renewal invoice refreshes the period end', async () => {
@@ -609,5 +638,35 @@ describe('no double subscriptions', () => {
     expect(res.status).toBe(409)
     expect(((await res.json()) as Json).code).toBe('subscription_open')
     expect(calls.some((c) => c.url.includes('/checkout/sessions'))).toBe(false)
+  })
+})
+
+describe('account deletion asks Stripe', () => {
+  it('refuses while any subscription on the customer still renews', async () => {
+    sub('sub_A', 'active', alice.id, { cancel_at_period_end: true })
+    await deliver({
+      id: 'evt_a',
+      type: 'customer.subscription.updated',
+      livemode: false,
+      data: { object: { id: 'sub_A' } },
+    })
+    // A second, renewing subscription we never linked.
+    sub('sub_hidden', 'active', alice.id)
+    const res = await h.request('/api/account', {
+      method: 'DELETE',
+      cookie: alice.cookie,
+      body: { confirm: 'DELETE', password: 'correct horse battery' },
+    })
+    expect(res.status).toBe(409)
+    subscriptions.set('sub_hidden', {
+      ...subscriptions.get('sub_hidden')!,
+      status: 'canceled',
+    })
+    const ok = await h.request('/api/account', {
+      method: 'DELETE',
+      cookie: alice.cookie,
+      body: { confirm: 'DELETE', password: 'correct horse battery' },
+    })
+    expect(ok.status).toBe(200)
   })
 })
