@@ -450,6 +450,7 @@ documentRoutes.post('/:id/pathway-approve', async (c) => {
     documentId,
     result.sessions,
     new Map(result.deadlines.map((step) => [step.stepId, step.deadline])),
+    new Map(result.stepOrders.map((step) => [step.stepId, step.order])),
   )
   return c.json(
     { pathwayId: saved.id, alreadySaved: saved.alreadySaved },
