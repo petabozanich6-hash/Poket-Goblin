@@ -72,9 +72,9 @@ export function defaultSettings(env: Env): PlatformSettings {
       documentUploads: true,
       aiProvider: true,
     },
-    aiLimits: { free: ai, premium: ai, owner: Math.max(ai, 200) },
+    aiLimits: { free: 3, premium: ai, owner: Math.max(ai, 200) },
     // Kept documents only; "Just sort it" files never count.
-    storageQuotas: { freeMb: 100, premiumMb: 1_024, ownerMb: 5_120 },
+    storageQuotas: { freeMb: 10, premiumMb: 1_024, ownerMb: 5_120 },
   }
 }
 
