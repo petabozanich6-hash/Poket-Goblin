@@ -485,7 +485,10 @@ documentRoutes.patch('/:id/pathway-sessions/:sessionId', async (c) => {
     minutes < 1 ||
     minutes > 240
   ) {
-    return c.json({ error: 'Provide a valid study date and 1–240 minutes.' }, 400)
+    return c.json(
+      { error: 'Provide a valid study date and 1–240 minutes.' },
+      400,
+    )
   }
   const session = await c.env.DB.prepare(
     `SELECT s.id, s.task_id as taskId
@@ -513,7 +516,10 @@ documentRoutes.patch('/:id/pathway-sessions/:sessionId', async (c) => {
     )
   }
   if (task?.status !== 'open') {
-    return c.json({ error: 'Completed or removed sessions cannot be edited.' }, 409)
+    return c.json(
+      { error: 'Completed or removed sessions cannot be edited.' },
+      409,
+    )
   }
   await c.env.DB.batch([
     c.env.DB.prepare(

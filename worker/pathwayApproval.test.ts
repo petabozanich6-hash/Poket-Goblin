@@ -124,9 +124,6 @@ describe('approved pathway transactions and Undo', () => {
         'SELECT title FROM tasks WHERE user_id = ? ORDER BY title',
         alice.id,
       ),
-    ).toEqual([
-      { title: 'Completed reading' },
-      { title: 'Unrelated chore' },
-    ])
+    ).toEqual([{ title: 'Completed reading' }, { title: 'Unrelated chore' }])
   })
 })
