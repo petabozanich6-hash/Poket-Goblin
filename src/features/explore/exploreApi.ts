@@ -335,3 +335,31 @@ export function getSavedStudyPathway(documentId: string) {
     `/documents/${encodeURIComponent(documentId)}/pathway`,
   )
 }
+
+export type StudyReplanResponse = {
+  today: string
+  missedCount: number
+  moves: Array<{ sessionId: string; date: string; minutes: number }>
+  warnings: Array<{
+    sessionId: string
+    reason: 'missing_deadline' | 'deadline_passed' | 'insufficient_capacity'
+  }>
+  applied: boolean
+}
+
+/** Preview missed-day changes; passing expectedMoves explicitly approves them. */
+export function replanMissedStudySessions(
+  documentId: string,
+  availability: StudyDayAvailability[],
+  expectedMoves?: StudyReplanResponse['moves'],
+) {
+  const offset = new Date().getTimezoneOffset()
+  return api.post<StudyReplanResponse>(
+    `/documents/${encodeURIComponent(documentId)}/pathway-replan?timezoneOffsetMinutes=${offset}`,
+    {
+      availability,
+      apply: expectedMoves !== undefined,
+      ...(expectedMoves !== undefined ? { expectedMoves } : {}),
+    },
+  )
+}
