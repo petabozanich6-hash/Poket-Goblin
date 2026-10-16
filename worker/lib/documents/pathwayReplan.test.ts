@@ -84,4 +84,67 @@ describe('missed study day replanning', () => {
       { sessionId: 'first', reason: 'insufficient_capacity' },
     ])
   })
+
+  it('places missed prerequisites before later unfinished steps in the same assessment', () => {
+    const result = planMissedStudySessions(
+      '2030-05-03',
+      [
+        session('draft', {
+          goalId: 'essay',
+          stepOrder: 1,
+          date: '2030-05-01',
+        }),
+        session('reading', {
+          goalId: 'essay',
+          stepOrder: 0,
+          date: '2030-05-01',
+        }),
+      ],
+      [
+        { date: '2030-05-03', availableMinutes: 60 },
+        { date: '2030-05-04', availableMinutes: 60 },
+      ],
+    )
+    expect(result.warnings).toEqual([])
+    expect(result.moves).toEqual([
+      { sessionId: 'reading', date: '2030-05-03', minutes: 60 },
+      { sessionId: 'draft', date: '2030-05-04', minutes: 60 },
+    ])
+  })
+
+  it('refuses to move a missed prerequisite after a future dependent step', () => {
+    const result = planMissedStudySessions(
+      '2030-05-03',
+      [
+        session('reading', {
+          goalId: 'essay',
+          stepOrder: 0,
+        }),
+        session('draft', {
+          goalId: 'essay',
+          stepOrder: 1,
+          date: '2030-05-04',
+        }),
+      ],
+      [{ date: '2030-05-05', availableMinutes: 120 }],
+    )
+    expect(result.moves).toEqual([])
+    expect(result.warnings).toEqual([
+      { sessionId: 'reading', reason: 'dependency_order' },
+    ])
+  })
+
+  it('allows missed work on unrelated assessments to use separate capacity', () => {
+    const result = planMissedStudySessions(
+      '2030-05-03',
+      [
+        session('essay', { goalId: 'essay', stepOrder: 0 }),
+        session('math', { goalId: 'math', stepOrder: 0 }),
+      ],
+      [{ date: '2030-05-03', availableMinutes: 120 }],
+    )
+    expect(result.moves).toHaveLength(2)
+    expect(result.moves.every((move) => move.date === '2030-05-03')).toBe(true)
+  })
+
 })
