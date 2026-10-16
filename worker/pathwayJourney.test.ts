@@ -118,11 +118,11 @@ describe('document to approved study pathway journey', () => {
     expect(approval.status).toBe(201)
     // Calendar export must include the study tasks without a phone sync
     // connection, and Undo must remove their previously exported entries.
-    const [createdTask] = h.query(
+    const createdTask = (h.query(
       'SELECT id FROM tasks WHERE user_id = ? AND status = ? ORDER BY id',
       owner.id,
       'open',
-    ) as Array<{ id: string }>
+    ) as Array<{ id: string }>)[0]!
     expect(createdTask).toBeTruthy()
     const beforeCalendar = await h.request('/api/calendar/export.ics', {
       cookie: owner.cookie,
