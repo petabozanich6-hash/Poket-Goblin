@@ -377,7 +377,13 @@ describe('limits', () => {
     expect(h.query(`SELECT * FROM documents`)).toEqual([])
   })
 
-  it('limits documents waiting for review', async () => {
+  it('limits documents waiting for review for Premium accounts', async () => {
+    h.run(
+      `INSERT INTO user_entitlements (id, user_id, entitlement, source, status, granted_by)
+       VALUES (?, ?, 'premium', 'admin', 'active', 'test')`,
+      'ent_pending_limit',
+      alice.id,
+    )
     for (let i = 0; i < 10; i += 1) {
       expect((await upload(alice, `${BILL}\n#${i}`)).status).toBe(201)
     }
