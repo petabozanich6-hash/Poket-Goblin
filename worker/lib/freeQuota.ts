@@ -45,24 +45,33 @@ export async function freeQuota(
   }
 }
 
-/** Counts document processing events in the current UTC calendar month. */
+/**
+ * Reserve a Free document read atomically before processing. Uses the same
+ * D1 conditional-upsert technique as Workers AI to prevent concurrent reads
+ * slipping through a count-then-write race. Reservations are intentionally
+ * not refunded on failed processing (cost-protective, but disclose in UX).
+ */
 export async function freeDocumentProcessingQuota(
   db: D1Database,
   userId: string,
 ) {
   const access = await loadAccess(db, userId)
   if (access.plan !== 'free') return null
-  const monthStart = new Date().toISOString().slice(0, 7) + '-01'
-  const used = await db
-    .prepare(
-      "SELECT COUNT(*) AS n FROM ai_events WHERE user_id = ? AND feature = 'document' AND created_at >= ?",
-    )
-    .bind(userId, monthStart)
-    .first<{ n: number }>()
-  if (Number(used?.n ?? 0) < 2) return null
+  const now = new Date()
+  const month = now.getUTCFullYear() * 12 + now.getUTCMonth()
+  const row = await db.prepare(
+    `INSERT INTO ai_request_limits (scope, user_id, window_start, request_count)
+     VALUES (?, ?, ?, 1)
+     ON CONFLICT(scope) DO UPDATE SET
+       window_start = excluded.window_start,
+       request_count = CASE WHEN window_start < excluded.window_start
+         THEN 1 ELSE request_count + 1 END
+     WHERE window_start < excluded.window_start
+       OR (window_start = excluded.window_start AND request_count < 2)`,
+  ).bind(`document-month:${userId}`, userId, month).run()
+  if (row.meta.changes === 1) return null
   return {
-    error:
-      'Free includes 2 document reads per month. Upgrade to Premium for more.',
+    error: 'Free includes 2 document reads per month. Upgrade to Premium for more.',
     code: 'FREE_PLAN_LIMIT',
     resource: 'document_processing',
     limit: 2,
