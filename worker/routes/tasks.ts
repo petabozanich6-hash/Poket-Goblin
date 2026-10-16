@@ -85,7 +85,12 @@ taskRoutes.post('/', async (c) => {
       ? (recurrenceRaw as RecurrenceFrequency)
       : null
 
-  const quota = await freeQuota(c.env.DB, user.id, 'tasks', recurrenceFrequency ? 4 : 1)
+  const quota = await freeQuota(
+    c.env.DB,
+    user.id,
+    'tasks',
+    recurrenceFrequency ? 4 : 1,
+  )
   if (quota) return c.json(quota, 403)
 
   if (recurrenceFrequency) {
