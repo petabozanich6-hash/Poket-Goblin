@@ -70,3 +70,11 @@ Free should remain permanent. No automatic trial, countdown, or charge.
 Default **new** platform settings now offer Free 3 AI requests/day and 10 MB of kept documents; Premium remains 40 AI/day and 1 GB. These controls already exist in backend AI and document-storage code. Persisted Owner HQ settings in production override defaults and must be explicitly updated after review.
 
 **Not yet complete: do not advertise these as enforced.** A 10-active-task, 3-reminder, 5-note, 1-list limit and 2-document-processings-per-month cap need consistent enforcement across direct CRUD, voice actions, AI-generated tasks, capture/review acceptance, document reprocessing, recurring occurrences and recovery/reopening routes, plus concurrent-write tests. The current document processor still has a daily per-plan allowance. Premium-reserved AI capacity also needs a shared global budget design. The subscription UI must not promise quotas until these paths are guarded and production settings are checked.
+
+### Quota acceptance test checklist
+
+- Direct tasks/notes/reminders: cap checks, completion, reopening, and recurring occurrences.
+- Captures and AI breakdown acceptance: count every created task and note before changes; do not partially accept.
+- Documents: test new uploads, duplicate rereads and /documents/:id/process against monthly budget; prevent concurrent retries from exceeding allowance.
+- Goblin action engine, review acceptance, document auto-add and bulk writes: still require consistent preflight quota enforcement and concurrency tests before activation.
+- Existing persisted Owner HQ settings must be reviewed and adjusted in production; code defaults cannot override configured values.
