@@ -28,6 +28,11 @@ export function resolveProvider(env: Env): {
   if (name === 'workers_ai' && env.AI && workersAiModel(env)) {
     return { kind: 'workers_ai', model: workersAiModel(env), configured: true }
   }
+  // External HTTP inference has no atomic pre-call budget reservation yet.
+  // In production, fail closed rather than risk uncontrolled provider bills.
+  if (env.ENVIRONMENT === 'production' && name === 'openai_compatible') {
+    return { kind: 'rules', model: null, configured: false }
+  }
   const key = env.AI_API_KEY?.trim()
   if (name === 'openai_compatible' && key) {
     return {
