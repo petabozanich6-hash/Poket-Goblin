@@ -20,6 +20,8 @@ export const PERMISSIONS = [
   'customers.suspend',
   'customers.sessions.revoke',
   'subscriptions.read',
+  'support.read',
+  'support.write',
   'settings.read',
   'settings.write',
   'audit.read',
