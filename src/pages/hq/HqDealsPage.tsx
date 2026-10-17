@@ -44,7 +44,9 @@ type Giveaway = {
 function GiveawaysPanel() {
   const qc = useQueryClient()
   const [notice, setNotice] = useState('')
-  const [recipientEmails, setRecipientEmails] = useState<Record<string, string>>({})
+  const [recipientEmails, setRecipientEmails] = useState<
+    Record<string, string>
+  >({})
   const campaigns = useQuery({
     queryKey: ['hq', 'giveaways'],
     queryFn: () => api.admin.get<{ giveaways: Giveaway[] }>('/deals/giveaways'),
@@ -137,7 +139,10 @@ function GiveawaysPanel() {
             style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}
             onSubmit={(event) => {
               event.preventDefault()
-              grant.mutate({ id: gift.id, email: recipientEmails[gift.id] ?? '' })
+              grant.mutate({
+                id: gift.id,
+                email: recipientEmails[gift.id] ?? '',
+              })
             }}
           >
             <label>
@@ -156,7 +161,9 @@ function GiveawaysPanel() {
             </label>
             <Button
               type="submit"
-              disabled={grant.isPending || gift.recipients >= gift.maxRecipients}
+              disabled={
+                grant.isPending || gift.recipients >= gift.maxRecipients
+              }
             >
               Award free Premium
             </Button>

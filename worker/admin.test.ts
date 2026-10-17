@@ -821,7 +821,10 @@ describe('free Premium giveaways', () => {
     expect((await grant('alice@example.com')).status).toBe(201)
     expect((await grant('bob@example.com')).status).toBe(409)
     expect(
-      h.query('SELECT * FROM premium_giveaway_grants WHERE user_id = ?', bob.id),
+      h.query(
+        'SELECT * FROM premium_giveaway_grants WHERE user_id = ?',
+        bob.id,
+      ),
     ).toEqual([])
   })
 })
