@@ -41,9 +41,45 @@ type Giveaway = {
   recipients: number
 }
 
+type GiveawayGrant = {
+  id: string
+  email: string
+  issuedAt: string
+  expiresAt: string | null
+  endedAt: string | null
+  status: string
+}
+
+function GiveawayGrantTracker({ giveawayId }: { giveawayId: string }) {
+  const claims = useQuery({
+    queryKey: ['hq', 'giveaways', giveawayId, 'grants'],
+    queryFn: () =>
+      api.admin.get<{ grants: GiveawayGrant[] }>(
+        `/deals/giveaways/${encodeURIComponent(giveawayId)}/grants`,
+      ),
+  })
+  if (claims.isLoading) return <p>Checking the gift ledger…</p>
+  if (claims.isError) return <p role="alert">Could not load gift history.</p>
+  if (!claims.data?.grants.length) return <p>No Premium gifts awarded yet.</p>
+  return (
+    <ul>
+      {claims.data.grants.map((gift) => (
+        <li key={gift.id}>
+          {gift.email} — {gift.status} · Awarded:{' '}
+          {new Date(gift.issuedAt).toLocaleDateString()} · Premium until:{' '}
+          {gift.expiresAt
+            ? new Date(gift.expiresAt).toLocaleDateString()
+            : 'Not specified'}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 function GiveawaysPanel() {
   const qc = useQueryClient()
   const [notice, setNotice] = useState('')
+  const [expandedGift, setExpandedGift] = useState<string | null>(null)
   const [recipientEmails, setRecipientEmails] = useState<
     Record<string, string>
   >({})
@@ -135,6 +171,19 @@ function GiveawaysPanel() {
         <div key={gift.id} style={{ marginTop: 20 }}>
           <strong>{gift.name}</strong> — {gift.durationDays} free days,{' '}
           {gift.recipients} / {gift.maxRecipients} awarded
+          <div>
+            <Button
+              variant="secondary"
+              onClick={() =>
+                setExpandedGift(expandedGift === gift.id ? null : gift.id)
+              }
+            >
+              {expandedGift === gift.id ? 'Hide recipients' : 'View recipients'}
+            </Button>
+            {expandedGift === gift.id ? (
+              <GiveawayGrantTracker giveawayId={gift.id} />
+            ) : null}
+          </div>
           <form
             style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}
             onSubmit={(event) => {
@@ -174,12 +223,54 @@ function GiveawaysPanel() {
   )
 }
 
+type Redemption = {
+  id: string
+  email: string
+  status: 'reserved' | 'confirmed' | 'failed' | 'expired'
+  createdAt: string
+  confirmedAt: string | null
+  committedCents: number
+  discountsRealisedCents: number
+  revenuePaidCents: number
+}
+
+function RedemptionTracker({ campaignId }: { campaignId: string }) {
+  const claims = useQuery({
+    queryKey: ['hq', 'deals', campaignId, 'redemptions'],
+    queryFn: () =>
+      api.admin.get<{ redemptions: Redemption[] }>(
+        `/deals/${encodeURIComponent(campaignId)}/redemptions`,
+      ),
+  })
+  if (claims.isLoading) return <p>Checking the treasure ledger…</p>
+  if (claims.isError)
+    return <p role="alert">Could not load the claims ledger.</p>
+  if (!claims.data?.redemptions.length)
+    return <p>No claims recorded for this campaign yet.</p>
+  return (
+    <div>
+      <h4>Claim history (latest 250)</h4>
+      <ul>
+        {claims.data.redemptions.map((claim) => (
+          <li key={claim.id}>
+            {claim.email} — {claim.status} ·{' '}
+            {new Date(claim.createdAt).toLocaleDateString()} · Discount used:{' '}
+            {money(claim.discountsRealisedCents)} · Revenue:{' '}
+            {money(claim.revenuePaidCents)}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 export function HqDealsPage() {
   const qc = useQueryClient()
   const deals = useQuery({ queryKey: ['hq', 'deals'], queryFn: fetchDeals })
   const [message, setMessage] = useState('')
   const [kind, setKind] = useState<'percent' | 'fixed'>('percent')
   const [preset, setPreset] = useState('custom')
+  const [expandedTracker, setExpandedTracker] = useState<string | null>(null)
   const refresh = () => qc.invalidateQueries({ queryKey: ['hq', 'deals'] })
   const create = useMutation({
     mutationFn: (data: Record<string, unknown>) =>
@@ -315,7 +406,7 @@ export function HqDealsPage() {
             />
           </label>
           <label>
-            Discounted billing cycles{' '}
+            Discounted invoices (not months){' '}
             <input
               name="cycles"
               type="number"
@@ -325,6 +416,13 @@ export function HqDealsPage() {
               required
             />
           </label>
+          <p role="note">
+            CAUTION: A billing cycle means one invoice, not one calendar month.
+            Six cycles means six months on a monthly plan but six years on an
+            annual plan. These draft codes cannot be activated or redeemed.
+            Calendar-duration and plan-specific discount rules are being
+            designed separately. Free Premium gifts are handled above.
+          </p>
           <label>
             Audience{' '}
             <select name="audience">
@@ -405,6 +503,17 @@ export function HqDealsPage() {
             </p>
             {p.activation_window_days ? (
               <p>Expires {p.activation_window_days} days after activation.</p>
+            ) : null}
+            <Button
+              variant="secondary"
+              onClick={() =>
+                setExpandedTracker(expandedTracker === p.id ? null : p.id)
+              }
+            >
+              {expandedTracker === p.id ? 'Hide claims' : 'View claim tracker'}
+            </Button>
+            {expandedTracker === p.id ? (
+              <RedemptionTracker campaignId={p.id} />
             ) : null}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <Button

@@ -879,6 +879,36 @@ adminRoutes.get(
   },
 )
 
+// Read-only campaign claim history. Financial and status details are scoped
+// to passkey-elevated Owner HQ; customers cannot fetch another user's claims.
+adminRoutes.get(
+  '/deals/:id/redemptions',
+  requirePermission('subscriptions.read'),
+  async (c) => {
+    const campaignId = c.req.param('id')
+    const campaign = await c.env.DB.prepare(
+      'SELECT id FROM promotion_campaigns WHERE id = ?',
+    )
+      .bind(campaignId)
+      .first()
+    if (!campaign) return c.json({ error: 'Campaign not found' }, 404)
+    const rows = await c.env.DB.prepare(
+      `SELECT r.id, u.email, r.status,
+              r.created_at AS createdAt, r.confirmed_at AS confirmedAt,
+              r.commitment_cents AS committedCents,
+              r.discounts_realised_cents AS discountsRealisedCents,
+              r.revenue_paid_cents AS revenuePaidCents
+       FROM promotion_redemptions r
+       JOIN users u ON u.id = r.user_id
+       WHERE r.campaign_id = ?
+       ORDER BY r.created_at DESC LIMIT 250`,
+    )
+      .bind(campaignId)
+      .all()
+    return c.json({ redemptions: rows.results ?? [] })
+  },
+)
+
 adminRoutes.post('/deals', requirePermission('settings.write'), async (c) => {
   const body = await readJson(c)
   const code =
@@ -1085,6 +1115,33 @@ adminRoutes.get(
        GROUP BY g.id ORDER BY g.created_at DESC`,
     ).all()
     return c.json({ giveaways: rows.results ?? [] })
+  },
+)
+
+adminRoutes.get(
+  '/deals/giveaways/:id/grants',
+  requirePermission('subscriptions.read'),
+  async (c) => {
+    const id = c.req.param('id')
+    const campaign = await c.env.DB.prepare(
+      'SELECT id FROM premium_giveaway_campaigns WHERE id = ?',
+    )
+      .bind(id)
+      .first()
+    if (!campaign) return c.json({ error: 'Giveaway not found' }, 404)
+    const rows = await c.env.DB.prepare(
+      `SELECT g.id, u.email, g.issued_at AS issuedAt,
+              e.current_period_end AS expiresAt, e.status,
+              e.ended_at AS endedAt
+       FROM premium_giveaway_grants g
+       JOIN users u ON u.id = g.user_id
+       JOIN user_entitlements e ON e.id = g.entitlement_id
+       WHERE g.campaign_id = ?
+       ORDER BY g.issued_at DESC LIMIT 250`,
+    )
+      .bind(id)
+      .all()
+    return c.json({ grants: rows.results ?? [] })
   },
 )
 
