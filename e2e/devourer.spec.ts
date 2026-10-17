@@ -114,3 +114,40 @@ test('Just sort it: approve, skip, devour — the task stays, the file goes', as
     })
   }
 })
+
+test('uploads several documents separately and keeps each review accessible', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('tab', { name: 'Register' }).click()
+  await page.getByLabel('What should the goblin call you?').fill('Batch Goblin')
+  await page.getByLabel('Email').fill(`batch_devour_${stamp}@example.com`)
+  await page.getByLabel('Password').fill(password)
+  await page.getByRole('button', { name: /create account/i }).click()
+  await expect(page).toHaveURL(/\\/den/, { timeout: 20_000 })
+
+  await page.goto('/life/documents')
+  await page.getByLabel(/Choose a bill, letter/).setInputFiles([
+    {
+      name: 'bill-a.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('Power bill. Amount due: $75. Due on 22 November 2030.'),
+    },
+    {
+      name: 'letter-b.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('Appointment letter. Appointment on 25 November 2030 at 10:30 AM.'),
+    },
+  ])
+  await page.getByRole('button', { name: 'Feed it to the goblin' }).click()
+  const results = page.getByRole('region', { name: 'Document upload results' })
+  await expect(results.getByText('bill-a.txt')).toBeVisible()
+  await expect(results.getByText('letter-b.txt')).toBeVisible()
+  await expect(results.getByRole('button', { name: 'Review bill-a.txt' })).toBeVisible()
+  await expect(results.getByRole('button', { name: 'Review letter-b.txt' })).toBeVisible()
+
+  await results.getByRole('button', { name: 'Review bill-a.txt' }).click()
+  await expect(page.getByText(/bill-a\\.txt/)).toBeVisible()
+  await page.getByRole('button', { name: /Done — .*delete the file/ }).click()
+  await page.getByRole('button', { name: 'Feed me another' }).click()
+  await results.getByRole('button', { name: 'Review letter-b.txt' }).click()
+  await expect(page.getByText(/letter-b\\.txt/)).toBeVisible()
+})
