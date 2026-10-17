@@ -644,7 +644,9 @@ export function DocumentDevourer({
     }
     const oversized = files.find((file) => file.size > maxMb * 1024 * 1024)
     if (oversized) {
-      setError(`Each file must be under ${maxMb} MB. Choose a smaller copy of ${oversized.name}.`)
+      setError(
+        `Each file must be under ${maxMb} MB. Choose a smaller copy of ${oversized.name}.`,
+      )
       return
     }
     const chosenMode = mode
@@ -656,22 +658,30 @@ export function DocumentDevourer({
     // Process one file at a time. Every file retains the existing server-side
     // duplicate, quota, privacy and review protections.
     for (const [id, file] of files.entries()) {
-      setBatch((items) => items.map((item) =>
-        item.id === id ? { ...item, status: 'reading' } : item,
-      ))
+      setBatch((items) =>
+        items.map((item) =>
+          item.id === id ? { ...item, status: 'reading' } : item,
+        ),
+      )
       try {
         const data = await devourDocument(file, chosenMode)
         if (files.length === 1) {
           setResult(data)
           onReviewing?.(data.document.id)
         }
-        setBatch((items) => items.map((item) =>
-          item.id === id ? { ...item, status: 'ready', result: data } : item,
-        ))
+        setBatch((items) =>
+          items.map((item) =>
+            item.id === id ? { ...item, status: 'ready', result: data } : item,
+          ),
+        )
       } catch (err) {
-        setBatch((items) => items.map((item) =>
-          item.id === id ? { ...item, status: 'failed', error: errorText(err) } : item,
-        ))
+        setBatch((items) =>
+          items.map((item) =>
+            item.id === id
+              ? { ...item, status: 'failed', error: errorText(err) }
+              : item,
+          ),
+        )
       }
     }
     setReading(false)
