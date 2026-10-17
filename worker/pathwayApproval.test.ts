@@ -291,4 +291,28 @@ describe('approved pathway transactions and Undo', () => {
       ),
     ).toEqual([])
   })
+
+  it('rolls back an entire pathway if it exceeds the Free task allowance', async () => {
+    const sessions = Array.from({ length: 11 }, (_, index) => ({
+      stepId: `free-limit-${index}`,
+      goalId: 'free-study',
+      title: `Study part ${index + 1}`,
+      date: '2030-05-12',
+      minutes: 30,
+      sequence: 1,
+    }))
+    await expect(
+      persistApprovedPathway(h.env.DB, alice.id, 'large-free-plan', sessions),
+    ).rejects.toThrow('FREE_PLAN_LIMIT')
+    expect(
+      h.query('SELECT id FROM study_pathways WHERE user_id = ?', alice.id),
+    ).toEqual([])
+    expect(
+      h.query('SELECT id FROM study_pathway_sessions WHERE user_id = ?', alice.id),
+    ).toEqual([])
+    expect(
+      h.query('SELECT id FROM tasks WHERE user_id = ?', alice.id),
+    ).toEqual([])
+  })
+
 })
