@@ -46,6 +46,8 @@ export const EXPORTED_TABLES: Record<string, { omit?: string[] }> = {
   documents: { omit: ['storage_key'] },
   document_extractions: {},
   review_items: {},
+  study_pathways: {},
+  study_pathway_sessions: {},
   record_links: {},
   daily_plans: {},
   user_memory: {},
@@ -214,7 +216,23 @@ accountRoutes.get('/export', async (c) => {
     .bind(user.id)
     .first()
   const data: Record<string, unknown[]> = {}
+  // The schema is released before the pathway Worker because merging to main
+  // automatically deploys. Export must work safely in that short interval
+  // even if new tables are not migrated yet. Once present, include all rows.
+  const schemaRows = await c.env.DB.prepare(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('study_pathways', 'study_pathway_sessions')",
+  ).all<{ name: string }>()
+  const availablePathwayTables = new Set(
+    (schemaRows.results ?? []).map((row) => row.name),
+  )
   for (const [table, rule] of Object.entries(EXPORTED_TABLES)) {
+    if (
+      (table === 'study_pathways' || table === 'study_pathway_sessions') &&
+      !availablePathwayTables.has(table)
+    ) {
+      data[table] = []
+      continue
+    }
     const rows = await c.env.DB.prepare(
       `SELECT * FROM ${table} WHERE user_id = ?`,
     )
