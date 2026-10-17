@@ -120,6 +120,31 @@ describe('document to approved study pathway journey', () => {
       body: { availability, expectedSessions: view.preview.sessions },
     })
     expect(approval.status).toBe(201)
+    // Pocket Goblin's calendar must show each dated study session without
+    // duplicating it as a conventional appointment.
+    const calendarUrl = '/api/documents/study-sessions?from=2026-10-19&to=2026-12-05'
+    const calendarSessions = await h.request(calendarUrl, {
+      cookie: owner.cookie,
+    })
+    expect(calendarSessions.status).toBe(200)
+    const calendarData = (await calendarSessions.json()) as {
+      sessions: Array<{ id: string; title: string; date: string; minutes: number }>
+    }
+    expect(calendarData.sessions).toHaveLength(view.preview.sessions.length)
+    expect(calendarData.sessions.every((session) =>
+      session.minutes > 0 && session.date >= '2026-10-19' &&
+      session.date <= '2026-12-05',
+    )).toBe(true)
+    const strangersCalendar = await h.request(calendarUrl, {
+      cookie: stranger.cookie,
+    })
+    expect(strangersCalendar.status).toBe(200)
+    expect(await strangersCalendar.json()).toEqual({ sessions: [] })
+    const invalidCalendar = await h.request(
+      '/api/documents/study-sessions?from=2026-02-30&to=2026-12-05',
+      { cookie: owner.cookie },
+    )
+    expect(invalidCalendar.status).toBe(400)
     // Calendar export must include the study tasks without a phone sync
     // connection, and Undo must remove their previously exported entries.
     const createdTasks = h.query(
@@ -182,6 +207,10 @@ describe('document to approved study pathway journey', () => {
       method: 'POST',
     })
     expect(undo.status).toBe(200)
+    const afterUndoSessions = await h.request(calendarUrl, {
+      cookie: owner.cookie,
+    })
+    expect(await afterUndoSessions.json()).toEqual({ sessions: [] })
     const afterCalendar = await h.request('/api/calendar/export.ics', {
       cookie: owner.cookie,
     })
