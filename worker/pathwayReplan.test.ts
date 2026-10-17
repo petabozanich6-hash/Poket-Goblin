@@ -167,4 +167,64 @@ describe('approved missed-day replan endpoint', () => {
       ),
     ).toEqual([{ day: '2030-05-01' }])
   })
+
+  it('refuses to overwrite a study task independently moved in the task list', async () => {
+    await persistApprovedPathway(
+      h.env.DB,
+      alice.id,
+      'externally-moved-doc',
+      [
+        {
+          stepId: 'read',
+          goalId: 'essay',
+          title: 'Read the paper',
+          date: '2030-05-01',
+          minutes: 60,
+          sequence: 1,
+        },
+      ],
+      new Map([['read', '2030-05-10']]),
+    )
+    const session = h.query(
+      'SELECT id FROM study_pathway_sessions WHERE user_id = ?',
+      alice.id,
+    )[0] as { id: string }
+    await h.env.DB.prepare(
+      `UPDATE tasks SET due_date = '2030-05-06'
+       WHERE user_id = ? AND title = 'Read the paper'`,
+    )
+      .bind(alice.id)
+      .run()
+    const preview = await h.request(
+      '/api/documents/externally-moved-doc/pathway-replan',
+      { cookie: alice.cookie, body: { availability } },
+    )
+    expect(preview.status).toBe(409)
+    expect(await preview.json()).toMatchObject({
+      conflictingSessionIds: [session.id],
+    })
+    const edit = await h.request(
+      `/api/documents/externally-moved-doc/pathway-sessions/${session.id}`,
+      {
+        method: 'PATCH',
+        cookie: alice.cookie,
+        body: {
+          date: '2030-05-04',
+          minutes: 60,
+          availableMinutes: 120,
+        },
+      },
+    )
+    expect(edit.status).toBe(409)
+    expect(
+      h.query(
+        'SELECT scheduled_date as date FROM study_pathway_sessions WHERE id = ?',
+        session.id,
+      ),
+    ).toEqual([{ date: '2030-05-01' }])
+    expect(
+      h.query('SELECT due_date as date FROM tasks WHERE user_id = ?', alice.id),
+    ).toEqual([{ date: '2030-05-06' }])
+  })
+
 })
