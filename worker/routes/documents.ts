@@ -593,14 +593,22 @@ documentRoutes.patch('/:id/pathway-sessions/:sessionId', async (c) => {
       availableMinutes < 15 ||
       availableMinutes > 1440
     ) {
-      return c.json({ error: 'Confirm your available minutes on the new study day.' }, 400)
+      return c.json(
+        { error: 'Confirm your available minutes on the new study day.' },
+        400,
+      )
     }
     const offset = readOffsetMinutes({
       timezoneOffsetMinutes: Number(c.req.query('timezoneOffsetMinutes') ?? 0),
     })
-    const today = new Date(Date.now() - offset * 60000).toISOString().slice(0, 10)
+    const today = new Date(Date.now() - offset * 60000)
+      .toISOString()
+      .slice(0, 10)
     if (date < today) {
-      return c.json({ error: 'Study sessions cannot be moved into the past.' }, 409)
+      return c.json(
+        { error: 'Study sessions cannot be moved into the past.' },
+        409,
+      )
     }
     const [otherTasks, otherStudy, events] = await Promise.all([
       c.env.DB.prepare(
@@ -631,8 +639,12 @@ documentRoutes.patch('/:id/pathway-sessions/:sessionId', async (c) => {
       )
         .bind(
           user.id,
-          new Date(Date.parse(date + 'T00:00:00Z') + offset * 60000).toISOString(),
-          new Date(Date.parse(date + 'T00:00:00Z') + offset * 60000 + 86400000).toISOString(),
+          new Date(
+            Date.parse(date + 'T00:00:00Z') + offset * 60000,
+          ).toISOString(),
+          new Date(
+            Date.parse(date + 'T00:00:00Z') + offset * 60000 + 86400000,
+          ).toISOString(),
         )
         .first<{ count: number }>(),
     ])
@@ -642,7 +654,10 @@ documentRoutes.patch('/:id/pathway-sessions/:sessionId', async (c) => {
       Number(events?.count ?? 0) * 60
     if (availableMinutes - committed < minutes) {
       return c.json(
-        { error: 'The new study day does not have enough time after existing commitments.' },
+        {
+          error:
+            'The new study day does not have enough time after existing commitments.',
+        },
         409,
       )
     }

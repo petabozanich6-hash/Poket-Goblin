@@ -169,8 +169,8 @@ export function StudyPathwayPreviewPanel({
           <h5>Saved study sessions</h5>
           <p>
             You can move unfinished sessions before their original assessment
-            deadlines. Confirm how much time you have on the new day; the
-            goblin will account for existing tasks and appointments.
+            deadlines. Confirm how much time you have on the new day; the goblin
+            will account for existing tasks and appointments.
           </p>
           <ul>
             {stored.sessions

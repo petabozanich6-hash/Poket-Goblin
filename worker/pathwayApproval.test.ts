@@ -266,9 +266,7 @@ describe('approved pathway transactions and Undo', () => {
         'SELECT scheduled_date as date, minutes, deadline_date as deadline FROM study_pathway_sessions WHERE id = ?',
         draft.id,
       ),
-    ).toEqual([
-      { date: '2030-05-09', minutes: 45, deadline: '2030-05-10' },
-    ])
+    ).toEqual([{ date: '2030-05-09', minutes: 45, deadline: '2030-05-10' }])
     expect((await send(draft.id, '2030-05-11', 45, 240)).status).toBe(409)
     const noBudget = await h.request(
       `/api/documents/doc-order/pathway-sessions/${draft.id}`,
