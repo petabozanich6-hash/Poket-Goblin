@@ -618,38 +618,82 @@ export function DocumentDevourer({
     queryFn: listStudyPathways,
   })
   const [error, setError] = useState<string | null>(null)
+  type BatchItem = {
+    id: number
+    name: string
+    status: 'waiting' | 'reading' | 'ready' | 'failed'
+    result?: DevourResponse
+    error?: string
+  }
+  const [batch, setBatch] = useState<BatchItem[]>([])
+  const [reading, setReading] = useState(false)
 
-  const upload = useMutation({
-    mutationFn: ({ file }: { file: File }) => devourDocument(file, mode),
-    onSuccess: async (data) => {
-      setError(null)
-      setResult(data)
-      onReviewing?.(data.document.id)
-      await Promise.all(
-        ['documents', 'sorting-documents', 'review'].map((key) =>
-          queryClient.invalidateQueries({ queryKey: [key] }),
-        ),
-      )
-    },
-    onError: (err) => setError(errorText(err)),
-  })
-
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (reading) return
     const input = event.currentTarget.elements.namedItem(
       'file',
     ) as HTMLInputElement
-    const file = input.files?.[0]
-    if (!file) {
-      setError('Choose a file first.')
+    const files = Array.from(input.files ?? [])
+    if (!files.length) {
+      setError('Choose at least one file first.')
       return
     }
-    if (file.size > maxMb * 1024 * 1024) {
-      setError(`That file is over ${maxMb} MB. Try a smaller copy or a PDF.`)
+    // Keep batches bounded to avoid exhausting the per-user review allowance.
+    if (files.length > 10) {
+      setError('Choose up to 10 documents at a time.')
       return
     }
-    upload.mutate({ file })
+    const oversized = files.find((file) => file.size > maxMb * 1024 * 1024)
+    if (oversized) {
+      setError(
+        `Each file must be under ${maxMb} MB. Choose a smaller copy of ${oversized.name}.`,
+      )
+      return
+    }
+    const chosenMode = mode
+    setError(null)
+    setResult(null)
+    setBatch(
+      files.map((file, id) => ({ id, name: file.name, status: 'waiting' })),
+    )
+    setReading(true)
     event.currentTarget.reset()
+    // Process one file at a time. Every file retains the existing server-side
+    // duplicate, quota, privacy and review protections.
+    for (const [id, file] of files.entries()) {
+      setBatch((items) =>
+        items.map((item) =>
+          item.id === id ? { ...item, status: 'reading' } : item,
+        ),
+      )
+      try {
+        const data = await devourDocument(file, chosenMode)
+        if (files.length === 1) {
+          setResult(data)
+          onReviewing?.(data.document.id)
+        }
+        setBatch((items) =>
+          items.map((item) =>
+            item.id === id ? { ...item, status: 'ready', result: data } : item,
+          ),
+        )
+      } catch (err) {
+        setBatch((items) =>
+          items.map((item) =>
+            item.id === id
+              ? { ...item, status: 'failed', error: errorText(err) }
+              : item,
+          ),
+        )
+      }
+    }
+    setReading(false)
+    await Promise.all(
+      ['documents', 'sorting-documents', 'review'].map((key) =>
+        queryClient.invalidateQueries({ queryKey: [key] }),
+      ),
+    )
   }
 
   if (result)
@@ -685,7 +729,7 @@ export function DocumentDevourer({
     )
 
   return (
-    <form className={styles.form} onSubmit={submit}>
+    <form className={styles.form} onSubmit={(event) => void submit(event)}>
       {pathways.data?.pathways.length ? (
         <section aria-label="Saved study pathways">
           <h3>Saved study pathways</h3>
@@ -754,16 +798,53 @@ export function DocumentDevourer({
           name="file"
           type="file"
           accept=".pdf,.docx,.txt,.md,image/jpeg,image/png,image/webp,image/gif,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+          multiple
           required
+          disabled={reading}
         />
       </label>
-      <Button type="submit" disabled={upload.isPending}>
-        {upload.isPending
-          ? upload.variables?.file.type.startsWith('image/')
-            ? 'Reading your photo — about 15 seconds…'
-            : 'The goblin is reading…'
-          : 'Feed it to the goblin'}
+      <p className={styles.muted}>
+        Choose up to 10 files. Each is read separately, with its own review.
+        Your selected privacy mode applies to every file.
+      </p>
+      <Button type="submit" disabled={reading}>
+        {reading ? 'Reading documents one at a time…' : 'Feed it to the goblin'}
       </Button>
+      {batch.length > 0 ? (
+        <section aria-label="Document upload results" aria-live="polite">
+          <h3>Document results</h3>
+          <ul>
+            {batch.map((item) => (
+              <li key={item.id}>
+                <strong>{item.name}</strong> —{' '}
+                {item.status === 'waiting'
+                  ? 'Waiting'
+                  : item.status === 'reading'
+                    ? 'Reading…'
+                    : item.status === 'failed'
+                      ? 'Could not read'
+                      : 'Ready for review'}
+                {item.error ? (
+                  <p className={styles.error}>{item.error}</p>
+                ) : null}
+                {item.result ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setResult(item.result ?? null)
+                      onReviewing?.(item.result?.document.id ?? null)
+                    }}
+                  >
+                    Review {item.name}
+                  </Button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       {error ? (
         <p className={styles.error} role="alert">
           {error}
