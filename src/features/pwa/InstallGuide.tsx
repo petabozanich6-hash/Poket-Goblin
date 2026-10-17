@@ -2,6 +2,7 @@ import { useState, useSyncExternalStore } from 'react'
 
 import { Button } from '@/components/ui/Button'
 import {
+  canOfferInstallPrompt,
   detectPlatform,
   getPwaState,
   promptInstall,
@@ -41,7 +42,7 @@ export function InstallGuide() {
           Installed. Look for Pocket Goblin on your home screen or in your apps.
         </p>
       ) : null}
-      {pwa.canPrompt ? (
+      {canOfferInstallPrompt(platform, pwa.canPrompt) ? (
         <Button
           onClick={() =>
             void promptInstall().then((result) =>
@@ -83,9 +84,12 @@ export function InstallGuide() {
         </p>
       ) : platform === 'samsung' ? (
         <p className={styles.sub}>
-          Tap the menu (☰) and choose <strong>Add page to</strong> →{' '}
-          <strong>Home screen</strong>, or the install icon in the address bar
-          if it appears.
+          Some Samsung Internet installations trigger a Google Play Protect
+          warning about older Android privacy protections. For now, open{' '}
+          <strong>pocketgoblin.org</strong> in <strong>Google Chrome</strong>,
+          then use Chrome’s menu → <strong>Install app</strong>. If Play Protect
+          still warns you, <strong>cancel the installation</strong> and keep
+          using Pocket Goblin in your browser. Never turn off Play Protect.
         </p>
       ) : platform === 'firefox' ? (
         <p className={styles.sub}>
@@ -107,8 +111,8 @@ export function InstallGuide() {
         </p>
       ) : null}
       <p className={styles.sub}>
-        No app store, no download beyond the website itself. Once installed,
-        long-press the icon (Android, desktop Chrome/Edge) for a{' '}
+        Installation is optional — Pocket Goblin works in your browser too.
+        On supported devices, long-press the installed icon for a{' '}
         <strong>Talk to Goblin</strong> shortcut.
       </p>
     </>
