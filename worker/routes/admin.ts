@@ -888,7 +888,9 @@ adminRoutes.get(
     const campaignId = c.req.param('id')
     const campaign = await c.env.DB.prepare(
       'SELECT id FROM promotion_campaigns WHERE id = ?',
-    ).bind(campaignId).first()
+    )
+      .bind(campaignId)
+      .first()
     if (!campaign) return c.json({ error: 'Campaign not found' }, 404)
     const rows = await c.env.DB.prepare(
       `SELECT r.id, u.email, r.status,
@@ -900,7 +902,9 @@ adminRoutes.get(
        JOIN users u ON u.id = r.user_id
        WHERE r.campaign_id = ?
        ORDER BY r.created_at DESC LIMIT 250`,
-    ).bind(campaignId).all()
+    )
+      .bind(campaignId)
+      .all()
     return c.json({ redemptions: rows.results ?? [] })
   },
 )
@@ -1121,7 +1125,9 @@ adminRoutes.get(
     const id = c.req.param('id')
     const campaign = await c.env.DB.prepare(
       'SELECT id FROM premium_giveaway_campaigns WHERE id = ?',
-    ).bind(id).first()
+    )
+      .bind(id)
+      .first()
     if (!campaign) return c.json({ error: 'Giveaway not found' }, 404)
     const rows = await c.env.DB.prepare(
       `SELECT g.id, u.email, g.issued_at AS issuedAt,
@@ -1132,7 +1138,9 @@ adminRoutes.get(
        JOIN user_entitlements e ON e.id = g.entitlement_id
        WHERE g.campaign_id = ?
        ORDER BY g.issued_at DESC LIMIT 250`,
-    ).bind(id).all()
+    )
+      .bind(id)
+      .all()
     return c.json({ grants: rows.results ?? [] })
   },
 )

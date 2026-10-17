@@ -243,7 +243,8 @@ function RedemptionTracker({ campaignId }: { campaignId: string }) {
       ),
   })
   if (claims.isLoading) return <p>Checking the treasure ledger…</p>
-  if (claims.isError) return <p role="alert">Could not load the claims ledger.</p>
+  if (claims.isError)
+    return <p role="alert">Could not load the claims ledger.</p>
   if (!claims.data?.redemptions.length)
     return <p>No claims recorded for this campaign yet.</p>
   return (
@@ -419,8 +420,8 @@ export function HqDealsPage() {
             CAUTION: A billing cycle means one invoice, not one calendar month.
             Six cycles means six months on a monthly plan but six years on an
             annual plan. These draft codes cannot be activated or redeemed.
-            Calendar-duration and plan-specific discount rules are being designed
-            separately. Free Premium gifts are handled above.
+            Calendar-duration and plan-specific discount rules are being
+            designed separately. Free Premium gifts are handled above.
           </p>
           <label>
             Audience{' '}
