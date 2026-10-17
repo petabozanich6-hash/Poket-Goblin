@@ -122,19 +122,29 @@ describe('document to approved study pathway journey', () => {
     expect(approval.status).toBe(201)
     // Pocket Goblin's calendar must show each dated study session without
     // duplicating it as a conventional appointment.
-    const calendarUrl = '/api/documents/study-sessions?from=2026-10-19&to=2026-12-05'
+    const calendarUrl =
+      '/api/documents/study-sessions?from=2026-10-19&to=2026-12-05'
     const calendarSessions = await h.request(calendarUrl, {
       cookie: owner.cookie,
     })
     expect(calendarSessions.status).toBe(200)
     const calendarData = (await calendarSessions.json()) as {
-      sessions: Array<{ id: string; title: string; date: string; minutes: number }>
+      sessions: Array<{
+        id: string
+        title: string
+        date: string
+        minutes: number
+      }>
     }
     expect(calendarData.sessions).toHaveLength(view.preview.sessions.length)
-    expect(calendarData.sessions.every((session) =>
-      session.minutes > 0 && session.date >= '2026-10-19' &&
-      session.date <= '2026-12-05',
-    )).toBe(true)
+    expect(
+      calendarData.sessions.every(
+        (session) =>
+          session.minutes > 0 &&
+          session.date >= '2026-10-19' &&
+          session.date <= '2026-12-05',
+      ),
+    ).toBe(true)
     const strangersCalendar = await h.request(calendarUrl, {
       cookie: stranger.cookie,
     })
