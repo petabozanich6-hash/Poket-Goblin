@@ -1059,3 +1059,142 @@ adminRoutes.patch(
     return c.json({ ok: true })
   },
 )
+
+
+// ---------------------------------------------------- owner-issued giveaways
+// These grants never talk to Stripe and never begin an automatic renewal.
+// Only a passkey-elevated owner can create or issue them.
+adminRoutes.get(
+  '/deals/giveaways',
+  requirePermission('subscriptions.read'),
+  async (c) => {
+    const rows = await c.env.DB.prepare(
+      `SELECT g.id, g.name, g.duration_days AS durationDays,
+              g.max_recipients AS maxRecipients, g.created_at AS createdAt,
+              COUNT(r.id) AS recipients
+       FROM premium_giveaway_campaigns g
+       LEFT JOIN premium_giveaway_grants r ON r.campaign_id = g.id
+       GROUP BY g.id ORDER BY g.created_at DESC`,
+    ).all()
+    return c.json({ giveaways: rows.results ?? [] })
+  },
+)
+
+adminRoutes.post(
+  '/deals/giveaways',
+  requirePermission('settings.write'),
+  async (c) => {
+    const body = await readJson(c)
+    const name = typeof body.name === 'string' ? body.name.trim() : ''
+    const days = body.durationDays
+    const max = body.maxRecipients
+    if (
+      name.length < 3 ||
+      name.length > 100 ||
+      !Number.isInteger(days) ||
+      Number(days) < 1 ||
+      Number(days) > 365 ||
+      !Number.isInteger(max) ||
+      Number(max) < 1 ||
+      Number(max) > 10000
+    )
+      return c.json({ error: 'Invalid giveaway details' }, 400)
+    const id = newId('gift')
+    const owner = c.get('user')
+    await c.env.DB.prepare(
+      `INSERT INTO premium_giveaway_campaigns
+       (id,name,duration_days,max_recipients,created_by)
+       VALUES (?,?,?,?,?)`,
+    )
+      .bind(id, name, days, max, owner.id)
+      .run()
+    await writeAudit(c.env.DB, {
+      ...actor(c),
+      action: 'giveaway.create',
+      targetType: 'premium_giveaway',
+      targetId: id,
+      detail: { durationDays: days, maxRecipients: max },
+    })
+    return c.json({ id }, 201)
+  },
+)
+
+adminRoutes.post(
+  '/deals/giveaways/:id/grant',
+  requirePermission('settings.write'),
+  async (c) => {
+    const body = await readJson(c)
+    const email =
+      typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
+    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || email.length > 254)
+      return c.json({ error: 'Enter an existing customer email.' }, 400)
+    const owner = c.get('user')
+    const recipient = await c.env.DB.prepare(
+      "SELECT id FROM users WHERE email = ? AND status = 'active'",
+    )
+      .bind(email)
+      .first<{ id: string }>()
+    if (!recipient) return c.json({ error: 'Active account not found' }, 404)
+    if (recipient.id === owner.id)
+      return c.json({ error: 'Owner giveaways must go to customers.' }, 409)
+    const giveawayId = c.req.param('id')
+    const campaign = await c.env.DB.prepare(
+      'SELECT duration_days AS days FROM premium_giveaway_campaigns WHERE id = ?',
+    )
+      .bind(giveawayId)
+      .first<{ days: number }>()
+    if (!campaign) return c.json({ error: 'Giveaway not found' }, 404)
+    const ends = new Date(Date.now() + campaign.days * 86_400_000).toISOString()
+    const entitlementId = newId('ent')
+    const grantId = newId('giftuse')
+    // D1 batch is transactional. The entitlement INSERT checks capacity and
+    // account eligibility within SQL, not from a stale read in the browser.
+    const results = await c.env.DB.batch([
+      c.env.DB.prepare(
+        `INSERT INTO user_entitlements
+         (id,user_id,entitlement,source,status,current_period_end,granted_by,reason)
+         SELECT ?, ?, 'premium', 'giveaway', 'active', ?, ?, ?
+         FROM premium_giveaway_campaigns g
+         WHERE g.id = ?
+           AND (SELECT COUNT(*) FROM premium_giveaway_grants
+                WHERE campaign_id = g.id) < g.max_recipients
+           AND NOT EXISTS (SELECT 1 FROM premium_giveaway_grants
+                           WHERE campaign_id = g.id AND user_id = ?)
+           AND NOT EXISTS (SELECT 1 FROM user_entitlements
+                           WHERE user_id = ? AND entitlement = 'premium'
+                             AND ended_at IS NULL)`,
+      ).bind(
+        entitlementId,
+        recipient.id,
+        ends,
+        owner.id,
+        'Free Premium giveaway',
+        giveawayId,
+        recipient.id,
+        recipient.id,
+      ),
+      c.env.DB.prepare(
+        `INSERT INTO premium_giveaway_grants
+         (id,campaign_id,user_id,entitlement_id,issued_by)
+         SELECT ?,?,?,?,?
+         WHERE EXISTS (SELECT 1 FROM user_entitlements WHERE id = ?)`,
+      ).bind(grantId, giveawayId, recipient.id, entitlementId, owner.id, entitlementId),
+    ])
+    if (!results[0]?.meta.changes)
+      return c.json(
+        {
+          error:
+            'Already claimed, campaign full, or customer already has a Premium entitlement.',
+        },
+        409,
+      )
+    await writeAudit(c.env.DB, {
+      ...actor(c),
+      action: 'giveaway.grant',
+      targetType: 'user',
+      targetId: recipient.id,
+      detail: { campaignId: giveawayId, durationDays: campaign.days },
+    })
+    return c.json({ ok: true, expiresAt: ends }, 201)
+  },
+)
