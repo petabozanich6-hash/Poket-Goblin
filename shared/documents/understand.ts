@@ -584,7 +584,16 @@ export function withDeadlinePlan<
   const simple = ['bill', 'appointment', 'medical'].includes(
     understanding.documentType,
   )
-  if (plan.deadlines.length >= 2 || (plan.deadlines.length === 1 && !simple)) {
+  // A week-by-week study schedule is a real plan even without separate
+  // assessment dates. Previously these extracted weekly tasks were discarded.
+  const hasWeeklyStudy = plan.suggestions.some(
+    (suggestion) => suggestion.group === 'Week by week',
+  )
+  if (
+    hasWeeklyStudy ||
+    plan.deadlines.length >= 2 ||
+    (plan.deadlines.length === 1 && !simple)
+  ) {
     // When the AI read it too, its plain-language description leads, and
     // any dated item it spotted that the plan doesn't have joins "check
     // these" (AI items are never added automatically).
