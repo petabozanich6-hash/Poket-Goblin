@@ -218,6 +218,7 @@ export async function processDocumentForUser(
         reference: local,
         monthFirst: options.monthFirst,
         fromAi: mode === 'ai',
+        filename: doc.displayName,
       })
     }
     await recordAiEvent(
