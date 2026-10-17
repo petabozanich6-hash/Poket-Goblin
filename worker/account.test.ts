@@ -199,7 +199,7 @@ describe('opt-in verified email registration gate', () => {
     ).toHaveLength(0)
   })
 
-  it('keeps a gated account pending if initial delivery fails and permits recovery', async () => {
+  it('keeps a gated account pending if delivery fails', async () => {
     const send = vi.fn()
     send.mockRejectedValueOnce(new Error('temporary outage'))
     send.mockImplementation(async (message: Sent) => {
