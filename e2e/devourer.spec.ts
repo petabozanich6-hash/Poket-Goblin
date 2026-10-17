@@ -122,7 +122,7 @@ test('uploads several documents separately and keeps each review accessible', as
   await page.getByLabel('Email').fill(`batch_devour_${stamp}@example.com`)
   await page.getByLabel('Password').fill(password)
   await page.getByRole('button', { name: /create account/i }).click()
-  await expect(page).toHaveURL(/\\/den/, { timeout: 20_000 })
+  await expect(page).toHaveURL(/den/, { timeout: 20_000 })
 
   await page.goto('/life/documents')
   await page.getByLabel(/Choose a bill, letter/).setInputFiles([
@@ -145,9 +145,9 @@ test('uploads several documents separately and keeps each review accessible', as
   await expect(results.getByRole('button', { name: 'Review letter-b.txt' })).toBeVisible()
 
   await results.getByRole('button', { name: 'Review bill-a.txt' }).click()
-  await expect(page.getByText(/bill-a\\.txt/)).toBeVisible()
+  await expect(page.getByText(/bill-a[.]txt/)).toBeVisible()
   await page.getByRole('button', { name: /Done — .*delete the file/ }).click()
   await page.getByRole('button', { name: 'Feed me another' }).click()
   await results.getByRole('button', { name: 'Review letter-b.txt' }).click()
-  await expect(page.getByText(/letter-b\\.txt/)).toBeVisible()
+  await expect(page.getByText(/letter-b[.]txt/)).toBeVisible()
 })
