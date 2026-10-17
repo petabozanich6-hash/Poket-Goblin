@@ -268,6 +268,26 @@ export function findDeadlines(text: string, options: PlanOptions): Deadline[] {
   for (const date of dates) {
     const { line, start } = lineAround(text, date.index)
     const before = text.slice(Math.max(0, date.index - 60), date.index)
+    // Learning platforms mark when materials are AVAILABLE or OPEN. That is
+    // access information, not a study deadline. PDF text extraction sometimes
+    // puts the date on the next line or separates status words with glyphs.
+    const prevEnd = text.lastIndexOf('\n', start - 1)
+    const prevStart = text.lastIndexOf('\n', prevEnd - 1) + 1
+    const preceding = text.slice(prevStart, Math.max(prevStart, prevEnd)).trim()
+    const availabilityWords =
+      /\b(?:available|availability|open(?:ed|s)?|released?|unlocked?)\b/i
+    const actualDeadlineWords =
+      /\b(?:due|deadline|submit(?:ted)?\s+by|submission\s+date|close(?:s|d)?\s+(?:on|by)|expires?\s+(?:on|by))\b/i
+    if (
+      (availabilityWords.test(line) && !actualDeadlineWords.test(line)) ||
+      (availabilityWords.test(preceding) &&
+        !actualDeadlineWords.test(preceding) &&
+        !actualDeadlineWords.test(line) &&
+        // Status lines immediately before a date are typically table cells.
+        preceding.length <= 70)
+    ) {
+      continue
+    }
     if (
       NOT_A_DEADLINE.test(before.split('\n').pop() ?? '') ||
       NOT_A_DEADLINE.test(line.slice(0, 40))

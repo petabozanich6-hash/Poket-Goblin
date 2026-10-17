@@ -13,7 +13,7 @@ import {
 
 export type PathwayPreview = PathwayResult & {
   estimates: Array<{ stepId: string; minutes: number; inferred: true }>
-  deadlines: Array<{ stepId: string; deadline: string }>
+  deadlines: Array<{ stepId: string; deadline: string | null }>
   stepOrders: Array<{ stepId: string; order: number }>
   unschedulable: DocumentSuggestion[]
 }
@@ -36,16 +36,29 @@ export function previewDocumentPathway(
   suggestions: DocumentSuggestion[],
   availability: DayAvailability[],
   completedStepIds: readonly string[] = [],
+  planningTargetDate: string | null = null,
 ): PathwayPreview {
+  // A study goal is not an assessment deadline. An undated module can use
+  // the learner's chosen planning target, but it must be a real date in the
+  // submitted availability window.
+  const targetValid =
+    typeof planningTargetDate === 'string' &&
+    /^\d{4}-\d{2}-\d{2}$/.test(planningTargetDate) &&
+    Number.isFinite(Date.parse(planningTargetDate + 'T00:00:00Z')) &&
+    new Date(planningTargetDate + 'T00:00:00Z').toISOString().slice(0, 10) ===
+      planningTargetDate &&
+    availability.some((day) => day.date === planningTargetDate)
+  const target = targetValid ? planningTargetDate : null
+
   const eligible = suggestions.filter(
     (item) => item.type === 'task' && item.group,
   )
   const unschedulable = eligible.filter(
-    (item) => !item.dueDate || item.uncertain,
+    (item) => (!item.dueDate && !target) || item.uncertain,
   )
   const groupOrder = new Map<string, number>()
   const usable = eligible
-    .filter((item) => item.dueDate && !item.uncertain)
+    .filter((item) => (item.dueDate || target) && !item.uncertain)
     .map((item, originalIndex) => {
       const group = item.group!
       if (!groupOrder.has(group)) groupOrder.set(group, groupOrder.size)
@@ -67,7 +80,7 @@ export function previewDocumentPathway(
     id: `${documentId}:${originalIndex}:${item.title}`,
     goalId: `${documentId}:${item.group}`,
     title: item.title,
-    deadline: item.dueDate!,
+    deadline: item.dueDate ?? target!,
     minutes: estimateMinutes(item.title),
     priority: item.priority === 'high' ? 1 : 0,
   }))
@@ -89,7 +102,12 @@ export function previewDocumentPathway(
     ...result,
     deadlines: steps.map((step) => ({
       stepId: step.id,
-      deadline: step.deadline,
+      // Only an explicitly sourced date is an immutable assessment deadline.
+      deadline:
+        usable.find(
+          ({ item, originalIndex }) =>
+            `${documentId}:${originalIndex}:${item.title}` === step.id,
+        )?.item.dueDate ?? null,
     })),
     stepOrders: steps.map((step, order) => ({ stepId: step.id, order })),
     estimates: steps.map((step) => ({

@@ -269,11 +269,12 @@ export function previewStudyPathway(
   documentId: string,
   availability: StudyDayAvailability[],
   completedStepIds: string[] = [],
+  planningTargetDate: string | null = null,
 ) {
   const offset = new Date().getTimezoneOffset()
   return api.post<StudyPathwayPreview>(
     `/documents/${encodeURIComponent(documentId)}/pathway-preview?timezoneOffsetMinutes=${offset}`,
-    { availability, completedStepIds },
+    { availability, completedStepIds, planningTargetDate },
   )
 }
 
@@ -282,11 +283,12 @@ export function approveStudyPathway(
   documentId: string,
   availability: StudyDayAvailability[],
   expectedSessions: StudyPathwayPreview['preview']['sessions'],
+  planningTargetDate: string | null = null,
 ) {
   const offset = new Date().getTimezoneOffset()
   return api.post<{ pathwayId: string; alreadySaved: boolean }>(
     `/documents/${encodeURIComponent(documentId)}/pathway-approve?timezoneOffsetMinutes=${offset}`,
-    { availability, expectedSessions },
+    { availability, expectedSessions, planningTargetDate },
   )
 }
 

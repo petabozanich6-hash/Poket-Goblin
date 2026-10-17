@@ -23,6 +23,7 @@ export function StudyPathwayPreviewPanel({
   const [minutes, setMinutes] = useState(60)
   const [includeWeekends, setIncludeWeekends] = useState(false)
   const [horizonDays, setHorizonDays] = useState(21)
+  const [planningTargetDate, setPlanningTargetDate] = useState('')
   const [preview, setPreview] = useState<StudyPathwayPreview | null>(null)
   const [loading, setLoading] = useState(false)
   const [availability, setAvailability] = useState<StudyDayAvailability[]>([])
@@ -81,7 +82,12 @@ export function StudyPathwayPreviewPanel({
         ].join('-')
         return { date: iso, availableMinutes: blocked ? 0 : minutes }
       })
-      const result = await previewStudyPathway(documentId, dates)
+      const result = await previewStudyPathway(
+        documentId,
+        dates,
+        [],
+        planningTargetDate || null,
+      )
       setAvailability(dates)
       setPreview(result)
     } catch (cause) {
@@ -104,6 +110,7 @@ export function StudyPathwayPreviewPanel({
         documentId,
         availability,
         preview.preview.sessions,
+        planningTargetDate || null,
       )
       setSaved(true)
       setCalendarChanged(true)
@@ -316,6 +323,22 @@ export function StudyPathwayPreviewPanel({
         </select>
       </label>
       <label>
+        Personal study completion target (for modules without a due date){' '}
+        <input
+          type="date"
+          value={planningTargetDate}
+          onChange={(event) => {
+            setPlanningTargetDate(event.target.value)
+            setPreview(null)
+          }}
+        />
+      </label>
+      <p>
+        Optional if the module has an actual assessment deadline. For undated
+        study material, choose when you want to finish; this is your planning
+        goal, <strong>not</strong> a university due date.
+      </p>
+      <label>
         Minutes available per study day{' '}
         <input
           type="number"
@@ -375,8 +398,9 @@ export function StudyPathwayPreviewPanel({
           ) : null}
           {preview.preview.unschedulable.length > 0 ? (
             <p role="alert">
-              {preview.preview.unschedulable.length} study steps need a
-              confirmed deadline before they can be scheduled.
+              {preview.preview.unschedulable.length} study steps still need
+              either a confirmed assessment deadline or a personal completion
+              target within the planning window before they can be scheduled.
             </p>
           ) : null}
           {saved ? (

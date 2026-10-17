@@ -251,3 +251,115 @@ describe('document to approved study pathway journey', () => {
     expect(view.preview.sessions.length).toBeGreaterThan(0)
   })
 })
+
+describe('realistic standalone university modules', () => {
+  it('keeps OPEN/AVAILABLE out of the calendar and requires approval of a personal study target', async () => {
+    const module = [
+      'UNE myLearn - Module 1 Understanding loss, grief and mourning',
+      'Module learning outcomes: understand key concepts and definitions.',
+      'Required readings: complete the prescribed readings.',
+      'Learning activities: explore different types of grief.',
+      'Reflection activity: consider the mourning process.',
+      'Available ≡ OPEN ≡',
+      '26 April 2027',
+    ].join('\n')
+    const form = new FormData()
+    form.append(
+      'file',
+      new File([module], 'Module 1 UNE myLearn.txt', {
+        type: 'text/plain',
+      }),
+    )
+    const upload = await app.request(
+      '/api/documents',
+      {
+        method: 'POST',
+        headers: { Cookie: owner.cookie },
+        body: form,
+      },
+      h.env,
+    )
+    expect(upload.status).toBe(201)
+    const data = (await upload.json()) as {
+      document: { id: string }
+      autoAdded?: { added: number; already: number }
+    }
+    expect(data.autoAdded?.added ?? 0).toBe(0)
+    const id = data.document.id
+    const items = h.query(
+      `SELECT payload_json as payload FROM review_items
+       WHERE user_id = ? AND source_type = 'document' AND source_id = ?`,
+      owner.id,
+      id,
+    ) as Array<{ payload: string }>
+    const activities = items.map(
+      (item) =>
+        JSON.parse(item.payload) as {
+          title: string
+          dueDate: string | null
+          requiresReview?: boolean
+          group?: string
+        },
+    )
+    expect(activities.length).toBeGreaterThanOrEqual(4)
+    expect(
+      activities.every(
+        (item) =>
+          item.group === 'Study module' &&
+          item.dueDate === null &&
+          item.requiresReview === true,
+      ),
+    ).toBe(true)
+
+    const availability = availableDays()
+    const noDate = await h.request(`/api/documents/${id}/pathway-preview`, {
+      cookie: owner.cookie,
+      body: { availability },
+    })
+    expect(noDate.status).toBe(200)
+    const blocked = (await noDate.json()) as {
+      preview: { sessions: unknown[]; unschedulable: unknown[] }
+    }
+    expect(blocked.preview.sessions).toEqual([])
+    expect(blocked.preview.unschedulable.length).toBeGreaterThan(0)
+
+    const planningTargetDate = '2026-11-02'
+    const preview = await h.request(`/api/documents/${id}/pathway-preview`, {
+      cookie: owner.cookie,
+      body: { availability, planningTargetDate },
+    })
+    expect(preview.status).toBe(200)
+    const proposed = (await preview.json()) as {
+      preview: {
+        sessions: Array<{ date: string; minutes: number }>
+        warnings: unknown[]
+        unscheduledMinutes: number
+        unschedulable: unknown[]
+        deadlines: Array<{ deadline: string | null }>
+      }
+    }
+    expect(proposed.preview.sessions.length).toBeGreaterThan(0)
+    expect(proposed.preview.warnings).toEqual([])
+    expect(proposed.preview.unschedulable).toEqual([])
+    expect(proposed.preview.unscheduledMinutes).toBe(0)
+    expect(proposed.preview.deadlines.every((d) => d.deadline === null)).toBe(
+      true,
+    )
+
+    const approve = await h.request(`/api/documents/${id}/pathway-approve`, {
+      cookie: owner.cookie,
+      body: {
+        availability,
+        planningTargetDate,
+        expectedSessions: proposed.preview.sessions,
+      },
+    })
+    expect(approve.status).toBe(201)
+    const rows = h.query(
+      'SELECT deadline_date as deadlineDate FROM study_pathway_sessions WHERE user_id = ?',
+      owner.id,
+    ) as Array<{ deadlineDate: string | null }>
+    expect(rows.length).toBeGreaterThan(0)
+    expect(rows.every((s) => s.deadlineDate === null)).toBe(true)
+  })
+})

@@ -11,7 +11,7 @@ export async function persistApprovedPathway(
   userId: string,
   documentId: string,
   sessions: ScheduledSession[],
-  stepDeadlines: ReadonlyMap<string, string> = new Map(),
+  stepDeadlines: ReadonlyMap<string, string | null> = new Map(),
   stepOrders: ReadonlyMap<string, number> = new Map(),
 ) {
   if (!sessions.length || sessions.length > 500) {
@@ -53,6 +53,7 @@ export async function persistApprovedPathway(
     const deadline = stepDeadlines.get(session.stepId)
     if (
       deadline !== undefined &&
+      deadline !== null &&
       (!/^\d{4}-\d{2}-\d{2}$/.test(deadline) ||
         !Number.isFinite(Date.parse(deadline + 'T00:00:00Z')) ||
         new Date(deadline + 'T00:00:00Z').toISOString().slice(0, 10) !==

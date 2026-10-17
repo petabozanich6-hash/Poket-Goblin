@@ -8,6 +8,7 @@
  */
 import type { Confidence } from '../types'
 import { planDeadlines } from './deadlines'
+import { suggestModuleStudy } from './moduleStudy'
 import {
   addDays,
   dateAfterCue,
@@ -563,13 +564,41 @@ export function withDeadlinePlan<
 >(
   understanding: U,
   text: string,
-  options: UnderstandOptions & { fromAi?: boolean } = {},
+  options: UnderstandOptions & { fromAi?: boolean; filename?: string } = {},
 ): U {
   const plan = planDeadlines(text.replace(/\r/g, ''), {
     reference: options.reference ?? new Date(),
     monthFirst: options.monthFirst,
     categorySlug: understanding.categorySlug,
   })
+  // University module pages often have readings and learning activities but
+  // no assessment due date. The learner chooses their own completion target
+  // in the pathway preview. Never turn "Available / OPEN" into a due date.
+  const moduleActivities = suggestModuleStudy(text, options.filename)
+  // A full course timetable with weekly topics or assessment deadlines
+  // already has a better, date-grounded pathway. The module activity fallback
+  // is only for standalone material with no reliable scheduled requirements.
+  const hasDatedStudyPlan =
+    (plan?.deadlines.length ?? 0) > 0 ||
+    (plan?.suggestions.some((item) => item.group === 'Week by week') ?? false)
+  if (moduleActivities.length && !hasDatedStudyPlan) {
+    const actualDeadlines = plan?.deadlines ?? []
+    return {
+      ...understanding,
+      documentType: 'education',
+      categorySlug: 'work_study',
+      summary: `I found study material and ${moduleActivities.length} suggested learning steps.${
+        actualDeadlines.length
+          ? ' Please check any assessment deadlines against the original document.'
+          : ' No assessment deadline was found. Choose a personal completion target to plan your study.'
+      }`,
+      // Ignore the ordinary notice-reader's speculative tasks and AI
+      // suggestions here. Only explicit calendar deadlines and grounded
+      // study steps are proposed; study tasks require pathway approval.
+      suggestions: [...(plan?.suggestions ?? []), ...moduleActivities],
+      warnings: [...understanding.warnings, ...(plan?.warnings ?? [])],
+    } as U
+  }
   if (!plan) return understanding
   // Nothing dated, but worth saying what it contains (e.g. an outline).
   // Its own guesses (e.g. "Pay phone bill" from a passing mention) would
