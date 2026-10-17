@@ -461,7 +461,9 @@ export function HqDealsPage() {
               created in the Stripe dashboard. Stripe is the source of truth.
               Viewing this list does not activate, redeem or change a code.
             </p>
-            {stripeCodes.isLoading ? <p>Checking Stripe's code ledger…</p> : null}
+            {stripeCodes.isLoading ? (
+              <p>Checking Stripe's code ledger…</p>
+            ) : null}
             {stripeCodes.isError ? (
               <p role="alert">
                 Unable to read Stripe's promotions. Check the Stripe dashboard
@@ -482,17 +484,24 @@ export function HqDealsPage() {
                   <ul>
                     {stripeCodes.data.codes.map((code) => (
                       <li key={code.id}>
-                        <strong>
-                          <code>{code.code}</code>
-                        </strong>{' '}
-                        — {code.active ? 'Active in Stripe' : 'Inactive in Stripe'}{' '}
-                        · Redeemed {code.redemptions}
-                        {code.maxRedemptions !== null
-                          ? ` / ${code.maxRedemptions}`
-                          : ' times'}
-                        {code.expiresAt
-                          ? ` · Redemption deadline ${new Date(code.expiresAt).toLocaleDateString()}`
-                          : ''}
+                        <strong>{code.code}</strong>
+                        <span>
+                          {' — '}
+                          {code.active ? 'Active in Stripe' : 'Inactive in Stripe'}
+                        </span>
+                        <span>
+                          {' · Redeemed '}
+                          {code.redemptions}
+                          {code.maxRedemptions === null
+                            ? ' times'
+                            : ` / ${code.maxRedemptions}`}
+                        </span>
+                        {code.expiresAt ? (
+                          <span>
+                            {' · Redemption deadline '}
+                            {new Date(code.expiresAt).toLocaleDateString()}
+                          </span>
+                        ) : null}
                       </li>
                     ))}
                   </ul>
