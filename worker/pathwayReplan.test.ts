@@ -226,5 +226,4 @@ describe('approved missed-day replan endpoint', () => {
       h.query('SELECT due_date as date FROM tasks WHERE user_id = ?', alice.id),
     ).toEqual([{ date: '2030-05-06' }])
   })
-
 })

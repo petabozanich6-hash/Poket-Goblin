@@ -195,9 +195,9 @@ export function StudyPathwayPreviewPanel({
                     session.taskDueDate !== session.date ? (
                       <p role="alert">
                         This task was moved in your task list to{' '}
-                        {session.taskDueDate ?? 'an unknown date'}.
-                        The saved study pathway still shows {session.date}.
-                        Restore the task date or undo the pathway before replanning.
+                        {session.taskDueDate ?? 'an unknown date'}. The saved
+                        study pathway still shows {session.date}. Restore the
+                        task date or undo the pathway before replanning.
                       </p>
                     ) : null}
                     <label>

@@ -574,7 +574,8 @@ documentRoutes.patch('/:id/pathway-sessions/:sessionId', async (c) => {
   if (task.dueDate !== session.currentDate) {
     return c.json(
       {
-        error: 'This task was moved elsewhere. Its date no longer matches the saved pathway.',
+        error:
+          'This task was moved elsewhere. Its date no longer matches the saved pathway.',
       },
       409,
     )
@@ -783,7 +784,8 @@ documentRoutes.post('/:id/pathway-replan', async (c) => {
   if (conflicting.length > 0) {
     return c.json(
       {
-        error: 'Some study tasks were changed outside this pathway. Review their dates before replanning.',
+        error:
+          'Some study tasks were changed outside this pathway. Review their dates before replanning.',
         conflictingSessionIds: conflicting.map((session) => session.id),
       },
       409,
