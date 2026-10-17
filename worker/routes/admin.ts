@@ -1042,6 +1042,24 @@ adminRoutes.post(
     const config = billingConfig(c.env)
     if (!config.enabled)
       return c.json({ error: 'Stripe is not configured.' }, 503)
+    // Never create a live Stripe code before the remote D1 migration exists.
+    try {
+      await c.env.DB.prepare(
+        'SELECT stripe_promotion_code_id FROM promotion_campaigns WHERE id = ?',
+      )
+        .bind(id)
+        .first()
+    } catch {
+      return c.json(
+        { error: 'Apply the Stripe promotion database migration first.' },
+        503,
+      )
+    }
+    if (!/^[A-Z0-9]+$/.test(String(row.code)))
+      return c.json(
+        { error: 'Stripe promotion codes must contain only letters and numbers.' },
+        409,
+      )
     const couponId = 'pg_' + id
     try {
       await stripe(
