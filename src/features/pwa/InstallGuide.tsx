@@ -83,14 +83,20 @@ export function InstallGuide() {
           Share in other browsers.
         </p>
       ) : platform === 'samsung' ? (
-        <p className={styles.sub}>
-          Some Samsung Internet installations trigger a Google Play Protect
-          warning about older Android privacy protections. For now, open{' '}
-          <strong>pocketgoblin.org</strong> in <strong>Google Chrome</strong>,
-          then use Chrome’s menu → <strong>Install app</strong>. If Play Protect
-          still warns you, <strong>cancel the installation</strong> and keep
-          using Pocket Goblin in your browser. Never turn off Play Protect.
-        </p>
+        <>
+          <p className={styles.sub}>
+            Samsung Internet can trigger Google Play Protect warnings during
+            web app installation.
+          </p>
+          <p className={styles.sub}>
+            Open pocketgoblin.org in Google Chrome, then choose Install app
+            from Chrome’s menu.
+          </p>
+          <p className={styles.sub}>
+            If Play Protect shows a warning, cancel the installation. Pocket
+            Goblin still works in your browser. Never disable Play Protect.
+          </p>
+        </>
       ) : platform === 'firefox' ? (
         <p className={styles.sub}>
           Firefox on Android: menu → <strong>Install</strong> (or Add to Home
