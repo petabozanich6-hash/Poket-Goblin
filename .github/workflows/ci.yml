@@ -27,6 +27,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # TEMPORARY PR-ONLY formatting diagnostic; remove before merge.
+      - name: Show exact module formatting changes
+        run: |
+          npx prettier --write shared/documents/moduleStudy.ts shared/documents/moduleStudy.test.ts shared/documents/pathwayPreview.ts worker/pathwayJourney.test.ts
+          git diff -- shared/documents/moduleStudy.ts shared/documents/moduleStudy.test.ts shared/documents/pathwayPreview.ts worker/pathwayJourney.test.ts
+
       - name: Typecheck
         run: npm run typecheck
 
