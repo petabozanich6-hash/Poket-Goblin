@@ -471,8 +471,10 @@ export function HqDealsPage() {
             {stripeCodes.data ? (
               <>
                 <p>
-                  {stripeCodes.data.live ? 'Live Stripe account' : 'Stripe test mode'}
-                  {' '}· Latest 100 codes
+                  {stripeCodes.data.live
+                    ? 'Live Stripe account'
+                    : 'Stripe test mode'}{' '}
+                  · Latest 100 codes
                 </p>
                 {stripeCodes.data.codes.length === 0 ? (
                   <p>No promotion codes found in this Stripe mode.</p>
@@ -480,9 +482,11 @@ export function HqDealsPage() {
                   <ul>
                     {stripeCodes.data.codes.map((code) => (
                       <li key={code.id}>
-                        <strong><code>{code.code}</code></strong> —{' '}
-                        {code.active ? 'Active in Stripe' : 'Inactive in Stripe'}
-                        {' '}· Redeemed {code.redemptions}
+                        <strong>
+                          <code>{code.code}</code>
+                        </strong>{' '}
+                        — {code.active ? 'Active in Stripe' : 'Inactive in Stripe'}{' '}
+                        · Redeemed {code.redemptions}
                         {code.maxRedemptions !== null
                           ? ` / ${code.maxRedemptions}`
                           : ' times'}
@@ -494,15 +498,24 @@ export function HqDealsPage() {
                   </ul>
                 )}
                 {stripeCodes.data.hasMore ? (
-                  <p>More codes exist. See the Stripe dashboard for the full list.</p>
+                  <p>
+                    More codes exist. See the Stripe dashboard for the full list.
+                  </p>
                 ) : null}
               </>
             ) : null}
-            <Button variant="secondary" onClick={() => void stripeCodes.refetch()}>
+            <Button
+              variant="secondary"
+              onClick={() => void stripeCodes.refetch()}
+            >
               Refresh Stripe codes
             </Button>
             <p>
-              <a href="https://dashboard.stripe.com/" target="_blank" rel="noopener noreferrer">
+              <a
+                href="https://dashboard.stripe.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 Open Stripe dashboard
               </a>{' '}
               to edit live coupons, redemption limits and duration.
@@ -739,14 +752,19 @@ export function HqDealsPage() {
                   <RedemptionTracker campaignId={p.id} />
                 ) : null}
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {!p.stripe_promotion_code_id && !p.active && p.redemptions === 0 ? (
+                  {!p.stripe_promotion_code_id &&
+                  !p.active &&
+                  p.redemptions === 0 ? (
                     <Button
                       variant="secondary"
                       disabled={discard.isPending}
                       onClick={() => {
-                        if (window.confirm(
-                          'Discard this unused local draft? This does not remove or deactivate anything in Stripe.',
-                        )) discard.mutate(p.id)
+                        if (
+                          window.confirm(
+                            'Discard this unused local draft? This does not remove or deactivate anything in Stripe.',
+                          )
+                        )
+                          discard.mutate(p.id)
                       }}
                     >
                       Discard local draft
