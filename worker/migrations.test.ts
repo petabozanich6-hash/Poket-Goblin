@@ -108,3 +108,70 @@ describe('migration 0007 (Document Devourer)', () => {
     ).toThrow()
   })
 })
+
+
+describe('migrations 0019–0020 (approved study pathways)', () => {
+  it('upgrades an existing database without changing previously saved tasks', () => {
+    const t = createTestD1({ upTo: 18 })
+    t.run(
+      `INSERT INTO users (id, email, password_hash, display_name)
+       VALUES ('study_user', 'study@example.com', 'x', 'Study User')`,
+    )
+    t.run(
+      `INSERT INTO tasks (id, user_id, title, due_date)
+       VALUES ('prior_task', 'study_user', 'Existing chore', '2026-11-01')`,
+    )
+    applyMigrations(t.sqlite, migrationFiles().slice(18))
+    expect(
+      t.query(
+        'SELECT id, title, due_date as dueDate FROM tasks WHERE user_id = ?',
+        'study_user',
+      ),
+    ).toEqual([
+      { id: 'prior_task', title: 'Existing chore', dueDate: '2026-11-01' },
+    ])
+    const columns = t.query('PRAGMA table_info(study_pathway_sessions)') as Array<{
+      name: string
+    }>
+    expect(columns.map((column) => column.name)).toContain('deadline_date')
+    expect(columns.map((column) => column.name)).toContain('step_order')
+    expect(columns.map((column) => column.name)).toContain('goal_id')
+  })
+
+  it('keeps cancelled versions, rejects duplicate active versions and deletes account data', () => {
+    const t = createTestD1()
+    t.run(
+      `INSERT INTO users (id, email, password_hash, display_name)
+       VALUES ('study_user', 'study@example.com', 'x', 'Study User')`,
+    )
+    t.run(
+      `INSERT INTO study_pathways (id, user_id, document_id)
+       VALUES ('first', 'study_user', 'source_doc')`,
+    )
+    expect(() =>
+      t.run(
+        `INSERT INTO study_pathways (id, user_id, document_id)
+         VALUES ('duplicate', 'study_user', 'source_doc')`,
+      ),
+    ).toThrow()
+    t.run(`UPDATE study_pathways SET status = 'cancelled' WHERE id = 'first'`)
+    t.run(
+      `INSERT INTO study_pathways (id, user_id, document_id)
+       VALUES ('second', 'study_user', 'source_doc')`,
+    )
+    t.run(
+      `INSERT INTO study_pathway_sessions
+       (id, pathway_id, user_id, step_id, title, scheduled_date, minutes,
+        sequence, deadline_date, goal_id, step_order)
+       VALUES ('session_one', 'second', 'study_user', 'read', 'Read article',
+               '2026-11-02', 45, 1, '2026-11-10', 'essay', 0)`,
+    )
+    expect(t.query('SELECT status FROM study_pathways ORDER BY id')).toEqual([
+      { status: 'cancelled' },
+      { status: 'active' },
+    ])
+    t.run(`DELETE FROM users WHERE id = 'study_user'`)
+    expect(t.query('SELECT id FROM study_pathways')).toEqual([])
+    expect(t.query('SELECT id FROM study_pathway_sessions')).toEqual([])
+  })
+})
