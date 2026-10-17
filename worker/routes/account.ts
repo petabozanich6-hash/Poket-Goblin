@@ -69,6 +69,7 @@ export const EXPORTED_TABLES: Record<string, { omit?: string[] }> = {
   achievements: {},
   // The customer's message is theirs; the Owner's private triage notes are not.
   support_threads: { omit: ['internal_note', 'unread_for_owner'] },
+  premium_giveaway_grants: {},
   promotion_redemptions: {
     omit: ['stripe_subscription_id', 'stripe_checkout_session_id'],
   },
