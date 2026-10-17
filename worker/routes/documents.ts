@@ -498,7 +498,7 @@ documentRoutes.get('/:id/pathway', async (c) => {
     `SELECT s.id, s.step_id as stepId, s.title, s.scheduled_date as date,
             s.deadline_date as deadlineDate,
             s.minutes, s.sequence, s.status, s.task_id as taskId,
-            t.status as taskStatus
+            t.status as taskStatus, t.due_date as taskDueDate
      FROM study_pathway_sessions s
      LEFT JOIN tasks t ON t.id = s.task_id AND t.user_id = s.user_id
      WHERE s.pathway_id = ? AND s.user_id = ?
@@ -568,6 +568,14 @@ documentRoutes.patch('/:id/pathway-sessions/:sessionId', async (c) => {
   if (task?.status !== 'open') {
     return c.json(
       { error: 'Completed or removed sessions cannot be edited.' },
+      409,
+    )
+  }
+  if (task.dueDate !== session.currentDate) {
+    return c.json(
+      {
+        error: 'This task was moved elsewhere. Its date no longer matches the saved pathway.',
+      },
       409,
     )
   }
@@ -757,13 +765,30 @@ documentRoutes.post('/:id/pathway-replan', async (c) => {
             s.goal_id as goalId, s.step_order as stepOrder,
             s.sequence, s.deadline_date as deadlineDate,
             s.minutes, s.status, s.task_id as taskId,
-            t.status as taskStatus
+            t.status as taskStatus, t.due_date as taskDueDate
      FROM study_pathway_sessions s
      LEFT JOIN tasks t ON t.id = s.task_id AND t.user_id = s.user_id
      WHERE s.pathway_id = ? AND s.user_id = ?`,
   )
     .bind(pathway.id, user.id)
     .all<SavedSessionForReplan>()
+  // A user may independently move an underlying task from the regular task
+  // list. Do not silently overwrite that decision or falsely report success.
+  const conflicting = (saved.results ?? []).filter(
+    (session) =>
+      session.status === 'planned' &&
+      session.taskStatus === 'open' &&
+      session.taskDueDate !== session.date,
+  )
+  if (conflicting.length > 0) {
+    return c.json(
+      {
+        error: 'Some study tasks were changed outside this pathway. Review their dates before replanning.',
+        conflictingSessionIds: conflicting.map((session) => session.id),
+      },
+      409,
+    )
+  }
   const offset = readOffsetMinutes({
     timezoneOffsetMinutes: Number(c.req.query('timezoneOffsetMinutes') ?? 0),
   })
