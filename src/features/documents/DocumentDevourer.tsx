@@ -661,6 +661,10 @@ export function DocumentDevourer({
       ))
       try {
         const data = await devourDocument(file, chosenMode)
+        if (files.length === 1) {
+          setResult(data)
+          onReviewing?.(data.document.id)
+        }
         setBatch((items) => items.map((item) =>
           item.id === id ? { ...item, status: 'ready', result: data } : item,
         ))
