@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input, TextArea } from '@/components/ui/Input'
 import { PhoneCalendarCard } from '@/features/calendar/PhoneCalendarCard'
-import { fetchStudyCalendarSessions } from '@/features/calendar/calendarApi'
+import { fetchDatedCalendarTasks } from '@/features/calendar/calendarApi'
 import { createEvent, deleteEvent, fetchEvents } from '@/features/life/lifeApi'
 
 import styles from './Page.module.css'
@@ -38,7 +38,12 @@ export function CalendarPage() {
     from.setDate(from.getDate() - 7)
     const to = new Date(cursor)
     to.setDate(to.getDate() + 45)
-    return { from: from.toISOString(), to: to.toISOString() }
+    return {
+      from: from.toISOString(),
+      to: to.toISOString(),
+      localFrom: toLocalDateInput(from),
+      localTo: toLocalDateInput(to),
+    }
   }, [cursor])
 
   const eventsQuery = useQuery({
@@ -46,13 +51,9 @@ export function CalendarPage() {
     queryFn: () => fetchEvents(range.from, range.to),
   })
 
-  const studyQuery = useQuery({
-    queryKey: ['study-calendar-sessions', range.from, range.to],
-    queryFn: () =>
-      fetchStudyCalendarSessions(
-        range.from.slice(0, 10),
-        range.to.slice(0, 10),
-      ),
+  const datedTasksQuery = useQuery({
+    queryKey: ['dated-calendar-tasks', range.localFrom, range.localTo],
+    queryFn: () => fetchDatedCalendarTasks(range.localFrom, range.localTo),
   })
 
   const createMutation = useMutation({
@@ -87,7 +88,7 @@ export function CalendarPage() {
   }
 
   const events = eventsQuery.data?.events ?? []
-  const studySessions = studyQuery.data?.sessions ?? []
+  const datedTasks = datedTasksQuery.data?.tasks ?? []
   const calendarItems = [
     ...events.map((event) => ({
       kind: 'event' as const,
@@ -96,12 +97,12 @@ export function CalendarPage() {
       date: toLocalDateInput(new Date(event.startsAt)),
       event,
     })),
-    ...studySessions.map((session) => ({
-      kind: 'study' as const,
-      id: session.id,
-      title: session.title,
-      date: session.date,
-      session,
+    ...datedTasks.map((task) => ({
+      kind: 'task' as const,
+      id: task.id,
+      title: task.title,
+      date: task.date,
+      task,
     })),
   ].sort((a, b) => a.date.localeCompare(b.date))
   const monthLabel = cursor.toLocaleString(undefined, {
@@ -127,11 +128,18 @@ export function CalendarPage() {
         <div>
           <h1>Calendar</h1>
           <p className={styles.sub}>
-            Appointments and approved study sessions live here — add them
-            yourself, tell the Goblin, or let it read a document.
+            Appointments, due tasks and approved study sessions appear here
+            automatically. Study time is planned by day, not by clock time.
           </p>
         </div>
       </header>
+
+      {(datedTasksQuery.isError || eventsQuery.isError) && (
+        <p role="alert">
+          Couldn't load everything for this calendar period. Try refreshing
+          the page. Your saved tasks have not been deleted.
+        </p>
+      )}
 
       <Card>
         <div className={styles.tabs}>
@@ -186,10 +194,10 @@ export function CalendarPage() {
                       key={`${item.kind}-${item.id}`}
                       className={styles.monthEvent}
                     >
-                      {item.kind === 'study' ? '📚 ' : ''}
+                      {item.kind === 'task' ? (item.task.studyMinutes ? '📚 ' : '☑ ') : ''}
                       {item.title}
-                      {item.kind === 'study'
-                        ? ` · ${item.session.minutes} min`
+                      {item.kind === 'task' && item.task.studyMinutes
+                        ? ` · ${item.task.studyMinutes} min`
                         : ''}
                     </p>
                   ))}
@@ -201,21 +209,27 @@ export function CalendarPage() {
 
         {(view === 'agenda' || view === 'week') && (
           <ul className={styles.stack}>
-            {calendarItems.length === 0 ? (
-              <p className={styles.sub}>
-                No appointments or study sessions in this period.
-              </p>
+            {eventsQuery.isPending || datedTasksQuery.isPending ? (
+              <li className={styles.sub}>Loading your calendar…</li>
+            ) : calendarItems.length === 0 ? (
+              <li className={styles.sub}>
+                {datedTasksQuery.isError || eventsQuery.isError
+                  ? 'Some calendar items could not be loaded.'
+                  : 'No appointments or dated tasks in this period.'}
+              </li>
             ) : (
               calendarItems.map((item) => (
                 <li key={`${item.kind}-${item.id}`} className={styles.listRow}>
                   <div>
                     <strong>
-                      {item.kind === 'study' ? '📚 ' : ''}
+                      {item.kind === 'task' ? (item.task.studyMinutes ? '📚 ' : '☑ ') : ''}
                       {item.title}
                     </strong>
                     <p className={styles.sub}>
-                      {item.kind === 'study'
-                        ? `${item.date} · ${item.session.minutes} min study · planned day (no set start time)`
+                      {item.kind === 'task'
+                        ? item.task.studyMinutes
+                          ? `${item.date} · ${item.task.studyMinutes} min study · planned day (no set start time)`
+                          : `${item.date} · task due date`
                         : new Date(item.event.startsAt).toLocaleString()}
                       {item.kind === 'event' && item.event.location
                         ? ` · ${item.event.location}`
@@ -224,8 +238,10 @@ export function CalendarPage() {
                         ? ' · all day'
                         : ''}
                     </p>
-                    {item.kind === 'study' ? (
-                      <Link to="/life/documents">View saved study pathway</Link>
+                    {item.kind === 'task' ? (
+                      <Link to={item.task.documentId ? '/life/documents' : '/life/tasks'}>
+                        {item.task.documentId ? 'View saved study pathway' : 'View task'}
+                      </Link>
                     ) : null}
                   </div>
                   {item.kind === 'event' ? (
