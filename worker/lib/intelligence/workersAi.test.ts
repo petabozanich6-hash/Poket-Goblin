@@ -178,7 +178,7 @@ describe('optional lower-cost Workers AI model trials', () => {
     }
     run.mockResolvedValueOnce({
       response:
-        '```json\\n{"documentType":"general","summary":"A study guide.","suggestions":[]}\\n```',
+        '```json\n{"documentType":"general","summary":"A study guide.","suggestions":[]}\n```',
     })
     const raw = await callDocumentAi(
       documentEnv,
@@ -231,7 +231,7 @@ describe('optional lower-cost Workers AI model trials', () => {
 
   it('rejects prose-wrapped and invalid JSON rather than guessing what was meant', () => {
     expect(strictJsonObject(' {"a":1} ')).toEqual({ a: 1 })
-    expect(strictJsonObject('```json\\n{"a":1}\\n```')).toEqual({ a: 1 })
+    expect(strictJsonObject('```json\n{"a":1}\n```')).toEqual({ a: 1 })
     for (const invalid of [
       'thinking... {"a":1}',
       '{"a":1} explanation',
