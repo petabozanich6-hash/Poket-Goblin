@@ -748,6 +748,33 @@ describe('free Premium giveaways', () => {
     expect(current.access.plan).toBe('premium')
   })
 
+  it('closes an expired gift before giving a different campaign', async () => {
+    h.elevate(owner)
+    const first = await json(await create('Seven day gift', 1))
+    const second = await json(await create('Another week', 1))
+    const award = (id: string) =>
+      h.request(`/api/admin/deals/giveaways/${id}/grant`, {
+        cookie: owner.cookie,
+        admin: true,
+        body: { email: 'alice@example.com' },
+      })
+    expect((await award(first.id)).status).toBe(201)
+    h.run(
+      `UPDATE user_entitlements
+       SET current_period_end = '2000-01-01T00:00:00.000Z'
+       WHERE user_id = ? AND source = 'giveaway'`,
+      alice.id,
+    )
+    expect((await award(second.id)).status).toBe(201)
+    expect(
+      h.query(
+        `SELECT COUNT(*) AS n FROM user_entitlements
+         WHERE user_id = ? AND ended_at IS NULL`,
+        alice.id,
+      ),
+    ).toEqual([{ n: 1 }])
+  })
+
   it('enforces the recipient cap on the server', async () => {
     h.elevate(owner)
     const bob = await h.register('bob@example.com')
