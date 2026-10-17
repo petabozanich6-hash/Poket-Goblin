@@ -260,7 +260,9 @@ export function TellTheGoblin({ prominent = false }: { prominent?: boolean }) {
           >
             <Send size={16} aria-hidden />
             {send.isPending
-              ? send.variables?.attachments.some((item) => item.type.startsWith('image/'))
+              ? send.variables?.attachments.some((item) =>
+                  item.type.startsWith('image/'),
+                )
                 ? 'Reading your photo — about 15 seconds…'
                 : 'Thinking…'
               : 'Give it to the Goblin'}
