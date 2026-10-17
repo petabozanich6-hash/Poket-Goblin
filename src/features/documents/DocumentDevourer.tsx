@@ -9,6 +9,7 @@ import {
   X,
 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router'
 
 import { Button } from '@/components/ui/Button'
 import {
@@ -242,6 +243,7 @@ export function DevourReview({
     null,
   )
   const [addedNote, setAddedNote] = useState<string | null>(null)
+  const [pathwayAssigned, setPathwayAssigned] = useState(false)
   const [auto, setAuto] = useState(result.autoAdded ?? { added: 0, already: 0 })
   const added = result.suggestions.filter((s) => s.status === 'accepted')
 
@@ -433,6 +435,15 @@ export function DevourReview({
         </p>
       ) : null}
 
+      {pathwayAssigned ? (
+        <p role="status" className={styles.addedNote}>
+          <Check size={16} aria-hidden /> Your study pathway is assigned.
+          The proposals are off your review list and the dated sessions are
+          on your <Link to="/life/calendar">calendar</Link>. You won't need
+          to add them again.
+        </p>
+      ) : null}
+
       {groups.length > 0 ? (
         <section className={styles.plan} aria-labelledby="plan-heading">
           <div className={styles.planTop}>
@@ -462,6 +473,7 @@ export function DevourReview({
             <StudyPathwayPreviewPanel
               documentId={doc.id}
               onApproved={() => {
+                setPathwayAssigned(true)
                 setOpen((list) =>
                   list.filter(
                     (item) =>
