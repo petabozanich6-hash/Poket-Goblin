@@ -65,6 +65,17 @@ export type Platform =
   | 'firefox'
   | 'other'
 
+/**
+ * Android Chromium/Samsung browsers may mint native WebAPKs from PWA
+ * manifests. On some Android 16 devices Play Protect flags the browser-
+ * generated package as targeting an older Android version. Until the
+ * installer is verified on physical devices, don't offer our own install
+ * prompt on these browsers. This does not control browser-menu installs.
+ */
+export function isAndroidInstallPaused(platform: Platform): boolean {
+  return platform === 'android' || platform === 'samsung'
+}
+
 export function detectPlatform(ua = navigator.userAgent): Platform {
   const iOS =
     /iPad|iPhone|iPod/.test(ua) ||
