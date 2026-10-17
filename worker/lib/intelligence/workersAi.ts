@@ -8,18 +8,60 @@ export class WorkersAiBlockedError extends Error {}
  * slightly fewer neurons. The fp8 variant never finished inside the timeout.
  */
 export const WORKERS_AI_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast'
-// Explicit allowlist: changing models requires reviewing cost and JSON support.
+// These are Cloudflare-hosted models only. New models are opt-in and must be
+// benchmarked before a production setting is changed. The existing model
+// remains the default for both ordinary requests and document interpretation.
+export const WORKERS_AI_TRIAL_MODELS = [
+  '@cf/qwen/qwen3-30b-a3b-fp8',
+  '@cf/google/gemma-4-26b-a4b-it',
+  '@cf/zai-org/glm-4.7-flash',
+  '@cf/openai/gpt-oss-20b',
+] as const
 const ALLOWED_MODELS = [
   WORKERS_AI_MODEL,
   '@cf/meta/llama-3.1-8b-instruct-fp8',
+  ...WORKERS_AI_TRIAL_MODELS,
 ] as const
+
+export type AiPurpose = 'general' | 'document'
+
+/** Invalid configured models fail closed rather than silently increasing bills. */
 export function workersAiModel(
   env: Env,
+  purpose: AiPurpose = 'general',
 ): (typeof ALLOWED_MODELS)[number] | null {
-  const model = env.AI_MODEL?.trim() || WORKERS_AI_MODEL
+  const model =
+    (purpose === 'document' ? env.AI_DOCUMENT_MODEL?.trim() : undefined) ||
+    env.AI_MODEL?.trim() ||
+    WORKERS_AI_MODEL
   return (ALLOWED_MODELS as readonly string[]).includes(model)
     ? (model as (typeof ALLOWED_MODELS)[number])
     : null
+}
+
+/** Model pages list these trials, but they are not yet in Cloudflare's JSON
+ * Mode supported-model list. Ask for JSON via the prompt instead; validate
+ * it strictly, or fall back to Pocket Goblin's existing rule engine. */
+export function usesLegacyJsonMode(model: string): boolean {
+  return !WORKERS_AI_TRIAL_MODELS.some((candidate) => candidate === model)
+}
+
+/** Accept only a whole JSON object, optionally surrounded by a JSON fence.
+ * Do not extract arbitrary objects from reasoning/prose or copy their content
+ * into logs. */
+export function strictJsonObject(content: string): Record<string, unknown> {
+  const trimmed = content.trim()
+  const text = trimmed.startsWith('```')
+    ? trimmed
+        .replace(/^```(?:json)?\s*\n?/i, '')
+        .replace(/\s*```$/, '')
+        .trim()
+    : trimmed
+  const parsed: unknown = JSON.parse(text)
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('Workers AI response is not a JSON object')
+  }
+  return parsed as Record<string, unknown>
 }
 
 function globalLimit(raw: string | undefined): number {
@@ -92,8 +134,9 @@ export async function callWorkersAi(
   system: string,
   user: string,
   timeoutMs = 12_000,
+  purpose: AiPurpose = 'general',
 ): Promise<unknown> {
-  const model = workersAiModel(env)
+  const model = workersAiModel(env, purpose)
   if (env.AI_PROVIDER?.toLowerCase() !== 'workers_ai' || !env.AI || !model) {
     throw new WorkersAiBlockedError('Workers AI not configured')
   }
@@ -110,14 +153,21 @@ export async function callWorkersAi(
   try {
     const result = await Promise.race([
       // The "-fast" variant is newer than the bundled type list.
-      env.AI.run(model as '@cf/meta/llama-3.1-8b-instruct-fp8', {
+      (
+        env.AI.run as (
+          model: string,
+          inputs: Record<string, unknown>,
+        ) => Promise<unknown>
+      )(model, {
         messages: [
           { role: 'system', content: system },
           { role: 'user', content: user },
         ],
         temperature: 0.1,
         max_tokens: 1024,
-        response_format: { type: 'json_object' },
+        ...(usesLegacyJsonMode(model)
+          ? { response_format: { type: 'json_object' } }
+          : {}),
         stream: false,
       }),
       new Promise<never>((_, reject) => {
@@ -134,7 +184,7 @@ export async function callWorkersAi(
     const content = result.response
     if (typeof content === 'string') {
       if (content.length > 32_000) throw new Error('AI output too large')
-      return JSON.parse(content) as unknown
+      return strictJsonObject(content)
     }
     // JSON mode can return an already parsed object.
     if (content && typeof content === 'object' && !Array.isArray(content)) {

@@ -17,6 +17,8 @@ export type Env = {
   AI_API_KEY?: string
   AI_BASE_URL?: string
   AI_MODEL?: string
+  /** Optional document-only Workers AI model. Never changes general brain dumps. */
+  AI_DOCUMENT_MODEL?: string
   /** Max intelligence requests per user per UTC day */
   AI_DAILY_USER_LIMIT?: string
   GOOGLE_OAUTH_CLIENT_ID?: string

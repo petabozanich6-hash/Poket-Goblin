@@ -231,6 +231,7 @@ export async function callDocumentAi(
       `<document>\n${fitBytes(input.text.slice(0, MAX_PROMPT_TEXT), WORKERS_AI_INPUT_BYTES - new TextEncoder().encode(system).length - 64)}\n</document>`,
       // Reading a whole document takes longer than a brain dump.
       20_000,
+      'document',
     )
   }
   if (env.ENVIRONMENT === 'production') {
