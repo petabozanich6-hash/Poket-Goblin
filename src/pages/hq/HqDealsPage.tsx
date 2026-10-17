@@ -32,6 +32,148 @@ const fetchDeals = () =>
   api.admin.get<{ campaigns: Campaign[]; checkoutIntegrated: boolean }>(
     '/deals',
   )
+
+type Giveaway = {
+  id: string
+  name: string
+  durationDays: number
+  maxRecipients: number
+  recipients: number
+}
+
+function GiveawaysPanel() {
+  const qc = useQueryClient()
+  const [notice, setNotice] = useState('')
+  const [recipientEmails, setRecipientEmails] = useState<
+    Record<string, string>
+  >({})
+  const campaigns = useQuery({
+    queryKey: ['hq', 'giveaways'],
+    queryFn: () => api.admin.get<{ giveaways: Giveaway[] }>('/deals/giveaways'),
+  })
+  const create = useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      api.admin.send('POST', '/deals/giveaways', body),
+    onSuccess: () => {
+      setNotice('Free Premium giveaway created. No payment details needed.')
+      void qc.invalidateQueries({ queryKey: ['hq', 'giveaways'] })
+    },
+    onError: (error: Error) => setNotice(error.message),
+  })
+  const grant = useMutation({
+    mutationFn: ({ id, email }: { id: string; email: string }) =>
+      api.admin.send(
+        'POST',
+        `/deals/giveaways/${encodeURIComponent(id)}/grant`,
+        { email },
+      ),
+    onSuccess: () => {
+      setNotice('Free Premium has been awarded — no recurring payment.')
+      void qc.invalidateQueries({ queryKey: ['hq', 'giveaways'] })
+    },
+    onError: (error: Error) => setNotice(error.message),
+  })
+  return (
+    <Card>
+      <h3>🎁 Free Premium giveaways</h3>
+      <p>
+        Choose how long Premium lasts and how many customers can receive it.
+        Grant access to an existing account by email. No checkout, payment
+        details, or recurring charge. Each account may receive a campaign only
+        once.
+      </p>
+      <p role="status">{notice}</p>
+      <form
+        style={{ display: 'grid', gap: 12, maxWidth: 600 }}
+        onSubmit={(event) => {
+          event.preventDefault()
+          const form = new FormData(event.currentTarget)
+          create.mutate({
+            name: String(form.get('name') ?? ''),
+            durationDays: Number(form.get('days')),
+            maxRecipients: Number(form.get('max')),
+          })
+        }}
+      >
+        <label>
+          Giveaway name{' '}
+          <input name="name" required minLength={3} maxLength={100} />
+        </label>
+        <label>
+          Free Premium duration (days){' '}
+          <input
+            name="days"
+            type="number"
+            min={1}
+            max={365}
+            defaultValue={7}
+            required
+          />
+        </label>
+        <label>
+          Maximum recipients{' '}
+          <input
+            name="max"
+            type="number"
+            min={1}
+            max={10000}
+            defaultValue={1}
+            required
+          />
+        </label>
+        <Button type="submit" disabled={create.isPending}>
+          Create giveaway
+        </Button>
+      </form>
+      {campaigns.isError ? (
+        <p role="alert">
+          Could not load giveaways. Check that the giveaway database migration
+          is applied.
+        </p>
+      ) : null}
+      {campaigns.data?.giveaways.map((gift) => (
+        <div key={gift.id} style={{ marginTop: 20 }}>
+          <strong>{gift.name}</strong> — {gift.durationDays} free days,{' '}
+          {gift.recipients} / {gift.maxRecipients} awarded
+          <form
+            style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}
+            onSubmit={(event) => {
+              event.preventDefault()
+              grant.mutate({
+                id: gift.id,
+                email: recipientEmails[gift.id] ?? '',
+              })
+            }}
+          >
+            <label>
+              Customer email{' '}
+              <input
+                type="email"
+                required
+                value={recipientEmails[gift.id] ?? ''}
+                onChange={(event) =>
+                  setRecipientEmails((previous) => ({
+                    ...previous,
+                    [gift.id]: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <Button
+              type="submit"
+              disabled={
+                grant.isPending || gift.recipients >= gift.maxRecipients
+              }
+            >
+              Award free Premium
+            </Button>
+          </form>
+        </div>
+      ))}
+    </Card>
+  )
+}
+
 export function HqDealsPage() {
   const qc = useQueryClient()
   const deals = useQuery({ queryKey: ['hq', 'deals'], queryFn: fetchDeals })
@@ -89,6 +231,7 @@ export function HqDealsPage() {
         checkout redemption is being completed.
       </p>
       <p role="status">{message}</p>
+      <GiveawaysPanel />
       <Card>
         <h3>Create a campaign</h3>
         <form

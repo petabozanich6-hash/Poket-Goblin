@@ -160,6 +160,17 @@ billingRoutes.post('/checkout', async (c) => {
   const price = config.prices[interval]
   if (!price) return c.json({ error: 'That option isn’t available.' }, 400)
 
+  // A finished free giveaway must not block a customer from subscribing.
+  // Only touch expired giveaway grants; never modify Stripe subscriptions.
+  await c.env.DB.prepare(
+    `UPDATE user_entitlements
+     SET status = 'expired', ended_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+         updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+     WHERE user_id = ? AND source = 'giveaway' AND ended_at IS NULL
+       AND current_period_end <= strftime('%Y-%m-%dT%H:%M:%fZ','now')`,
+  )
+    .bind(user.id)
+    .run()
   const access = await loadAccess(c.env.DB, user.id)
   if (access.plan !== 'free') {
     return c.json(

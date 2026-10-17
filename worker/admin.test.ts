@@ -694,3 +694,137 @@ describe('own sessions', () => {
     expect((await h.request('/api/me', { cookie: second })).status).toBe(401)
   })
 })
+
+describe('free Premium giveaways', () => {
+  const create = (name = 'A week of goblin mischief', maxRecipients = 1) =>
+    h.request('/api/admin/deals/giveaways', {
+      cookie: owner.cookie,
+      admin: true,
+      body: { name, durationDays: 7, maxRecipients },
+    })
+
+  it('requires owner permissions and an active passkey step-up', async () => {
+    expect((await create()).status).toBe(401)
+    h.elevate(alice)
+    expect(
+      (
+        await h.request('/api/admin/deals/giveaways', {
+          cookie: alice.cookie,
+          admin: true,
+          body: {
+            name: 'Unauthorised gift',
+            durationDays: 7,
+            maxRecipients: 1,
+          },
+        })
+      ).status,
+    ).toBe(404)
+  })
+
+  it('awards Premium once without a Stripe subscription or recurring charge', async () => {
+    h.elevate(owner)
+    const made = await create()
+    expect(made.status).toBe(201)
+    const { id } = await json(made)
+    const claim = () =>
+      h.request(`/api/admin/deals/giveaways/${id}/grant`, {
+        cookie: owner.cookie,
+        admin: true,
+        body: { email: 'alice@example.com' },
+      })
+    expect((await claim()).status).toBe(201)
+    expect((await claim()).status).toBe(409)
+    expect(
+      h.query(
+        'SELECT COUNT(*) AS n FROM premium_giveaway_grants WHERE campaign_id = ?',
+        id,
+      ),
+    ).toEqual([{ n: 1 }])
+    const entitlements = h.query(
+      'SELECT source, stripe_customer_id, stripe_subscription_id, current_period_end FROM user_entitlements WHERE user_id = ?',
+      alice.id,
+    )
+    expect(entitlements).toHaveLength(1)
+    expect(entitlements[0]).toMatchObject({
+      source: 'giveaway',
+      stripe_customer_id: null,
+      stripe_subscription_id: null,
+    })
+    const current = await json(
+      await h.request('/api/me', { cookie: alice.cookie }),
+    )
+    expect(current.access.plan).toBe('premium')
+  })
+
+  it('closes an expired gift before giving a different campaign', async () => {
+    h.elevate(owner)
+    const first = await json(await create('Seven day gift', 1))
+    const second = await json(await create('Another week', 1))
+    const award = (id: string) =>
+      h.request(`/api/admin/deals/giveaways/${id}/grant`, {
+        cookie: owner.cookie,
+        admin: true,
+        body: { email: 'alice@example.com' },
+      })
+    expect((await award(first.id)).status).toBe(201)
+    h.run(
+      `UPDATE user_entitlements
+       SET current_period_end = '2000-01-01T00:00:00.000Z'
+       WHERE user_id = ? AND source = 'giveaway'`,
+      alice.id,
+    )
+    expect((await award(second.id)).status).toBe(201)
+    expect(
+      h.query(
+        `SELECT COUNT(*) AS n FROM user_entitlements
+         WHERE user_id = ? AND ended_at IS NULL`,
+        alice.id,
+      ),
+    ).toEqual([{ n: 1 }])
+  })
+
+  it('refuses the same giveaway again even after its Premium period expires', async () => {
+    h.elevate(owner)
+    const { id } = await json(await create())
+    const award = () =>
+      h.request(`/api/admin/deals/giveaways/${id}/grant`, {
+        cookie: owner.cookie,
+        admin: true,
+        body: { email: 'alice@example.com' },
+      })
+    expect((await award()).status).toBe(201)
+    h.run(
+      `UPDATE user_entitlements
+       SET current_period_end = '2000-01-01T00:00:00.000Z'
+       WHERE user_id = ? AND source = 'giveaway'`,
+      alice.id,
+    )
+    expect((await award()).status).toBe(409)
+    expect(
+      h.query(
+        'SELECT COUNT(*) AS n FROM premium_giveaway_grants WHERE campaign_id = ?',
+        id,
+      ),
+    ).toEqual([{ n: 1 }])
+  })
+
+  it('enforces the recipient cap on the server', async () => {
+    h.elevate(owner)
+    const bob = await h.register('bob@example.com')
+    const { id } = await json(await create())
+    const grant = (email: string) =>
+      h.request(`/api/admin/deals/giveaways/${id}/grant`, {
+        cookie: owner.cookie,
+        admin: true,
+        body: { email },
+      })
+    expect((await grant('alice@example.com')).status).toBe(201)
+    expect((await grant('bob@example.com')).status).toBe(409)
+    expect(
+      h.query(
+        'SELECT * FROM premium_giveaway_grants WHERE user_id = ?',
+        bob.id,
+      ),
+    ).toEqual([])
+  })
+})
