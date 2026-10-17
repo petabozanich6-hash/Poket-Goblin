@@ -55,5 +55,4 @@ describe('weekly-only study schedules', () => {
       ),
     ).toBe(true)
   })
-
 })
