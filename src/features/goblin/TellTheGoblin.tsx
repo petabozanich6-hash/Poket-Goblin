@@ -101,7 +101,9 @@ export function TellTheGoblin({ prominent = false }: { prominent?: boolean }) {
           add({ kind: 'document', devour })
         } catch (err) {
           failures.push(
-            `${attachment.name}: ${err instanceof ApiError ? err.message : 'Could not read this file.'}`,
+            `${attachment.name}: ${
+              err instanceof ApiError ? err.message : 'Could not read this file.'
+            }`,
           )
         }
       }
