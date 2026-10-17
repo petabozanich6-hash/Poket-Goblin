@@ -68,10 +68,10 @@ export function TellTheGoblin({ prominent = false }: { prominent?: boolean }) {
     setError,
   )
 
+  // Never silently discard a document review, Undo or confirmation.
+  // The old three-result cap could hide decisions before the user made them.
   const add = (result: ResultBody) =>
-    setResults((list) =>
-      [{ ...result, id: nextId.current++ }, ...list].slice(0, 3),
-    )
+    setResults((list) => [{ ...result, id: nextId.current++ }, ...list])
 
   const refresh = () =>
     Promise.all(
