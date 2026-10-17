@@ -716,13 +716,7 @@ documentRoutes.patch('/:id/pathway-sessions/:sessionId', async (c) => {
        SET due_date = ?,
            notes = CASE WHEN notes = ? THEN ? ELSE notes END
        WHERE id = ? AND user_id = ? AND status = 'open'`,
-    ).bind(
-      date,
-      oldGeneratedNotes,
-      newGeneratedNotes,
-      session.taskId,
-      user.id,
-    ),
+    ).bind(date, oldGeneratedNotes, newGeneratedNotes, session.taskId, user.id),
   ])
   return c.json({ sessionId: session.id, date, minutes })
 })
