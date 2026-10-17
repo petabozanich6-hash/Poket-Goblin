@@ -84,7 +84,7 @@ test('a study schedule becomes a reviewable path, downloadable calendar tasks an
   const calendarPage = await page.context().newPage()
   await calendarPage.goto('/life/calendar')
   await expect(
-    calendarPage.getByRole('heading', { name: 'Calendar' }),
+    calendarPage.getByRole('heading', { name: 'Calendar', exact: true }),
   ).toBeVisible()
   await expect(
     calendarPage.getByText(/Understanding evidence/).first(),
