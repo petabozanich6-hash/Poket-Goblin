@@ -43,32 +43,44 @@ export function suggestModuleStudy(
   )
   add(
     `Make notes on ${moduleLabel} key concepts`,
-    find(/\b(?:definitions?|concepts?|theor(?:y|ies)|process(?:es)?|topics?|learning outcomes?)\b/i),
+    find(
+      /\b(?:definitions?|concepts?|theor(?:y|ies)|process(?:es)?|topics?|learning outcomes?)\b/i,
+    ),
     'Suggested active-learning step; review the source material for what matters.',
   )
   add(
     `Complete ${moduleLabel} prescribed readings`,
-    find(/\b(?:required|prescribed|essential|recommended)\s+readings?\b|\breadings?\b/i),
+    find(
+      /\b(?:required|prescribed|essential|recommended)\s+readings?\b|\breadings?\b/i,
+    ),
     'Check the module for the specific reading list; the Goblin has not invented references.',
   )
   add(
     `Complete ${moduleLabel} learning activities`,
-    find(/\b(?:learning|module)\s+activities\b|\bactivity\s*\d+\b|\bactivities\s+to\s+complete\b/i),
+    find(
+      /\b(?:learning|module)\s+activities\b|\bactivity\s*\d+\b|\bactivities\s+to\s+complete\b/i,
+    ),
     'Work through the activities stated in the module.',
   )
   add(
     `Complete ${moduleLabel} reflection exercise`,
-    find(/\b(?:reflection|reflective)\s+(?:activity|exercise|questions?|task|journal)\b|\breflect\s+on\b|\breflection activities\b/i),
+    find(
+      /\b(?:reflection|reflective)\s+(?:activity|exercise|questions?|task|journal)\b|\breflect\s+on\b|\breflection activities\b/i,
+    ),
     'Use the actual reflection instructions in the source document.',
   )
   add(
     `Complete ${moduleLabel} quiz`,
-    find(/\b(?:module|knowledge|self[- ]?check|practice)\s+quiz\b|\bquiz\s*\d*\b/i),
+    find(
+      /\b(?:module|knowledge|self[- ]?check|practice)\s+quiz\b|\bquiz\s*\d*\b/i,
+    ),
     'Use the quiz or self-check identified in the module.',
   )
   add(
     `Watch ${moduleLabel} lecture or video`,
-    find(/\b(?:watch|view)\s+(?:the\s+)?(?:video|lecture|recording)\b|\b(?:video|lecture)\s+recording\b/i),
+    find(
+      /\b(?:watch|view)\s+(?:the\s+)?(?:video|lecture|recording)\b|\b(?:video|lecture)\s+recording\b/i,
+    ),
     'Follow the actual video or lecture link in the module.',
   )
   add(
