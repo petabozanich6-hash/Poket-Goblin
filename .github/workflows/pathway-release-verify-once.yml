@@ -1,0 +1,24 @@
+name: Verify final pathway release checks once
+on:
+  push:
+    branches: [feature/pathway-capacity-engine]
+    paths: [.github/workflows/pathway-release-verify-once.yml]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/pathway-capacity-engine
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Typecheck, lint, format, full tests and production build
+        run: npm run check
+      - name: Dry-run Worker deployment without uploading
+        run: npx wrangler deploy --dry-run --outdir .wrangler/dry-run --var ENVIRONMENT:production
