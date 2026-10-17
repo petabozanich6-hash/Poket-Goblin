@@ -308,11 +308,13 @@ describe('approved pathway transactions and Undo', () => {
       h.query('SELECT id FROM study_pathways WHERE user_id = ?', alice.id),
     ).toEqual([])
     expect(
-      h.query('SELECT id FROM study_pathway_sessions WHERE user_id = ?', alice.id),
+      h.query(
+        'SELECT id FROM study_pathway_sessions WHERE user_id = ?',
+        alice.id,
+      ),
     ).toEqual([])
-    expect(
-      h.query('SELECT id FROM tasks WHERE user_id = ?', alice.id),
-    ).toEqual([])
+    expect(h.query('SELECT id FROM tasks WHERE user_id = ?', alice.id)).toEqual(
+      [],
+    )
   })
-
 })
