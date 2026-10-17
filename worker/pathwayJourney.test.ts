@@ -127,10 +127,13 @@ describe('document to approved study pathway journey', () => {
        WHERE user_id = ? AND source_type = 'document' AND source_id = ?
          AND json_valid(payload_json) = 1
          AND json_extract(payload_json, '$.requiresReview') = 1`,
-      owner.id, id,
+      owner.id,
+      id,
     ) as Array<{ status: string }>
     expect(proposalsAfterApproval.length).toBeGreaterThan(0)
-    expect(proposalsAfterApproval.every((item) => item.status === 'accepted')).toBe(true)
+    expect(
+      proposalsAfterApproval.every((item) => item.status === 'accepted'),
+    ).toBe(true)
 
     // Pocket Goblin's calendar must show each dated study session without
     // duplicating it as a conventional appointment.
@@ -421,7 +424,8 @@ describe('realistic standalone university modules', () => {
        WHERE user_id = ? AND source_type = 'document' AND source_id = ?
          AND json_valid(payload_json) = 1
          AND json_extract(payload_json, '$.requiresReview') = 1`,
-      owner.id, id,
+      owner.id,
+      id,
     ) as Array<{ status: string }>
     expect(assigned.length).toBe(activities.length)
     expect(assigned.every((item) => item.status === 'accepted')).toBe(true)
@@ -448,7 +452,8 @@ describe('realistic standalone university modules', () => {
        WHERE user_id = ? AND source_type = 'document' AND source_id = ?
          AND json_valid(payload_json) = 1
          AND json_extract(payload_json, '$.requiresReview') = 1`,
-      owner.id, id,
+      owner.id,
+      id,
     ) as Array<{ status: string }>
     expect(restored.length).toBe(assigned.length)
     expect(restored.every((item) => item.status === 'pending')).toBe(true)
