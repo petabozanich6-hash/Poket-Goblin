@@ -1151,6 +1151,15 @@ adminRoutes.post(
     // account eligibility within SQL, not from a stale read in the browser.
     const results = await c.env.DB.batch([
       c.env.DB.prepare(
+        `UPDATE user_entitlements
+         SET status = 'expired',
+             ended_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+             updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+         WHERE user_id = ? AND source = 'giveaway'
+           AND ended_at IS NULL
+           AND current_period_end <= strftime('%Y-%m-%dT%H:%M:%fZ','now')`,
+      ).bind(recipient.id),
+      c.env.DB.prepare(
         `INSERT INTO user_entitlements
          (id,user_id,entitlement,source,status,current_period_end,granted_by,reason)
          SELECT ?, ?, 'premium', 'giveaway', 'active', ?, ?, ?
@@ -1180,7 +1189,7 @@ adminRoutes.post(
          WHERE EXISTS (SELECT 1 FROM user_entitlements WHERE id = ?)`,
       ).bind(grantId, giveawayId, recipient.id, entitlementId, owner.id, entitlementId),
     ])
-    if (!results[0]?.meta.changes)
+    if (!results[1]?.meta.changes)
       return c.json(
         {
           error:
