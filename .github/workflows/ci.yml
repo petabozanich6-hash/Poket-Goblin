@@ -33,14 +33,6 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      # TEMPORARY diagnostic: displays Prettier's proposed edit in this PR's
-      # Actions logs without changing any committed source or production code.
-      - name: Show expected Prettier diff (temporary)
-        run: |
-          npx prettier --write src/pages/hq/HqDealsPage.tsx
-          git diff -- src/pages/hq/HqDealsPage.tsx
-          git checkout -- src/pages/hq/HqDealsPage.tsx
-
       - name: Format check
         run: npm run format:check
 
