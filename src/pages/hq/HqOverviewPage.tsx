@@ -130,7 +130,15 @@ export function HqOverviewPage() {
             value={ai.failed30d}
             hint="AI errors that fell back to rules"
           />
-          <NotAvailable label="AI spending" info={ai.costs} />
+          {ai.costs.available ? (
+            <Stat
+              label="Measured AI model calls"
+              value={ai.costs.trackedCalls30d}
+              hint={`${ai.costs.unpricedCalls30d} successful calls have no verified cost rate; see AI & Costs for measured latency.`}
+            />
+          ) : (
+            <NotAvailable label="AI measurements" info={ai.costs} />
+          )}
         </div>
         <h3
           className={styles.statLabel}
