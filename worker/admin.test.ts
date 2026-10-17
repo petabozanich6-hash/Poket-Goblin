@@ -695,6 +695,60 @@ describe('own sessions', () => {
   })
 })
 
+describe('promotion owner-only isolation', () => {
+  it('does not expose promotion details or recipient ledgers to other accounts', async () => {
+    h.elevate(owner)
+    const drafted = await h.request('/api/admin/deals', {
+      cookie: owner.cookie,
+      admin: true,
+      body: {
+        code: 'SAFELEDGER',
+        name: 'Private test campaign',
+        kind: 'percent',
+        amount: 10,
+        billingCycles: 1,
+        audience: 'new',
+        verification: 'none',
+        maxRedemptions: 1,
+      },
+    })
+    expect(drafted.status).toBe(201)
+    const { id } = await json(drafted)
+    const gifted = await h.request('/api/admin/deals/giveaways', {
+      cookie: owner.cookie,
+      admin: true,
+      body: {
+        name: 'Private gift',
+        durationDays: 7,
+        maxRecipients: 1,
+      },
+    })
+    expect(gifted.status).toBe(201)
+    const gift = await json(gifted)
+    const paths = [
+      '/api/admin/deals',
+      `/api/admin/deals/${id}/redemptions`,
+      `/api/admin/deals/${id}/stripe-usage`,
+      '/api/admin/deals/giveaways',
+      `/api/admin/deals/giveaways/${gift.id}/grants`,
+    ]
+    for (const path of paths) {
+      expect((await h.request(path)).status).toBe(401)
+      expect(
+        (await h.request(path, { cookie: alice.cookie })).status,
+      ).toBe(404)
+      expect(
+        (await h.request(path, { cookie: owner.cookie })).status,
+      ).toBe(401)
+    }
+    const published = await h.request(
+      `/api/admin/deals/${id}/publish-first-invoice`,
+      { cookie: alice.cookie, admin: true, body: {} },
+    )
+    expect(published.status).toBe(404)
+  })
+})
+
 describe('Stripe first-invoice promotions', () => {
   it('does not publish a multi-cycle draft or expose publishing to regular users', async () => {
     h.elevate(owner)
