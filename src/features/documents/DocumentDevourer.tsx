@@ -792,8 +792,7 @@ export function DocumentDevourer({
         </label>
       </fieldset>
       <label className={styles.field}>
-        Choose a bill, letter, form or notice (PDF, Word, text or photo · up to{' '}
-        {maxMb} MB)
+        Upload up to 10 documents (PDF, Word, text or photos · {maxMb} MB per file)
         <input
           name="file"
           type="file"
@@ -804,8 +803,8 @@ export function DocumentDevourer({
         />
       </label>
       <p className={styles.muted}>
-        Choose up to 10 files. Each is read separately, with its own review.
-        Your selected privacy mode applies to every file.
+        Select multiple files together. Each gets its own review, and your
+        selected privacy mode applies to every file.
       </p>
       <Button type="submit" disabled={reading}>
         {reading ? 'Reading documents one at a time…' : 'Feed it to the goblin'}
