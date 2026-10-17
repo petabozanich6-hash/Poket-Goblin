@@ -496,6 +496,7 @@ documentRoutes.get('/:id/pathway', async (c) => {
   if (!pathway) return c.json({ pathway: null, sessions: [] })
   const sessions = await c.env.DB.prepare(
     `SELECT s.id, s.step_id as stepId, s.title, s.scheduled_date as date,
+            s.deadline_date as deadlineDate,
             s.minutes, s.sequence, s.status, s.task_id as taskId,
             t.status as taskStatus
      FROM study_pathway_sessions s
@@ -514,9 +515,11 @@ documentRoutes.patch('/:id/pathway-sessions/:sessionId', async (c) => {
   const body = (await c.req.json().catch(() => null)) as {
     date?: unknown
     minutes?: unknown
+    availableMinutes?: unknown
   } | null
   const date = body?.date
   const minutes = body?.minutes
+  const availableMinutes = body?.availableMinutes
   if (
     typeof date !== 'string' ||
     !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
@@ -534,7 +537,8 @@ documentRoutes.patch('/:id/pathway-sessions/:sessionId', async (c) => {
   }
   const session = await c.env.DB.prepare(
     `SELECT s.id, s.task_id as taskId, s.pathway_id as pathwayId,
-            s.deadline_date as deadlineDate, s.goal_id as goalId,
+            s.deadline_date as deadlineDate, s.scheduled_date as currentDate,
+            s.goal_id as goalId,
             s.step_order as stepOrder, s.sequence, s.minutes
      FROM study_pathway_sessions s
      JOIN study_pathways p ON p.id = s.pathway_id
@@ -547,6 +551,7 @@ documentRoutes.patch('/:id/pathway-sessions/:sessionId', async (c) => {
       taskId: string | null
       pathwayId: string
       deadlineDate: string | null
+      currentDate: string
       goalId: string | null
       stepOrder: number | null
       sequence: number
@@ -560,14 +565,6 @@ documentRoutes.patch('/:id/pathway-sessions/:sessionId', async (c) => {
   )
     .bind(session.taskId, user.id)
     .first<{ status: string; dueDate: string | null }>()
-  // The original assessment deadline is not stored separately yet.
-  // Until it is, only allow earlier moves to avoid crossing that deadline.
-  if (task?.status === 'open' && task.dueDate && date > task.dueDate) {
-    return c.json(
-      { error: 'Moving a session later requires deadline verification.' },
-      409,
-    )
-  }
   if (task?.status !== 'open') {
     return c.json(
       { error: 'Completed or removed sessions cannot be edited.' },
@@ -575,17 +572,80 @@ documentRoutes.patch('/:id/pathway-sessions/:sessionId', async (c) => {
     )
   }
   if (
-    !session.deadlineDate ||
-    date > session.deadlineDate ||
+    (session.deadlineDate !== null && date > session.deadlineDate) ||
+    (session.deadlineDate === null && date > session.currentDate) ||
     minutes > session.minutes
   ) {
     return c.json(
       {
         error:
-          'Check the original assessment deadline and available time before increasing study workload.',
+          'The study move would cross an unverified assessment deadline or increase the approved workload.',
       },
       409,
     )
+  }
+  // The learner provides their actual budget for the destination day; never
+  // count it as free time until existing tasks, sessions and events are removed.
+  if (date !== session.currentDate) {
+    if (
+      typeof availableMinutes !== 'number' ||
+      !Number.isInteger(availableMinutes) ||
+      availableMinutes < 15 ||
+      availableMinutes > 1440
+    ) {
+      return c.json({ error: 'Confirm your available minutes on the new study day.' }, 400)
+    }
+    const offset = readOffsetMinutes({
+      timezoneOffsetMinutes: Number(c.req.query('timezoneOffsetMinutes') ?? 0),
+    })
+    const today = new Date(Date.now() - offset * 60000).toISOString().slice(0, 10)
+    if (date < today) {
+      return c.json({ error: 'Study sessions cannot be moved into the past.' }, 409)
+    }
+    const [otherTasks, otherStudy, events] = await Promise.all([
+      c.env.DB.prepare(
+        `SELECT COUNT(*) AS count FROM tasks t
+         WHERE t.user_id = ? AND t.status = 'open' AND t.due_date = ?
+           AND t.id != ?
+           AND NOT EXISTS (
+             SELECT 1 FROM study_pathway_sessions s
+             WHERE s.task_id = t.id AND s.user_id = t.user_id
+               AND s.status = 'planned'
+           )`,
+      )
+        .bind(user.id, date, session.taskId)
+        .first<{ count: number }>(),
+      c.env.DB.prepare(
+        `SELECT COALESCE(SUM(s.minutes), 0) AS minutes
+         FROM study_pathway_sessions s
+         JOIN tasks t ON t.id = s.task_id AND t.user_id = s.user_id
+         WHERE s.user_id = ? AND s.scheduled_date = ?
+           AND s.id != ? AND s.status = 'planned' AND t.status = 'open'`,
+      )
+        .bind(user.id, date, session.id)
+        .first<{ minutes: number }>(),
+      c.env.DB.prepare(
+        `SELECT COUNT(*) AS count FROM events
+         WHERE user_id = ? AND status = 'scheduled'
+           AND starts_at >= ? AND starts_at < ?`,
+      )
+        .bind(
+          user.id,
+          new Date(Date.parse(date + 'T00:00:00Z') + offset * 60000).toISOString(),
+          new Date(Date.parse(date + 'T00:00:00Z') + offset * 60000 + 86400000).toISOString(),
+        )
+        .first<{ count: number }>(),
+    ])
+    const committed =
+      Number(otherTasks?.count ?? 0) * 30 +
+      Number(otherStudy?.minutes ?? 0) +
+      Number(events?.count ?? 0) * 60
+    if (availableMinutes - committed < minutes) {
+      return c.json(
+        { error: 'The new study day does not have enough time after existing commitments.' },
+        409,
+      )
+    }
   }
   if (session.goalId && session.stepOrder !== null) {
     const peers = await c.env.DB.prepare(
