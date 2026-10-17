@@ -627,6 +627,7 @@ export function DocumentDevourer({
   }
   const [batch, setBatch] = useState<BatchItem[]>([])
   const [reading, setReading] = useState(false)
+  const [selectedNames, setSelectedNames] = useState<string[]>([])
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -659,6 +660,7 @@ export function DocumentDevourer({
     )
     setReading(true)
     event.currentTarget.reset()
+    setSelectedNames([])
     // Process one file at a time. Every file retains the existing server-side
     // duplicate, quota, privacy and review protections.
     for (const [id, file] of files.entries()) {
@@ -801,8 +803,23 @@ export function DocumentDevourer({
           multiple
           required
           disabled={reading}
+          onChange={(event) => {
+            setSelectedNames(
+              Array.from(event.target.files ?? [], (file) => file.name),
+            )
+          }}
         />
       </label>
+      {selectedNames.length > 0 ? (
+        <section aria-label="Documents ready to upload" aria-live="polite">
+          <p>{selectedNames.length} document(s) selected:</p>
+          <ul>
+            {selectedNames.map((name, index) => (
+              <li key={`${index}-${name}`}>{name}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       <p className={styles.muted}>
         Select multiple files together. Each gets its own review, and your
         selected privacy mode applies to every file.
