@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { app } from './index'
@@ -191,4 +193,54 @@ describe('document to approved study pathway journey', () => {
     ) as Array<{ status: string }>
     expect(active).toEqual([{ status: 'cancelled' }])
   })
+
+  it('extracts a real Chrome-generated university PDF into reviewable assessment steps', async () => {
+    const bytes = readFileSync(
+      new URL('../shared/documents/fixtures/chrome-letter-spaced.pdf', import.meta.url),
+    )
+    const data = new FormData()
+    data.append(
+      'file',
+      new File([new Uint8Array(bytes)], 'UNE Study Schedule.pdf', {
+        type: 'application/pdf',
+      }),
+    )
+    const uploaded = await app.request(
+      '/api/documents',
+      { method: 'POST', headers: { Cookie: owner.cookie }, body: data },
+      h.env,
+    )
+    expect(uploaded.status).toBe(201)
+    const result = (await uploaded.json()) as {
+      document: { id: string; documentType: string }
+    }
+    expect(result.document.documentType).toBe('education')
+    const rows = h.query(
+      `SELECT payload_json as payload FROM review_items
+       WHERE user_id = ? AND source_type = 'document' AND source_id = ?`,
+      owner.id,
+      result.document.id,
+    ) as Array<{ payload: string }>
+    const studyTasks = rows
+      .map((row) => JSON.parse(row.payload) as {
+        title?: string
+        type?: string
+        requiresReview?: boolean
+      })
+      .filter((item) => item.type === 'task' && item.requiresReview === true)
+    expect(studyTasks.length).toBeGreaterThan(0)
+    expect(studyTasks.some((item) => /reflective essay/i.test(item.title ?? ''))).toBe(
+      true,
+    )
+    const preview = await h.request(
+      `/api/documents/${result.document.id}/pathway-preview`,
+      { cookie: owner.cookie, body: { availability: availableDays() } },
+    )
+    expect(preview.status).toBe(200)
+    const view = (await preview.json()) as {
+      preview: { sessions: Array<{ title: string }> }
+    }
+    expect(view.preview.sessions.length).toBeGreaterThan(0)
+  })
+
 })
