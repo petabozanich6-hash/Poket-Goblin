@@ -79,14 +79,23 @@ export function HqDealsPage() {
       verification: String(f.get('verification')),
       maxRedemptions: max ? Number(max) : null,
       budgetCents: budget ? Math.round(Number(budget) * 100) : null,
+      activationWindowDays: f.get('activationWindowDays')
+        ? Number(f.get('activationWindowDays'))
+        : null,
+      startAt: f.get('startAt')
+        ? new Date(String(f.get('startAt'))).toISOString()
+        : null,
+      expiresAt: f.get('expiresAt')
+        ? new Date(String(f.get('expiresAt'))).toISOString()
+        : null,
     })
   }
   return (
     <section className={styles.page}>
       <h2>🧌 Goblin Deals &amp; Mischief</h2>
       <p>
-        Campaign management in AUD. All offers remain inactive while secure
-        checkout redemption is being completed.
+        Create targeted offers with limits, budgets and time windows. All
+        campaigns remain inactive until secure redemption is implemented.
       </p>
       <p role="status">{message}</p>
       <Card>
@@ -155,6 +164,18 @@ export function HqDealsPage() {
               <option value="none">No verification required</option>
               <option value="manual">Manual verification required</option>
             </select>
+          </label>
+          <label>
+            Start date (optional){' '}
+            <input name="startAt" type="datetime-local" />
+          </label>
+          <label>
+            Expiry date (optional){' '}
+            <input name="expiresAt" type="datetime-local" />
+          </label>
+          <label>
+            Days after activation before expiry (optional){' '}
+            <input name="activationWindowDays" type="number" min={1} max={365} />
           </label>
           <label>
             Maximum redemptions (optional){' '}
