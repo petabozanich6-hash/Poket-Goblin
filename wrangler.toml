@@ -47,6 +47,8 @@ AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fast"
 # Platform-wide AI calls per UTC day (cost guard; each person also has a
 # daily limit by plan). Roughly a tenth of a cent per document read.
 AI_DAILY_GLOBAL_LIMIT = "300"
+# Require verified email for new registrations. Existing accounts are grandfathered.
+EMAIL_VERIFICATION_REQUIRED = "true"
 # Stripe Premium price ids (not secret). Empty = Premium shows "Coming soon".
 # The keys are Worker secrets: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET.
 # Live keys stay refused until STRIPE_LIVE_ENABLED = "true" (owner approval).
