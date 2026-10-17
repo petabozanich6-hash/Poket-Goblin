@@ -695,7 +695,6 @@ describe('own sessions', () => {
   })
 })
 
-
 describe('free Premium giveaways', () => {
   const create = (name = 'A week of goblin mischief', maxRecipients = 1) =>
     h.request('/api/admin/deals/giveaways', {
@@ -712,7 +711,11 @@ describe('free Premium giveaways', () => {
         await h.request('/api/admin/deals/giveaways', {
           cookie: alice.cookie,
           admin: true,
-          body: { name: 'Unauthorised gift', durationDays: 7, maxRecipients: 1 },
+          body: {
+            name: 'Unauthorised gift',
+            durationDays: 7,
+            maxRecipients: 1,
+          },
         })
       ).status,
     ).toBe(404)
@@ -732,7 +735,10 @@ describe('free Premium giveaways', () => {
     expect((await claim()).status).toBe(201)
     expect((await claim()).status).toBe(409)
     expect(
-      h.query('SELECT COUNT(*) AS n FROM premium_giveaway_grants WHERE campaign_id = ?', id),
+      h.query(
+        'SELECT COUNT(*) AS n FROM premium_giveaway_grants WHERE campaign_id = ?',
+        id,
+      ),
     ).toEqual([{ n: 1 }])
     const entitlements = h.query(
       'SELECT source, stripe_customer_id, stripe_subscription_id, current_period_end FROM user_entitlements WHERE user_id = ?',
@@ -744,7 +750,9 @@ describe('free Premium giveaways', () => {
       stripe_customer_id: null,
       stripe_subscription_id: null,
     })
-    const current = await json(await h.request('/api/me', { cookie: alice.cookie }))
+    const current = await json(
+      await h.request('/api/me', { cookie: alice.cookie }),
+    )
     expect(current.access.plan).toBe('premium')
   })
 
