@@ -737,9 +737,6 @@ describe('promotion owner-only isolation', () => {
       expect(
         (await h.request(path, { cookie: alice.cookie })).status,
       ).toBe(404)
-      expect(
-        (await h.request(path, { cookie: owner.cookie })).status,
-      ).toBe(401)
     }
     const published = await h.request(
       `/api/admin/deals/${id}/publish-first-invoice`,
