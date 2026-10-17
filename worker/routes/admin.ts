@@ -1141,6 +1141,21 @@ adminRoutes.patch(
           },
           409,
         )
+      if (row.stripe_promotion_code_id) {
+        const config = billingConfig(c.env)
+        if (!config.enabled)
+          return c.json({ error: 'Stripe unavailable; cannot safely pause code.' }, 503)
+        try {
+          await stripe(
+            config,
+            'POST',
+            '/promotion_codes/' + String(row.stripe_promotion_code_id),
+            { active: false },
+          )
+        } catch {
+          return c.json({ error: 'Stripe could not deactivate code.' }, 502)
+        }
+      }
       fields.active = 0
     }
     if ('name' in body) {
@@ -1159,9 +1174,9 @@ adminRoutes.patch(
           Number(body.maxRedemptions) < 1)
       )
         return c.json({ error: 'Invalid redemption limit' }, 400)
-      if (locked)
+      if (locked || row.stripe_promotion_code_id)
         return c.json(
-          { error: 'Campaign with redemptions cannot change terms' },
+          { error: 'Published or redeemed campaigns cannot change terms' },
           409,
         )
       fields.max_redemptions = body.maxRedemptions
