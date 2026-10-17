@@ -33,17 +33,6 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Temporary formatter output
-        run: |
-          npx prettier --write e2e/devourer.spec.ts src/features/documents/DocumentDevourer.tsx
-          echo 'START_FORMATTED_E2E'
-          base64 -w0 e2e/devourer.spec.ts
-          echo
-          echo 'END_FORMATTED_E2E'
-          echo 'START_FORMATTED_COMPONENT'
-          base64 -w0 src/features/documents/DocumentDevourer.tsx
-          echo
-          echo 'END_FORMATTED_COMPONENT'
       - name: Format check
         run: npm run format:check
 
