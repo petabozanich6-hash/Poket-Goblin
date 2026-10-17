@@ -70,6 +70,80 @@ describe('calendar file', () => {
   })
 })
 
+describe('Pocket Goblin in-app calendar', () => {
+  it('shows dated tasks even when they were not created as events or approved pathways', async () => {
+    await seed(alice)
+    await seed(bob)
+    const from = soon(0)
+    const to = soon(20)
+    const path = `/api/calendar/dated-tasks?from=${from}&to=${to}`
+    const response = await h.request(path, { cookie: alice.cookie })
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as {
+      tasks: Array<{
+        id: string
+        title: string
+        date: string
+        studyMinutes: number | null
+      }>
+    }
+    expect(body.tasks).toEqual([
+      expect.objectContaining({
+        title: 'Pay rent',
+        date: soon(5),
+        studyMinutes: null,
+      }),
+    ])
+    expect(JSON.stringify(body)).not.toContain('secret note')
+
+    const other = await h.request(path, { cookie: bob.cookie })
+    expect(other.status).toBe(200)
+    expect((await other.json()) as { tasks: unknown[] }).toMatchObject({
+      tasks: [{ title: 'Pay rent' }],
+    })
+
+    expect((await h.request(path)).status).toBe(401)
+    expect(
+      (
+        await h.request(`/api/calendar/dated-tasks?from=2026-02-30&to=${to}`, {
+          cookie: alice.cookie,
+        })
+      ).status,
+    ).toBe(400)
+  })
+
+  it('removes a completed task from the upcoming calendar', async () => {
+    const taskResponse = await h.request('/api/tasks', {
+      cookie: alice.cookie,
+      body: { title: 'Read module 1', dueDate: soon(2) },
+    })
+    expect(taskResponse.status).toBe(201)
+    const data = (await taskResponse.json()) as { task: { id: string } }
+    const calendarPath = `/api/calendar/dated-tasks?from=${soon(0)}&to=${soon(10)}`
+    expect(
+      (
+        (await (
+          await h.request(calendarPath, { cookie: alice.cookie })
+        ).json()) as {
+          tasks: Array<{ title: string }>
+        }
+      ).tasks.some((task) => task.title === 'Read module 1'),
+    ).toBe(true)
+    const complete = await h.request(`/api/tasks/${data.task.id}`, {
+      method: 'PATCH',
+      cookie: alice.cookie,
+      body: { status: 'completed' },
+    })
+    expect(complete.status).toBe(200)
+    const final = (await (
+      await h.request(calendarPath, { cookie: alice.cookie })
+    ).json()) as {
+      tasks: Array<{ title: string }>
+    }
+    expect(final.tasks).toEqual([])
+  })
+})
+
 describe('download', () => {
   it('exports appointments, task due dates and nothing private', async () => {
     await seed(alice)

@@ -416,6 +416,16 @@ documentRoutes.post('/:id/pathway-approve', async (c) => {
     .first()
   if (!document) return c.json({ error: 'Document not found' }, 404)
 
+  // Repeated approval requests must be idempotent. Already-approved work is
+  // managed in the saved pathway rather than being added to tasks again.
+  const prior = await c.env.DB.prepare(
+    `SELECT id FROM study_pathways
+     WHERE user_id = ? AND document_id = ? AND status = 'active'`,
+  )
+    .bind(user.id, documentId)
+    .first<{ id: string }>()
+  if (prior) return c.json({ pathwayId: prior.id, alreadySaved: true }, 200)
+
   const body = (await c.req.json().catch(() => null)) as {
     availability?: DayAvailability[]
     expectedSessions?: unknown[]
@@ -451,14 +461,15 @@ documentRoutes.post('/:id/pathway-approve', async (c) => {
   }
 
   const rows = await c.env.DB.prepare(
-    `SELECT payload_json as payload FROM review_items
+    `SELECT id, payload_json as payload FROM review_items
      WHERE user_id = ? AND source_type = 'document' AND source_id = ?
        AND status IN ('pending', 'snoozed', 'edited')
      ORDER BY created_at ASC, rowid ASC`,
   )
     .bind(user.id, documentId)
-    .all<{ payload: string }>()
+    .all<{ id: string; payload: string }>()
   const suggestions: DocumentSuggestion[] = []
+  const approvedReviewItemIds: string[] = []
   for (const row of rows.results ?? []) {
     try {
       const item = JSON.parse(row.payload) as DocumentSuggestion & {
@@ -466,6 +477,7 @@ documentRoutes.post('/:id/pathway-approve', async (c) => {
       }
       if (item.type === 'task' && item.group && item.requiresReview === true) {
         suggestions.push(item)
+        approvedReviewItemIds.push(row.id)
       }
     } catch {
       // Treat invalid document-generated proposals as unavailable.
@@ -536,6 +548,7 @@ documentRoutes.post('/:id/pathway-approve', async (c) => {
     result.sessions,
     new Map(result.deadlines.map((step) => [step.stepId, step.deadline])),
     new Map(result.stepOrders.map((step) => [step.stepId, step.order])),
+    approvedReviewItemIds,
   )
   return c.json(
     { pathwayId: saved.id, alreadySaved: saved.alreadySaved },
@@ -1017,6 +1030,22 @@ documentRoutes.post('/:id/pathway-undo', async (c) => {
       )
     }
   }
+  // If the original document/review still exists, Undo also restores the
+  // pathway's accepted proposals so the learner can revise and approve again.
+  // No action when a temporary original has already been deleted.
+  statements.push(
+    c.env.DB.prepare(
+      `UPDATE review_items
+       SET status = 'pending', reviewed_at = NULL,
+           updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+       WHERE user_id = ? AND source_type = 'document' AND source_id = ?
+         AND status = 'accepted'
+         AND json_valid(payload_json) = 1
+         AND json_extract(payload_json, '$.requiresReview') = 1
+         AND json_extract(payload_json, '$.type') = 'task'
+         AND json_extract(payload_json, '$.group') IS NOT NULL`,
+    ).bind(user.id, documentId),
+  )
   statements.push(
     c.env.DB.prepare(
       `UPDATE study_pathway_sessions SET status = 'cancelled'

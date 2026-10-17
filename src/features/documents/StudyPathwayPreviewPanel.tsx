@@ -19,8 +19,10 @@ import {
 /** Approvals always require the backend to revalidate the displayed pathway. */
 export function StudyPathwayPreviewPanel({
   documentId,
+  onApproved,
 }: {
   documentId: string
+  onApproved?: () => void
 }) {
   const queryClient = useQueryClient()
   const [minutes, setMinutes] = useState(60)
@@ -118,9 +120,10 @@ export function StudyPathwayPreviewPanel({
       setSaved(true)
       setCalendarChanged(true)
       await refreshSaved()
+      onApproved?.()
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: ['study-calendar-sessions'],
+          queryKey: ['dated-calendar-tasks'],
         }),
         queryClient.invalidateQueries({ queryKey: ['tasks'] }),
         queryClient.invalidateQueries({ queryKey: ['study-pathways'] }),
@@ -146,7 +149,7 @@ export function StudyPathwayPreviewPanel({
       setCalendarChanged(true)
       await refreshSaved()
       await queryClient.invalidateQueries({
-        queryKey: ['study-calendar-sessions'],
+        queryKey: ['dated-calendar-tasks'],
       })
     } catch (cause) {
       setError(
@@ -176,7 +179,7 @@ export function StudyPathwayPreviewPanel({
       setCalendarChanged(true)
       await refreshSaved()
       await queryClient.invalidateQueries({
-        queryKey: ['study-calendar-sessions'],
+        queryKey: ['dated-calendar-tasks'],
       })
     } catch (cause) {
       setError(
@@ -332,132 +335,141 @@ export function StudyPathwayPreviewPanel({
           </Button>
         </div>
       ) : null}
-      <p>
-        See how these steps could fit into your available study days. Previewing
-        does not change your tasks or calendar. Only approving a complete plan
-        creates tasks.
-      </p>
-      <label>
-        Planning window{' '}
-        <select
-          value={horizonDays}
-          onChange={(event) => {
-            setHorizonDays(Number(event.target.value))
-            setPreview(null)
-          }}
-        >
-          <option value={21}>3 weeks</option>
-          <option value={42}>6 weeks</option>
-          <option value={84}>12 weeks</option>
-        </select>
-      </label>
-      <label>
-        Personal study completion target (for modules without a due date){' '}
-        <input
-          type="date"
-          value={planningTargetDate}
-          onChange={(event) => {
-            setPlanningTargetDate(event.target.value)
-            setPreview(null)
-          }}
-        />
-      </label>
-      <p>
-        Optional if the module has an actual assessment deadline. For undated
-        study material, choose when you want to finish; this is your planning
-        goal, <strong>not</strong> a university due date.
-      </p>
-      <label>
-        Minutes available per study day{' '}
-        <input
-          type="number"
-          min={15}
-          max={600}
-          step={15}
-          value={minutes}
-          onChange={(event) => {
-            setMinutes(Number(event.target.value))
-            setPreview(null)
-          }}
-        />
-      </label>
-      <label>
-        <input
-          type="checkbox"
-          checked={includeWeekends}
-          onChange={(event) => {
-            setIncludeWeekends(event.target.checked)
-            setPreview(null)
-          }}
-        />{' '}
-        Include weekends
-      </label>
-      <Button
-        onClick={() => void generate()}
-        disabled={
-          loading || !Number.isFinite(minutes) || minutes < 15 || minutes > 600
-        }
-      >
-        {loading ? 'Planning…' : 'Preview my pathway'}
-      </Button>
-      {error ? <p role="alert">{error}</p> : null}
-      {preview && stored?.pathway?.status !== 'active' ? (
-        <div aria-live="polite">
+      {stored?.pathway?.status !== 'active' ? (
+        <>
           <p>
-            {preview.preview.sessions.length} proposed sessions.{' '}
-            {preview.preview.unscheduledMinutes} minutes could not be scheduled.
+            See how these steps could fit into your available study days.
+            Previewing does not change your tasks or calendar. Only approving a
+            complete plan creates tasks.
           </p>
-          <p>
-            {preview.assumptions.note} Each existing task is estimated at{' '}
-            {preview.assumptions.taskMinutes} minutes and appointment at{' '}
-            {preview.assumptions.appointmentMinutes} minutes.
-          </p>
-          <ul>
-            {preview.preview.sessions.map((session) => (
-              <li key={`${session.stepId}:${session.sequence}`}>
-                {session.date}: {session.title} — {session.minutes} min
-              </li>
-            ))}
-          </ul>
-          {preview.preview.warnings.length > 0 ? (
-            <p role="alert">
-              Some work could not fit. Change your availability or review the
-              deadlines.
-            </p>
-          ) : null}
-          {preview.preview.unschedulable.length > 0 ? (
-            <p role="alert">
-              {preview.preview.unschedulable.length} study steps still need
-              either a confirmed assessment deadline or a personal completion
-              target within the planning window before they can be scheduled.
-            </p>
-          ) : null}
-          {saved ? (
-            <div>
-              <p role="status">Pathway approved and saved to your tasks.</p>
-              <Button
-                variant="secondary"
-                onClick={() => void undo()}
-                disabled={undoing}
-              >
-                {undoing ? 'Undoing…' : 'Undo this pathway'}
-              </Button>
-            </div>
-          ) : (
-            <Button
-              onClick={() => void approve()}
-              disabled={
-                saving ||
-                preview.preview.sessions.length === 0 ||
-                preview.preview.unscheduledMinutes > 0 ||
-                preview.preview.warnings.length > 0 ||
-                preview.preview.unschedulable.length > 0
-              }
+          <label>
+            Planning window{' '}
+            <select
+              value={horizonDays}
+              onChange={(event) => {
+                setHorizonDays(Number(event.target.value))
+                setPreview(null)
+              }}
             >
-              {saving ? 'Saving…' : 'Approve and add these study tasks'}
-            </Button>
-          )}
-        </div>
+              <option value={21}>3 weeks</option>
+              <option value={42}>6 weeks</option>
+              <option value={84}>12 weeks</option>
+            </select>
+          </label>
+          <label>
+            Personal study completion target (for modules without a due date){' '}
+            <input
+              type="date"
+              value={planningTargetDate}
+              onChange={(event) => {
+                setPlanningTargetDate(event.target.value)
+                setPreview(null)
+              }}
+            />
+          </label>
+          <p>
+            Optional if the module has an actual assessment deadline. For
+            undated study material, choose when you want to finish; this is your
+            planning goal, <strong>not</strong> a university due date.
+          </p>
+          <label>
+            Minutes available per study day{' '}
+            <input
+              type="number"
+              min={15}
+              max={600}
+              step={15}
+              value={minutes}
+              onChange={(event) => {
+                setMinutes(Number(event.target.value))
+                setPreview(null)
+              }}
+            />
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={includeWeekends}
+              onChange={(event) => {
+                setIncludeWeekends(event.target.checked)
+                setPreview(null)
+              }}
+            />{' '}
+            Include weekends
+          </label>
+          <Button
+            onClick={() => void generate()}
+            disabled={
+              loading ||
+              !Number.isFinite(minutes) ||
+              minutes < 15 ||
+              minutes > 600
+            }
+          >
+            {loading ? 'Planning…' : 'Preview my pathway'}
+          </Button>
+          {error ? <p role="alert">{error}</p> : null}
+          {preview ? (
+            <div aria-live="polite">
+              <p>
+                {preview.preview.sessions.length} proposed sessions.{' '}
+                {preview.preview.unscheduledMinutes} minutes could not be
+                scheduled.
+              </p>
+              <p>
+                {preview.assumptions.note} Each existing task is estimated at{' '}
+                {preview.assumptions.taskMinutes} minutes and appointment at{' '}
+                {preview.assumptions.appointmentMinutes} minutes.
+              </p>
+              <ul>
+                {preview.preview.sessions.map((session) => (
+                  <li key={`${session.stepId}:${session.sequence}`}>
+                    {session.date}: {session.title} — {session.minutes} min
+                  </li>
+                ))}
+              </ul>
+              {preview.preview.warnings.length > 0 ? (
+                <p role="alert">
+                  Some work could not fit. Change your availability or review
+                  the deadlines.
+                </p>
+              ) : null}
+              {preview.preview.unschedulable.length > 0 ? (
+                <p role="alert">
+                  {preview.preview.unschedulable.length} study steps still need
+                  either a confirmed assessment deadline or a personal
+                  completion target within the planning window before they can
+                  be scheduled.
+                </p>
+              ) : null}
+              {saved ? (
+                <div>
+                  <p role="status">Pathway approved and saved to your tasks.</p>
+                  <Button
+                    variant="secondary"
+                    onClick={() => void undo()}
+                    disabled={undoing}
+                  >
+                    {undoing ? 'Undoing…' : 'Undo this pathway'}
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  onClick={() => void approve()}
+                  disabled={
+                    saving ||
+                    preview.preview.sessions.length === 0 ||
+                    preview.preview.unscheduledMinutes > 0 ||
+                    preview.preview.warnings.length > 0 ||
+                    preview.preview.unschedulable.length > 0
+                  }
+                >
+                  {saving ? 'Saving…' : 'Approve and add these study tasks'}
+                </Button>
+              )}
+            </div>
+          ) : null}
+        </>
       ) : null}
     </section>
   )

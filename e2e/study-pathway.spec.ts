@@ -70,15 +70,13 @@ test('a study schedule becomes a reviewable path, downloadable calendar tasks an
   await page
     .getByRole('button', { name: 'Approve and add these study tasks' })
     .click()
-  await expect(page.getByText('Saved study sessions')).toBeVisible()
+  await expect(page.getByText(/Your study pathway is assigned/)).toBeVisible()
+  await expect(page.getByText(/Proposed study step/)).toHaveCount(0)
   await expect(
     page.getByRole('link', {
       name: 'Download your calendar (.ics)',
     }),
   ).toHaveAttribute('href', /\/api\/calendar\/export\.ics\?tz=/)
-  await expect(
-    page.getByText(/downloaded calendar file is a one-time copy/i),
-  ).toBeVisible()
   // The built-in calendar must show the saved sessions, not only exported
   // all-day task due dates. Use another tab to preserve the upload review.
   const calendarPage = await page.context().newPage()
@@ -102,9 +100,7 @@ test('a study schedule becomes a reviewable path, downloadable calendar tasks an
   expect(content).toContain('Understanding evidence')
 
   // The uploaded original can be discarded without losing the approved plan.
-  await page
-    .getByRole('button', { name: /Done — skip the rest and delete the file/ })
-    .click()
+  await page.getByRole('button', { name: /Done — delete the file/ }).click()
   await expect(page.getByText('DOCUMENT DEVOURED!')).toBeVisible()
   await page.getByRole('button', { name: 'Feed me another' }).click()
   await expect(

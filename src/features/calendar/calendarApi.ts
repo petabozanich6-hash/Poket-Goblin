@@ -54,3 +54,20 @@ export function fetchStudyCalendarSessions(from: string, to: string) {
     `/documents/study-sessions?${params.toString()}`,
   )
 }
+
+export type DatedCalendarTask = {
+  id: string
+  title: string
+  date: string
+  priority: string
+  studyMinutes: number | null
+  documentId: string | null
+}
+
+/** All dated, unfinished tasks, whether created by a study pathway or elsewhere. */
+export function fetchDatedCalendarTasks(from: string, to: string) {
+  const params = new URLSearchParams({ from, to })
+  return api.get<{ tasks: DatedCalendarTask[] }>(
+    `/calendar/dated-tasks?${params.toString()}`,
+  )
+}
