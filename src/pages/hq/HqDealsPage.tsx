@@ -304,9 +304,15 @@ export function HqDealsPage() {
   })
   const publish = useMutation({
     mutationFn: (id: string) =>
-      api.admin.send('POST', `/deals/${encodeURIComponent(id)}/publish-first-invoice`, {}),
+      api.admin.send(
+        'POST',
+        `/deals/${encodeURIComponent(id)}/publish-first-invoice`,
+        {},
+      ),
     onSuccess: () => {
-      setMessage('First-invoice code published to Stripe. Test at Checkout without completing payment.')
+      setMessage(
+        'First-invoice code published to Stripe. Test at Checkout without completing payment.',
+      )
       void refresh()
     },
     onError: (e: Error) => setMessage(e.message),
@@ -574,7 +580,7 @@ export function HqDealsPage() {
                     onClick={() => {
                       if (
                         window.confirm(
-                          'Publish this one-use, first-invoice code in live Stripe? It can be redeemed for a real discount. No payment is required to inspect Checkout.'
+                          'Publish this one-use, first-invoice code in live Stripe? It can be redeemed for a real discount. No payment is required to inspect Checkout.',
                         )
                       )
                         publish.mutate(p.id)

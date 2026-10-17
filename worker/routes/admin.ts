@@ -1037,10 +1037,7 @@ adminRoutes.post(
         },
         409,
       )
-    if (
-      row.expires_at &&
-      Date.parse(String(row.expires_at)) <= Date.now()
-    )
+    if (row.expires_at && Date.parse(String(row.expires_at)) <= Date.now())
       return c.json({ error: 'This draft is already expired.' }, 409)
     const config = billingConfig(c.env)
     if (!config.enabled)
@@ -1144,7 +1141,10 @@ adminRoutes.patch(
       if (row.stripe_promotion_code_id) {
         const config = billingConfig(c.env)
         if (!config.enabled)
-          return c.json({ error: 'Stripe unavailable; cannot safely pause code.' }, 503)
+          return c.json(
+            { error: 'Stripe unavailable; cannot safely pause code.' },
+            503,
+          )
         try {
           await stripe(
             config,
