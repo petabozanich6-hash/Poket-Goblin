@@ -34,8 +34,17 @@ describe('manual-only Cloudflare Workers AI comparison', () => {
       response: JSON.stringify({
         summary: 'Two assessments.',
         suggestions: [
-          { title: 'Research essay', dueDate: '2026-11-30', sourceReference: 'Research essay (2000 words) due 30 November 2026 at 5 pm.' },
-          { title: 'Group presentation', dueDate: '2026-12-12', sourceReference: 'Group presentation due 12 December 2026 at 2 pm.' },
+          {
+            title: 'Research essay',
+            dueDate: '2026-11-30',
+            sourceReference:
+              'Research essay (2000 words) due 30 November 2026 at 5 pm.',
+          },
+          {
+            title: 'Group presentation',
+            dueDate: '2026-12-12',
+            sourceReference: 'Group presentation due 12 December 2026 at 2 pm.',
+          },
         ],
       }),
     }
@@ -57,7 +66,8 @@ describe('manual-only Cloudflare Workers AI comparison', () => {
     })
     expect(result.groundedReferences).toBe(false)
     expect(result.otherDatesToReview).toEqual(['2027-01-01'])
-    expect(() => parseCandidateResponse({ response: 'Sure! {"suggestions":[]}' }))
-      .toThrow()
+    expect(() =>
+      parseCandidateResponse({ response: 'Sure! {"suggestions":[]}' }),
+    ).toThrow()
   })
 })

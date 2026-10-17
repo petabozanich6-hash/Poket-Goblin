@@ -31,6 +31,7 @@ choosing a production default. If the candidate fails, leave the existing
 `AI_DOCUMENT_MODEL` unset.
 
 References:
+
 - https://developers.cloudflare.com/workers-ai/models/
 - https://developers.cloudflare.com/workers-ai/platform/pricing/
 - https://developers.cloudflare.com/workers-ai/features/json-mode/
