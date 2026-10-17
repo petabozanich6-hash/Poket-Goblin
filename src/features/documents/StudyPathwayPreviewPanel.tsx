@@ -191,6 +191,15 @@ export function StudyPathwayPreviewPanel({
                     }}
                   >
                     <strong>{session.title}</strong>{' '}
+                    {session.taskStatus === 'open' &&
+                    session.taskDueDate !== session.date ? (
+                      <p role="alert">
+                        This task was moved in your task list to{' '}
+                        {session.taskDueDate ?? 'an unknown date'}.
+                        The saved study pathway still shows {session.date}.
+                        Restore the task date or undo the pathway before replanning.
+                      </p>
+                    ) : null}
                     <label>
                       Date{' '}
                       <input
@@ -231,7 +240,9 @@ export function StudyPathwayPreviewPanel({
                       type="submit"
                       size="sm"
                       disabled={
-                        sessionSaving !== null || session.taskStatus !== 'open'
+                        sessionSaving !== null ||
+                        session.taskStatus !== 'open' ||
+                        session.taskDueDate !== session.date
                       }
                     >
                       {sessionSaving === session.id
