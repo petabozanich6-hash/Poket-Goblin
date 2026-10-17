@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Bell,
   CalendarDays,
@@ -17,12 +17,15 @@ import {
   dismissReviewItem,
   finishDevouring,
   keepDocumentInstead,
+  listStudyPathways,
   undoAutoAdded,
   type DevourResponse,
   type DocumentSuggestion,
 } from '@/features/explore/exploreApi'
 import { ApiError } from '@/lib/api'
 
+import { isStudyPathwayGroup } from '../../../shared/documents/studyPathwayGroups'
+import { StudyPathwayPreviewPanel } from './StudyPathwayPreviewPanel'
 import styles from './DocumentDevourer.module.css'
 
 const TYPE_META: Record<
@@ -325,6 +328,9 @@ export function DevourReview({
 
   const actedFirst = auto.added > 0
   const groups = planGroups(open)
+  const hasStudyPathway =
+    doc.documentType === 'education' &&
+    groups.some((group) => isStudyPathwayGroup(group.label))
   const loose = open.filter((s) => !s.group)
 
   if (devoured) {
@@ -433,22 +439,28 @@ export function DevourReview({
             <h3 id="plan-heading">
               {actedFirst ? 'Check these — I wasn’t sure' : 'Your plan'}
             </h3>
-            <Button
-              onClick={() => void addWholePlan()}
-              disabled={adding !== null}
-            >
-              <CalendarDays size={16} aria-hidden />
-              {adding
-                ? `Adding ${adding.done} of ${adding.total}…`
-                : actedFirst
-                  ? `Add these too (${open.length})`
-                  : `Add the whole plan (${open.length})`}
-            </Button>
+            {!hasStudyPathway ? (
+              <Button
+                onClick={() => void addWholePlan()}
+                disabled={adding !== null}
+              >
+                <CalendarDays size={16} aria-hidden />
+                {adding
+                  ? `Adding ${adding.done} of ${adding.total}…`
+                  : actedFirst
+                    ? `Add these too (${open.length})`
+                    : `Add the whole plan (${open.length})`}
+              </Button>
+            ) : null}
           </div>
           <p className={styles.muted}>
-            Steps go on your task list, due dates go in your calendar. Skip
-            anything you don’t want first.
+            {hasStudyPathway
+              ? 'Study tasks are proposals until you approve the capacity-checked pathway above. Assessment dates and ordinary reminders can still be reviewed separately.'
+              : 'Steps go on your task list, due dates go in your calendar. Skip anything you don’t want first.'}
           </p>
+          {hasStudyPathway ? (
+            <StudyPathwayPreviewPanel documentId={doc.id} />
+          ) : null}
           {groups.map((group) => (
             <div key={group.label} className={styles.planGroup}>
               <h4 className={styles.planHead}>{group.label}</h4>
@@ -458,18 +470,35 @@ export function DevourReview({
                 </p>
               ) : null}
               <ul className={styles.suggestions}>
-                {group.items.map((s) => (
-                  <SuggestionRow
-                    key={s.id}
-                    suggestion={s}
-                    compact
-                    onDone={(outcome) => {
-                      setOpen((list) => list.filter((x) => x.id !== s.id))
-                      if (outcome === 'accepted') setSaved((n) => n + 1)
-                      void refresh()
-                    }}
-                  />
-                ))}
+                {group.items.map((s) =>
+                  hasStudyPathway &&
+                  isStudyPathwayGroup(group.label) &&
+                  s.type === 'task' ? (
+                    <li key={s.id} className={styles.suggestion}>
+                      <strong>{s.title}</strong>
+                      {s.details ? (
+                        <p className={styles.muted}>{s.details}</p>
+                      ) : null}
+                      <p className={styles.muted}>
+                        Proposed study step · only added after pathway approval
+                        {s.dueDate
+                          ? ` · Assessment date: ${formatDay(s.dueDate)}`
+                          : ''}
+                      </p>
+                    </li>
+                  ) : (
+                    <SuggestionRow
+                      key={s.id}
+                      suggestion={s}
+                      compact
+                      onDone={(outcome) => {
+                        setOpen((list) => list.filter((x) => x.id !== s.id))
+                        if (outcome === 'accepted') setSaved((n) => n + 1)
+                        void refresh()
+                      }}
+                    />
+                  ),
+                )}
               </ul>
             </div>
           ))}
@@ -550,6 +579,13 @@ export function DocumentDevourer({
   const queryClient = useQueryClient()
   const [mode, setMode] = useState<'sort' | 'keep'>('sort')
   const [result, setResult] = useState<DevourResponse | null>(null)
+  const [managedDocumentId, setManagedDocumentId] = useState<string | null>(
+    null,
+  )
+  const pathways = useQuery({
+    queryKey: ['study-pathways'],
+    queryFn: listStudyPathways,
+  })
   const [error, setError] = useState<string | null>(null)
 
   const upload = useMutation({
@@ -586,10 +622,64 @@ export function DocumentDevourer({
   }
 
   if (result)
-    return <DevourReview result={result} onClose={() => setResult(null)} />
+    return (
+      <DevourReview
+        result={result}
+        onClose={() => {
+          setResult(null)
+          onReviewing?.(null)
+          void queryClient.invalidateQueries({ queryKey: ['study-pathways'] })
+        }}
+      />
+    )
+
+  if (managedDocumentId)
+    return (
+      <section
+        className={styles.review}
+        aria-label="Manage saved study pathway"
+      >
+        <Button
+          variant="secondary"
+          type="button"
+          onClick={() => {
+            setManagedDocumentId(null)
+            void queryClient.invalidateQueries({ queryKey: ['study-pathways'] })
+          }}
+        >
+          Back to documents
+        </Button>
+        <StudyPathwayPreviewPanel documentId={managedDocumentId} />
+      </section>
+    )
 
   return (
     <form className={styles.form} onSubmit={submit}>
+      {pathways.data?.pathways.length ? (
+        <section aria-label="Saved study pathways">
+          <h3>Saved study pathways</h3>
+          <p className={styles.muted}>
+            Return to an approved plan to edit sessions or rescue missed study
+            days, even after the uploaded document has been deleted.
+          </p>
+          <ul>
+            {pathways.data.pathways.map((pathway) => (
+              <li key={pathway.id}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setManagedDocumentId(pathway.documentId)}
+                >
+                  {pathway.title} · {pathway.openSessions} unfinished
+                  {pathway.completedSessions > 0
+                    ? ` · ${pathway.completedSessions} completed`
+                    : ''}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       <fieldset className={styles.modes}>
         <legend className={styles.legend}>
           What should the goblin do with it?

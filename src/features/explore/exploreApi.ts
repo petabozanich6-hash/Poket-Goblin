@@ -233,3 +233,157 @@ export function connectProvider(provider: string) {
 export function disconnectProvider(provider: string) {
   return api.post<{ ok: boolean }>(`/connections/${provider}/disconnect`)
 }
+
+export type StudyDayAvailability = {
+  date: string
+  availableMinutes: number
+  committedMinutes?: number
+  blocked?: boolean
+}
+
+export type StudyPathwayPreview = {
+  preview: {
+    sessions: Array<{
+      stepId: string
+      goalId: string
+      title: string
+      date: string
+      minutes: number
+      sequence: number
+    }>
+    warnings: Array<{
+      stepId: string
+      remainingMinutes: number
+      reason: string
+    }>
+    unscheduledMinutes: number
+    estimates: Array<{ stepId: string; minutes: number; inferred: true }>
+    unschedulable: unknown[]
+  }
+  assumptions: { taskMinutes: number; appointmentMinutes: number; note: string }
+  applied: false
+}
+
+/** Returns a proposal only; never creates or changes tasks or calendar entries. */
+export function previewStudyPathway(
+  documentId: string,
+  availability: StudyDayAvailability[],
+  completedStepIds: string[] = [],
+) {
+  const offset = new Date().getTimezoneOffset()
+  return api.post<StudyPathwayPreview>(
+    `/documents/${encodeURIComponent(documentId)}/pathway-preview?timezoneOffsetMinutes=${offset}`,
+    { availability, completedStepIds },
+  )
+}
+
+/** Approve exactly the sessions displayed in the most recent preview. */
+export function approveStudyPathway(
+  documentId: string,
+  availability: StudyDayAvailability[],
+  expectedSessions: StudyPathwayPreview['preview']['sessions'],
+) {
+  const offset = new Date().getTimezoneOffset()
+  return api.post<{ pathwayId: string; alreadySaved: boolean }>(
+    `/documents/${encodeURIComponent(documentId)}/pathway-approve?timezoneOffsetMinutes=${offset}`,
+    { availability, expectedSessions },
+  )
+}
+
+/** Undo tasks created by an approved document pathway. */
+export function undoStudyPathway(documentId: string) {
+  return api.post<{ undone: number; alreadyUndone: boolean }>(
+    `/documents/${encodeURIComponent(documentId)}/pathway-undo`,
+  )
+}
+
+/** Change a saved study session's planned day and effort, not its assessment deadline. */
+export function editStudyPathwaySession(
+  documentId: string,
+  sessionId: string,
+  date: string,
+  minutes: number,
+  availableMinutes: number,
+) {
+  const offset = new Date().getTimezoneOffset()
+  return api.patch<{ sessionId: string; date: string; minutes: number }>(
+    `/documents/${encodeURIComponent(documentId)}/pathway-sessions/${encodeURIComponent(sessionId)}?timezoneOffsetMinutes=${offset}`,
+    { date, minutes, availableMinutes },
+  )
+}
+
+export type SavedStudyPathway = {
+  pathway: {
+    id: string
+    status: 'active' | 'cancelled'
+    approvedAt: string
+  } | null
+  sessions: Array<{
+    id: string
+    stepId: string
+    title: string
+    date: string
+    deadlineDate: string | null
+    minutes: number
+    sequence: number
+    status: string
+    taskId: string | null
+    taskStatus: string | null
+    taskDueDate: string | null
+  }>
+}
+
+/** Read the actual saved sessions, including edits and task completion. */
+export function getSavedStudyPathway(documentId: string) {
+  return api.get<SavedStudyPathway>(
+    `/documents/${encodeURIComponent(documentId)}/pathway`,
+  )
+}
+
+export type StudyReplanResponse = {
+  today: string
+  missedCount: number
+  moves: Array<{ sessionId: string; date: string; minutes: number }>
+  warnings: Array<{
+    sessionId: string
+    reason:
+      | 'missing_deadline'
+      | 'deadline_passed'
+      | 'insufficient_capacity'
+      | 'dependency_order'
+  }>
+  applied: boolean
+}
+
+/** Preview missed-day changes; passing expectedMoves explicitly approves them. */
+export function replanMissedStudySessions(
+  documentId: string,
+  availability: StudyDayAvailability[],
+  expectedMoves?: StudyReplanResponse['moves'],
+) {
+  const offset = new Date().getTimezoneOffset()
+  return api.post<StudyReplanResponse>(
+    `/documents/${encodeURIComponent(documentId)}/pathway-replan?timezoneOffsetMinutes=${offset}`,
+    {
+      availability,
+      apply: expectedMoves !== undefined,
+      ...(expectedMoves !== undefined ? { expectedMoves } : {}),
+    },
+  )
+}
+
+export type StudyPathwayListItem = {
+  id: string
+  documentId: string
+  approvedAt: string
+  title: string
+  openSessions: number
+  completedSessions: number
+}
+
+/** Access approved study plans independently of the uploaded source file. */
+export function listStudyPathways() {
+  return api.get<{ pathways: StudyPathwayListItem[] }>(
+    '/documents/study-pathways',
+  )
+}

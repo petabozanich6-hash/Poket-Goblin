@@ -11,6 +11,7 @@
  * - Temporary ("Just sort it") documents never have their text stored, and a
  *   failure deletes their original immediately.
  */
+import { isStudyPathwayGroup } from '../../../shared/documents/studyPathwayGroups'
 import {
   extractText,
   scannedPageImage,
@@ -287,6 +288,16 @@ export async function processDocumentForUser(
       }
     }
     for (const suggestion of understanding.suggestions) {
+      // Planned study steps are only proposals until the learner approves
+      // the complete pathway. Ordinary document reminders still follow
+      // the existing auto-add settings.
+      const reviewPayload =
+        understanding.documentType === 'education' &&
+        suggestion.type === 'task' &&
+        typeof suggestion.group === 'string' &&
+        isStudyPathwayGroup(suggestion.group)
+          ? { ...suggestion, requiresReview: true }
+          : suggestion
       statements.push(
         env.DB.prepare(
           `INSERT INTO review_items
@@ -300,7 +311,7 @@ export async function processDocumentForUser(
           suggestion.title,
           suggestion.details,
           suggestion.type,
-          JSON.stringify(suggestion),
+          JSON.stringify(reviewPayload),
           suggestion.uncertain ? 1 : 0,
         ),
       )

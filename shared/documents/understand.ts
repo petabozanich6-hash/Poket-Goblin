@@ -584,7 +584,32 @@ export function withDeadlinePlan<
   const simple = ['bill', 'appointment', 'medical'].includes(
     understanding.documentType,
   )
-  if (plan.deadlines.length >= 2 || (plan.deadlines.length === 1 && !simple)) {
+  // A week-by-week study schedule is a real plan even without separate
+  // assessment dates. Previously these extracted weekly tasks were discarded.
+  const hasWeeklyStudy = plan.suggestions.some(
+    (suggestion) => suggestion.group === 'Week by week',
+  )
+  // A PDF extracted from a university unit guide can start out as "general"
+  // before its deadlines are parsed. Keep its academic study steps together
+  // for pathway approval; never apply this rule to a bill or medical notice.
+  const hasAcademicContext =
+    /\b(?:study\s+schedule|study\s+plan|course\s+outline|unit\s+guide|university|semester|trimester|assessment\s+\d+|module\s+\d+|learning\s+outcomes?)\b/i.test(
+      text,
+    )
+  const hasAcademicSteps = plan.suggestions.some(
+    (suggestion) =>
+      suggestion.type === 'task' &&
+      typeof suggestion.group === 'string' &&
+      /\b(?:assessment|assignment|essay|exam|research\s+project|portfolio|thesis|study\s+plan)\b/i.test(
+        suggestion.group,
+      ),
+  )
+  const isAcademicPlan = !simple && hasAcademicContext && hasAcademicSteps
+  if (
+    hasWeeklyStudy ||
+    plan.deadlines.length >= 2 ||
+    (plan.deadlines.length === 1 && !simple)
+  ) {
     // When the AI read it too, its plain-language description leads, and
     // any dated item it spotted that the plan doesn't have joins "check
     // these" (AI items are never added automatically).
@@ -597,6 +622,10 @@ export function withDeadlinePlan<
       .map((s) => ({ ...s, group: 'Also spotted', uncertain: true }))
     return {
       ...understanding,
+      documentType:
+        hasWeeklyStudy || isAcademicPlan
+          ? 'education'
+          : understanding.documentType,
       summary: options.fromAi
         ? `${understanding.summary} ${plan.summary}`
         : plan.summary,
