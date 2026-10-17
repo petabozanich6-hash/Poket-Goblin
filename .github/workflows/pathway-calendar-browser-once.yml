@@ -1,0 +1,77 @@
+name: Check refreshed study calendar browser flow once
+
+on:
+  push:
+    branches: [feature/pathway-capacity-engine]
+    paths: [.github/workflows/pathway-calendar-browser-once.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  study-journey:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: feature/pathway-capacity-engine
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Format pathway calendar screen and acceptance assertions
+        run: |
+          npx prettier --write src/features/documents/StudyPathwayPreviewPanel.tsx e2e/study-pathway.spec.ts
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/features/documents/StudyPathwayPreviewPanel.tsx e2e/study-pathway.spec.ts
+            git commit -m "Format refreshed pathway calendar export interface"
+            git push origin HEAD:feature/pathway-capacity-engine
+          fi
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Configure local-only credentials
+        run: |
+          printf 'ENVIRONMENT=development\nAUTH_SECRET=browser-test-only-not-for-production-1234567890\nAI_PROVIDER=none\n' > .dev.vars
+      - name: Prepare isolated local database
+        run: npm run db:migrate:local
+      - name: Start isolated local servers and run browser acceptance
+        run: |
+          npm run dev > /tmp/pocket-goblin-dev.log 2>&1 &
+          dev_pid=$!
+          trap 'kill "$dev_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for attempt in $(seq 1 55); do
+            if curl --fail --silent http://localhost:5173/ > /dev/null &&
+               curl --fail --silent http://localhost:8787/api/health > /dev/null; then
+              ready=1
+              break
+            fi
+            if ! kill -0 "$dev_pid" 2>/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo '::error::Local browser test servers did not start.'
+            cat /tmp/pocket-goblin-dev.log
+            exit 1
+          fi
+          npx playwright test e2e/study-pathway.spec.ts --reporter=line || {
+            cat /tmp/pocket-goblin-dev.log
+            exit 1
+          }
+      - name: Upload browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: study-pathway-browser-failure
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 3
