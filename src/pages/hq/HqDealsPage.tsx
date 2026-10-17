@@ -267,7 +267,9 @@ export function HqDealsPage() {
               <option value="student">Student / verified eligibility</option>
               <option value="founder">Founding goblins / limited places</option>
               <option value="flash">Flash sale / time-limited deal</option>
-              <option value="giveaway">Free Premium giveaway (draft only)</option>
+              <option value="giveaway">
+                Free Premium giveaway (draft only)
+              </option>
             </select>
           </label>
           {preset === 'giveaway' ? (
