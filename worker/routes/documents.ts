@@ -702,14 +702,27 @@ documentRoutes.patch('/:id/pathway-sessions/:sessionId', async (c) => {
       )
     }
   }
+  // Keep the automatically generated task description in sync with the
+  // approved session, but never overwrite notes edited by the learner.
+  const oldGeneratedNotes = `Pocket Goblin approved study session · ${session.minutes} min · pathway ${session.pathwayId}`
+  const newGeneratedNotes = `Pocket Goblin approved study session · ${minutes} min · pathway ${session.pathwayId}`
   await c.env.DB.batch([
     c.env.DB.prepare(
       `UPDATE study_pathway_sessions SET scheduled_date = ?, minutes = ?
        WHERE id = ? AND user_id = ? AND status = 'planned'`,
     ).bind(date, minutes, session.id, user.id),
     c.env.DB.prepare(
-      `UPDATE tasks SET due_date = ? WHERE id = ? AND user_id = ? AND status = 'open'`,
-    ).bind(date, session.taskId, user.id),
+      `UPDATE tasks
+       SET due_date = ?,
+           notes = CASE WHEN notes = ? THEN ? ELSE notes END
+       WHERE id = ? AND user_id = ? AND status = 'open'`,
+    ).bind(
+      date,
+      oldGeneratedNotes,
+      newGeneratedNotes,
+      session.taskId,
+      user.id,
+    ),
   ])
   return c.json({ sessionId: session.id, date, minutes })
 })
@@ -896,18 +909,54 @@ documentRoutes.post('/:id/pathway-undo', async (c) => {
     return c.json({ undone: 0, alreadyUndone: true })
 
   const sessions = await c.env.DB.prepare(
-    `SELECT id, task_id as taskId FROM study_pathway_sessions
-     WHERE pathway_id = ? AND user_id = ? AND status = 'planned'`,
+    `SELECT s.id, s.task_id as taskId, s.title,
+            s.scheduled_date as scheduledDate,
+            t.title as taskTitle, t.due_date as taskDueDate,
+            t.notes as taskNotes
+     FROM study_pathway_sessions s
+     LEFT JOIN tasks t ON t.id = s.task_id AND t.user_id = s.user_id
+     WHERE s.pathway_id = ? AND s.user_id = ? AND s.status = 'planned'`,
   )
     .bind(pathway.id, user.id)
-    .all<{ id: string; taskId: string | null }>()
+    .all<{
+      id: string
+      taskId: string | null
+      title: string
+      scheduledDate: string
+      taskTitle: string | null
+      taskDueDate: string | null
+      taskNotes: string | null
+    }>()
   const statements = []
+  let removable = 0
   for (const session of sessions.results ?? []) {
-    if (session.taskId) {
+    // A study task the learner edited independently is no longer just a
+    // disposable generated suggestion. Preserve it even when Undo is used.
+    const generatedNotes =
+      session.taskNotes !== null &&
+      /^Pocket Goblin approved study session · [1-9]\\d* min · pathway /.test(
+        session.taskNotes,
+      ) &&
+      session.taskNotes.endsWith(`pathway ${pathway.id}`)
+    if (
+      session.taskId &&
+      session.taskTitle === session.title &&
+      session.taskDueDate === session.scheduledDate &&
+      generatedNotes
+    ) {
+      removable++
       statements.push(
         c.env.DB.prepare(
-          `DELETE FROM tasks WHERE id = ? AND user_id = ? AND status = 'open'`,
-        ).bind(session.taskId, user.id),
+          `DELETE FROM tasks
+           WHERE id = ? AND user_id = ? AND status = 'open'
+             AND title = ? AND due_date = ? AND notes = ?`,
+        ).bind(
+          session.taskId,
+          user.id,
+          session.title,
+          session.scheduledDate,
+          session.taskNotes,
+        ),
       )
     }
   }
@@ -925,7 +974,8 @@ documentRoutes.post('/:id/pathway-undo', async (c) => {
   )
   await c.env.DB.batch(statements)
   return c.json({
-    undone: (sessions.results ?? []).length,
+    undone: removable,
+    retained: (sessions.results ?? []).length - removable,
     alreadyUndone: false,
   })
 })
