@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { detectPlatform } from './pwa'
+import { detectPlatform, isAndroidInstallPaused } from './pwa'
 
 const root = path.resolve(__dirname, '../..')
 const read = (p: string) => readFileSync(path.join(root, p), 'utf8')
@@ -128,5 +128,20 @@ describe('platform detection for install help', () => {
     ],
   ])('%s', (ua, platform) => {
     expect(detectPlatform(ua)).toBe(platform)
+  })
+})
+
+describe('Play Protect installation warning mitigation', () => {
+  it('pauses app-triggered installation from Android Chrome and Samsung Internet', () => {
+    expect(isAndroidInstallPaused('android')).toBe(true)
+    expect(isAndroidInstallPaused('samsung')).toBe(true)
+  })
+
+  it('does not change installs on iOS, desktop or Firefox shortcuts', () => {
+    expect(isAndroidInstallPaused('ios-safari')).toBe(false)
+    expect(isAndroidInstallPaused('ios-other')).toBe(false)
+    expect(isAndroidInstallPaused('desktop-chromium')).toBe(false)
+    expect(isAndroidInstallPaused('desktop-safari')).toBe(false)
+    expect(isAndroidInstallPaused('firefox')).toBe(false)
   })
 })
