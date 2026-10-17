@@ -12,7 +12,7 @@ Your thoughts, plans and paperwork belong to you. This policy explains what info
 - **Information you enter:** tasks, reminders, calendar items, notes, shopping lists, brain dumps, conversations with the Goblin, documents and information extracted from them, and personalisation you choose to save.
 - **Support information:** messages, replies and the status of requests sent through Messages to Goblin HQ or email.
 - **Usage and security information:** sign-in sessions, security events, feature usage counts, rate limits and technical diagnostics needed to operate, protect and troubleshoot the service.
-- **Billing information:** your subscription plan, payment status, renewal dates, Stripe customer and subscription identifiers and any applicable offer. Stripe handles payment-card information directly; Pocket Goblin does not receive your full card number or card security code.
+- **Billing and promotion information:** your subscription plan, payment status, renewal dates, Stripe customer and subscription identifiers, applied coupon or promotional-code details, and records of time-limited Premium giveaways. Goblin HQ may show an authorised administrator which account received a giveaway; Stripe holds the actual promotional-code redemption count for published discount codes. Stripe handles payment-card information directly; Pocket Goblin does not receive your full card number or card security code.
 
 You may include personal or sensitive information in your own notes and uploaded documents. Only add information you are comfortable entrusting to an online organising service, and take care when uploading information about other people.
 
