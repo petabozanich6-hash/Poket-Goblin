@@ -137,11 +137,18 @@ export function StudyPathwayPreviewPanel({
     session: SavedStudyPathway['sessions'][number],
     date: string,
     minutesValue: number,
+    availableMinutes: number,
   ) {
     setSessionSaving(session.id)
     setError(null)
     try {
-      await editStudyPathwaySession(documentId, session.id, date, minutesValue)
+      await editStudyPathwaySession(
+        documentId,
+        session.id,
+        date,
+        minutesValue,
+        availableMinutes,
+      )
       await refreshSaved()
     } catch (cause) {
       setError(
@@ -161,8 +168,9 @@ export function StudyPathwayPreviewPanel({
         <div>
           <h5>Saved study sessions</h5>
           <p>
-            Completed tasks cannot be changed. Moving a session later requires
-            deadline-aware replanning, which is still being built.
+            You can move unfinished sessions before their original assessment
+            deadlines. Confirm how much time you have on the new day; the
+            goblin will account for existing tasks and appointments.
           </p>
           <ul>
             {stored.sessions
@@ -178,6 +186,7 @@ export function StudyPathwayPreviewPanel({
                         session,
                         String(fields.get('date')),
                         Number(fields.get('minutes')),
+                        Number(fields.get('availableMinutes')),
                       )
                     }}
                   >
@@ -202,6 +211,22 @@ export function StudyPathwayPreviewPanel({
                         required
                       />
                     </label>{' '}
+                    <label>
+                      Minutes free on new day{' '}
+                      <input
+                        name="availableMinutes"
+                        type="number"
+                        min={15}
+                        max={1440}
+                        defaultValue={Math.max(60, session.minutes)}
+                        required
+                      />
+                    </label>{' '}
+                    {session.deadlineDate ? (
+                      <small>Assessment deadline: {session.deadlineDate}</small>
+                    ) : (
+                      <small>Deadline unknown: later moves are blocked.</small>
+                    )}{' '}
                     <Button
                       type="submit"
                       size="sm"
