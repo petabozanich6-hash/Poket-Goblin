@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { detectPlatform } from './pwa'
+import { canOfferInstallPrompt, detectPlatform } from './pwa'
 
 const root = path.resolve(__dirname, '../..')
 const read = (p: string) => readFileSync(path.join(root, p), 'utf8')
@@ -128,5 +128,18 @@ describe('platform detection for install help', () => {
     ],
   ])('%s', (ua, platform) => {
     expect(detectPlatform(ua)).toBe(platform)
+  })
+})
+
+describe('Android install safety', () => {
+  it('does not offer the known problematic Samsung Internet WebAPK prompt', () => {
+    expect(canOfferInstallPrompt('samsung', true)).toBe(false)
+    expect(canOfferInstallPrompt('samsung', false)).toBe(false)
+  })
+
+  it('preserves install prompts for other supported browsers', () => {
+    expect(canOfferInstallPrompt('android', true)).toBe(true)
+    expect(canOfferInstallPrompt('desktop-chromium', true)).toBe(true)
+    expect(canOfferInstallPrompt('android', false)).toBe(false)
   })
 })
