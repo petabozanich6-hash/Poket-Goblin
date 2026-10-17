@@ -23,6 +23,7 @@ import {
   type DevourResponse,
   type DocumentSuggestion,
 } from '@/features/explore/exploreApi'
+import { exportUrl } from '@/features/calendar/calendarApi'
 import { ApiError } from '@/lib/api'
 
 import { isStudyPathwayGroup } from '../../../shared/documents/studyPathwayGroups'
@@ -440,7 +441,8 @@ export function DevourReview({
           <Check size={16} aria-hidden /> Your study pathway is assigned.
           The proposals are off your review list and the dated sessions are
           on your <Link to="/life/calendar">calendar</Link>. You won't need
-          to add them again.
+          to add them again.{' '}
+          <a href={exportUrl()} download>Download your calendar (.ics)</a>
         </p>
       ) : null}
 
