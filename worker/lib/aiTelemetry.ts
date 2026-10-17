@@ -26,7 +26,10 @@ export const PRICING_SOURCE =
   'https://developers.cloudflare.com/workers-ai/platform/pricing/'
 
 function token(v: unknown): number | null {
-  return typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 20_000_000
+  return typeof v === 'number' &&
+    Number.isFinite(v) &&
+    v >= 0 &&
+    v <= 20_000_000
     ? Math.round(v)
     : null
 }
@@ -39,9 +42,11 @@ export function makeInferenceSample(input: {
   raw: unknown
   promptText?: string
 }): InferenceSample {
-  const raw = input.raw as
-    | { usage?: Record<string, unknown>; response?: unknown; result?: { usage?: Record<string, unknown> } }
-    | null
+  const raw = input.raw as {
+    usage?: Record<string, unknown>
+    response?: unknown
+    result?: { usage?: Record<string, unknown> }
+  } | null
   const usage = raw?.usage ?? raw?.result?.usage
   const reportedIn = token(usage?.prompt_tokens ?? usage?.input_tokens)
   const reportedOut = token(usage?.completion_tokens ?? usage?.output_tokens)
@@ -53,7 +58,10 @@ export function makeInferenceSample(input: {
       inputTokens = Math.ceil(input.promptText.length / 4)
     }
     if (outputTokens === null && response !== undefined && response !== null) {
-      const chars = typeof response === 'string' ? response.length : JSON.stringify(response).length
+      const chars =
+        typeof response === 'string'
+          ? response.length
+          : JSON.stringify(response).length
       outputTokens = Math.ceil(chars / 4)
     }
   }
@@ -65,7 +73,10 @@ export function makeInferenceSample(input: {
         : 'unknown'
   const rate = PUBLISHED_RATES_USD_PER_MILLION[input.model]
   const estimatedGrossUsd =
-    input.status === 'completed' && rate && inputTokens !== null && outputTokens !== null
+    input.status === 'completed' &&
+    rate &&
+    inputTokens !== null &&
+    outputTokens !== null
       ? (inputTokens * rate.input + outputTokens * rate.output) / 1_000_000
       : null
   return {
@@ -81,7 +92,10 @@ export function makeInferenceSample(input: {
 }
 
 /** Missing migrations/failed logging must never interrupt the customer's AI call. */
-export async function recordInferenceSample(env: Env, sample: InferenceSample): Promise<void> {
+export async function recordInferenceSample(
+  env: Env,
+  sample: InferenceSample,
+): Promise<void> {
   try {
     await env.DB.prepare(
       `INSERT INTO ai_inference_metrics
@@ -133,11 +147,12 @@ export async function inferenceSummary(
 ): Promise<InferenceSummary | { available: false; reason: string }> {
   try {
     const since = new Date(now.getTime() - 30 * 86_400_000).toISOString()
-    const earliest = await db.prepare(
-      'SELECT MIN(created_at) AS first FROM ai_inference_metrics',
-    ).first<{ first: string | null }>()
-    const rows = await db.prepare(
-      `SELECT model, modality, COUNT(*) AS calls,
+    const earliest = await db
+      .prepare('SELECT MIN(created_at) AS first FROM ai_inference_metrics')
+      .first<{ first: string | null }>()
+    const rows = await db
+      .prepare(
+        `SELECT model, modality, COUNT(*) AS calls,
          SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failures,
          ROUND(AVG(duration_ms)) AS avg_ms,
          SUM(CASE WHEN token_basis = 'reported' THEN 1 ELSE 0 END) AS reported,
@@ -149,7 +164,9 @@ export async function inferenceSummary(
        WHERE created_at >= ?
        GROUP BY model, modality
        ORDER BY calls DESC`,
-    ).bind(since).all<Record<string, string | number>>()
+      )
+      .bind(since)
+      .all<Record<string, string | number>>()
     const models = (rows.results ?? []).map((r) => ({
       model: String(r.model),
       modality: r.modality as InferenceModality,
@@ -172,6 +189,10 @@ export async function inferenceSummary(
       note: 'Gross estimates for priced models only, before free neurons, tax and adjustments. Unpriced models are excluded. Cloudflare billing is authoritative; this is not the invoice.',
     }
   } catch {
-    return { available: false, reason: 'Inference metrics unavailable until the approved D1 migration has run.' }
+    return {
+      available: false,
+      reason:
+        'Inference metrics unavailable until the approved D1 migration has run.',
+    }
   }
 }

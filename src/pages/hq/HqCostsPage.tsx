@@ -76,13 +76,15 @@ export function HqCostsPage() {
           <strong>Cloudflare's actual AI bill is not available here.</strong>{' '}
           {inference?.available
             ? `We measured ${inference.trackedCalls30d} model calls over the last 30 days. ${inference.unpricedCalls30d} successful calls have no verified dollar estimate. Historical calls before tracking began are not included.`
-            : inference?.reason ?? 'Loading inference measurements.'}{' '}
+            : (inference?.reason ?? 'Loading inference measurements.')}{' '}
           Your Cloudflare billing page remains the source of truth.
         </p>
       </Card>
 
       <Card>
-        <h2 className={styles.sectionTitle}>AI model performance (last 30 days)</h2>
+        <h2 className={styles.sectionTitle}>
+          AI model performance (last 30 days)
+        </h2>
         <p className={styles.sectionLead}>
           Call counts, mean inference duration and indicative gross costs — no
           prompts, document contents or personal details are stored.
@@ -91,10 +93,12 @@ export function HqCostsPage() {
           <>
             <p className={styles.note}>
               Tracking began: {inference.trackedSince ?? 'No calls yet'}.
-              Estimated gross for priced models only: US${inference.estimatedGrossUsd30d.toFixed(4)}
+              Estimated gross for priced models only: US$
+              {inference.estimatedGrossUsd30d.toFixed(4)}
               {quote
                 ? ` (approximately ${aud(inference.estimatedGrossUsd30d * quote.rate)} at the reference rate)`
-                : ''}.
+                : ''}
+              .
               {inference.unpricedCalls30d > 0
                 ? ' Some calls are unpriced; do not treat this as a total.'
                 : ''}
@@ -114,11 +118,16 @@ export function HqCostsPage() {
                 <tbody>
                   {inference.models.map((m) => (
                     <tr key={`${m.model}:${m.modality}`}>
-                      <td>{m.model} ({m.modality})</td>
+                      <td>
+                        {m.model} ({m.modality})
+                      </td>
                       <td>{m.calls}</td>
                       <td>{m.failures}</td>
                       <td>{(m.avgMs / 1000).toFixed(2)} s</td>
-                      <td>{m.reportedTokens} reported, {m.approximateTokens} approximate, {m.unknownTokens} unknown</td>
+                      <td>
+                        {m.reportedTokens} reported, {m.approximateTokens}{' '}
+                        approximate, {m.unknownTokens} unknown
+                      </td>
                       <td>
                         {m.unpricedCalls > 0
                           ? `Unpriced (${m.unpricedCalls} calls)`
@@ -127,7 +136,9 @@ export function HqCostsPage() {
                     </tr>
                   ))}
                   {inference.models.length === 0 && (
-                    <tr><td colSpan={6}>No AI calls measured yet.</td></tr>
+                    <tr>
+                      <td colSpan={6}>No AI calls measured yet.</td>
+                    </tr>
                   )}
                 </tbody>
               </table>
