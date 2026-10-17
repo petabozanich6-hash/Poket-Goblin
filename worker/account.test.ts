@@ -339,6 +339,22 @@ describe('data export', () => {
     expect(text).not.toMatch(/password_hash|pbkdf2\$|token_hash/)
   })
 
+  it('keeps account export working before optional study-pathway tables are migrated', async () => {
+    // Schema-awareness can be deployed from main before D1 migrations are
+    // applied; the existing data export must keep working in that interval.
+    h.run('DROP TABLE study_pathway_sessions')
+    h.run('DROP TABLE study_pathways')
+    const response = await h.request('/api/account/export', {
+      cookie: alice.cookie,
+    })
+    expect(response.status).toBe(200)
+    const exported = (await response.json()) as {
+      data: Record<string, unknown[]>
+    }
+    expect(exported.data.study_pathways).toEqual([])
+    expect(exported.data.study_pathway_sessions).toEqual([])
+  })
+
   it('exports support threads while omitting internal notes', async () => {
     h.run(
       `INSERT INTO support_threads (id, user_id, category, subject, message, internal_note)
