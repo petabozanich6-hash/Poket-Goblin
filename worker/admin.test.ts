@@ -808,6 +808,62 @@ describe('free Premium giveaways', () => {
     ).toEqual([{ n: 1 }])
   })
 
+  it('sends exactly one branded gift email only for a successful grant', async () => {
+    const sent: Array<{ to: string; subject: string; text: string }> = []
+    h.env.EMAIL = {
+      send: async (message: unknown) => {
+        const payload = message as {
+          to: string
+          subject: string
+          text: string
+        }
+        sent.push({
+          to: payload.to,
+          subject: payload.subject,
+          text: payload.text,
+        })
+      },
+    } as unknown as typeof h.env.EMAIL
+    h.elevate(owner)
+    const { id } = await json(await create())
+    const award = () =>
+      h.request(`/api/admin/deals/giveaways/${id}/grant`, {
+        cookie: owner.cookie,
+        admin: true,
+        body: { email: alice.email },
+      })
+    const initial = await award()
+    expect(initial.status).toBe(201)
+    expect((await json(initial)).emailSent).toBe(true)
+    expect(sent).toHaveLength(1)
+    expect(sent[0]?.to).toBe(alice.email)
+    expect(sent[0]?.subject).toContain('free Premium')
+    expect(sent[0]?.text).toContain('No payment details are needed')
+    expect((await award()).status).toBe(409)
+    expect(sent).toHaveLength(1)
+  })
+
+  it('keeps a successfully awarded gift if email delivery fails', async () => {
+    h.env.EMAIL = {
+      send: async () => {
+        throw new Error('simulated email provider outage')
+      },
+    } as unknown as typeof h.env.EMAIL
+    h.elevate(owner)
+    const { id } = await json(await create())
+    const response = await h.request(`/api/admin/deals/giveaways/${id}/grant`, {
+      cookie: owner.cookie,
+      admin: true,
+      body: { email: alice.email },
+    })
+    expect(response.status).toBe(201)
+    expect((await json(response)).emailSent).toBe(false)
+    const current = await json(
+      await h.request('/api/me', { cookie: alice.cookie }),
+    )
+    expect(current.access.plan).toBe('premium')
+  })
+
   it('enforces the recipient cap on the server', async () => {
     h.elevate(owner)
     const bob = await h.register('bob@example.com')
