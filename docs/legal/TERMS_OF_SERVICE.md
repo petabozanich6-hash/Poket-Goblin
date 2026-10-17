@@ -32,7 +32,7 @@ Premium is offered as a monthly or annual recurring subscription. The standard b
 
 Payment is handled securely by Stripe. By completing checkout, you authorise recurring charges for your selected interval until the subscription is cancelled. Free accounts are never charged merely for remaining on Free.
 
-Any discount or promotion is subject to the eligibility, expiry, redemption limits and duration shown with the offer and at checkout. A discount does not grant administrative privileges. Unless specifically stated, offers cannot be combined or converted to cash.
+Promotions may be restricted to new customers, particular subscription plans or a limited number of uses. A one-invoice discount reduces only the eligible first invoice; subsequent renewals are charged at the applicable undiscounted recurring price unless the offer expressly states otherwise. The total, currency, billing interval and any applied discount are displayed in Stripe Checkout before payment. Free Premium giveaways are time-limited access grants, not automatically renewing subscriptions, and do not require payment details. A discount does not grant administrative privileges. Unless specifically stated, offers cannot be combined or exchanged for cash.
 
 ## Cancellation and refunds
 
