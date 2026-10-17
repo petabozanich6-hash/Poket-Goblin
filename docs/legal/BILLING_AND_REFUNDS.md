@@ -30,7 +30,7 @@ We will investigate, explain the outcome and arrange an appropriate remedy where
 
 ## Promotions and pricing changes
 
-Promotion codes may have eligibility, time and redemption limits. Any discounted renewal amount and the duration of the discount are confirmed at checkout. We will communicate material changes to recurring prices before they apply, in accordance with applicable law.
+Promotion codes may have eligibility, expiry and redemption limits. An offer described as applying to the **first invoice** discounts that invoice only, whether the customer selects monthly or annual billing; later renewals return to the otherwise applicable recurring price unless an offer expressly provides a further discount. Read the Stripe Checkout breakdown before completing a payment. Time-limited Free Premium giveaways do not create a paid subscription or automatically start renewal charges. We will communicate material changes to recurring prices before they apply, in accordance with applicable law.
 
 ## Help
 
