@@ -214,18 +214,6 @@ export function HqDealsPage() {
             Maximum committed discount budget (A$, optional){' '}
             <input name="budget" type="number" step="0.01" min="0.01" />
           </label>
-          <label>
-            Starts (optional){' '}
-            <input name="start" type="datetime-local" />
-          </label>
-          <label>
-            Ends (optional){' '}
-            <input name="expires" type="datetime-local" />
-          </label>
-          <label>
-            Days after activation before expiry (optional){' '}
-            <input name="window" type="number" min={1} max={365} />
-          </label>
           <p className={styles.sub}>
             One redemption per account per campaign is enforced in the
             database. Campaigns cannot be activated until checkout and
