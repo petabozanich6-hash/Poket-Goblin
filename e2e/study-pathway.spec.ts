@@ -36,7 +36,8 @@ test('a study schedule becomes a reviewable path, downloadable calendar tasks an
         'Week Commencing Topic Assessment',
         `1 ${futureDate(2)}`,
         'Module 1: Understanding evidence',
-        `Assessment 1 Research essay (40%) due ${futureDate(19)}`,
+        `2 ${futureDate(9)}`,
+        'Module 2: Research and sources',
       ].join('\n'),
     ),
   })
@@ -75,7 +76,7 @@ test('a study schedule becomes a reviewable path, downloadable calendar tasks an
   const content = await calendar.text()
   expect(content).toContain('BEGIN:VCALENDAR')
   expect(content).toContain('SUMMARY:To do:')
-  expect(content).toContain('Research essay')
+  expect(content).toContain('Understanding evidence')
 
   // The uploaded original can be discarded without losing the approved plan.
   await page
