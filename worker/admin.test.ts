@@ -811,14 +811,19 @@ describe('free Premium giveaways', () => {
   it('sends exactly one branded gift email only for a successful grant', async () => {
     const sent: Array<{ to: string; subject: string; text: string }> = []
     h.env.EMAIL = {
-      send: async (message) => {
+      send: async (message: unknown) => {
+        const payload = message as {
+          to: string
+          subject: string
+          text: string
+        }
         sent.push({
-          to: message.to,
-          subject: message.subject,
-          text: message.text,
+          to: payload.to,
+          subject: payload.subject,
+          text: payload.text,
         })
       },
-    } as typeof h.env.EMAIL
+    } as unknown as typeof h.env.EMAIL
     h.elevate(owner)
     const { id } = await json(await create())
     const award = () =>
@@ -843,7 +848,7 @@ describe('free Premium giveaways', () => {
       send: async () => {
         throw new Error('simulated email provider outage')
       },
-    } as typeof h.env.EMAIL
+    } as unknown as typeof h.env.EMAIL
     h.elevate(owner)
     const { id } = await json(await create())
     const response = await h.request(
