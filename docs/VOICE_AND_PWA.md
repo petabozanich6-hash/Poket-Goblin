@@ -111,7 +111,7 @@ suspended or the device is locked, and this one doesn’t try.
 | Browser                    | Install                                   | Voice input                                                      | Shortcuts (long-press)      |
 | -------------------------- | ----------------------------------------- | ---------------------------------------------------------------- | --------------------------- |
 | Android Chrome             | Install prompt / menu                     | Yes (Google’s servers)                                           | Yes, “Talk to Goblin”       |
-| Samsung Internet           | Menu → Add page to → Home screen          | Varies by version — feature-detected                             | Support varies; verify      |
+| Samsung Internet           | Avoid WebAPK install while Play Protect warnings persist; use Chrome or browser | Varies by version — feature-detected               | Support varies; verify      |
 | iPhone/iPad Safari         | Share → Add to Home Screen (instructions) | Safari 14.5+ (Apple, server or on-device)                        | Not supported by iOS        |
 | iOS installed web app      | —                                         | Historically unreliable in home-screen mode; typing always works | Not supported               |
 | Desktop Chrome / Edge      | Install icon / prompt                     | Yes (vendor servers)                                             | Yes, in the app’s jump list |
@@ -124,6 +124,18 @@ with a scripted recogniser, denied permission, missing recognition, phone
 layout and personalisation. **Not verified:** any physical phone, real speech
 services, Samsung Internet, Safari/iOS.
 
+\n**Android Play Protect / Samsung Internet (October 2026):** Samsung Internet
+may generate a PWA installation package that Play Protect blocks with
+“built for an older version of Android” and missing privacy protections.
+This is a browser-generated Android package issue, not a setting in the
+website's web manifest. The in-app install button is suppressed in Samsung
+Internet. Users are directed to try current Chrome, or simply use the
+website; if any browser shows a security warning, cancel rather than bypass
+it. Chrome installation is not guaranteed on every device. Do not recommend
+disabling Play Protect. Track upstream reports at
+https://github.com/SamsungInternet/support/issues/123 and
+https://issuetracker.google.com/issues/569517876.
+\n
 ## Offline
 
 - The app shell (HTML, built JS/CSS, icons) is cached; pages open offline.
