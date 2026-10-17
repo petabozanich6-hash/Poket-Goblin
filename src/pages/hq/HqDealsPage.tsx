@@ -238,7 +238,8 @@ export function HqDealsPage() {
       <h2>🧌 Goblin Deals &amp; Mischief</h2>
       <p>
         Create targeted offers with limits, budgets and time windows. All
-        discount campaigns remain inactive until secure redemption is implemented.
+        discount campaigns remain inactive until secure redemption is
+        implemented.
       </p>
       <p role="status">{message}</p>
       <GiveawaysPanel />
@@ -347,7 +348,12 @@ export function HqDealsPage() {
           </label>
           <label>
             Days after activation before expiry (optional){' '}
-            <input name="activationWindowDays" type="number" min={1} max={365} />
+            <input
+              name="activationWindowDays"
+              type="number"
+              min={1}
+              max={365}
+            />
           </label>
           <label>
             Maximum redemptions (optional){' '}
