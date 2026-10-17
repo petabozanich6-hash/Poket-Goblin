@@ -1229,8 +1229,12 @@ adminRoutes.post(
         subject: '🎁 The goblins have a gift for you — free Premium!',
         greeting: 'A little mischief for you, ' + recipient.displayName + '!',
         lines: [
-          'The Pocket Goblin gremlins awarded you ' + campaign.days + ' days of Premium access, completely free.',
-          'Your access is ready now and lasts until ' + ends.slice(0, 10) + ' (UTC).',
+          'The Pocket Goblin gremlins awarded you ' +
+            campaign.days +
+            ' days of Premium access, completely free.',
+          'Your access is ready now and lasts until ' +
+            ends.slice(0, 10) +
+            ' (UTC).',
           'No payment details are needed. This gift will not start a subscription or renew automatically.',
           'Sign in to Pocket Goblin to enjoy your gift!',
         ],
