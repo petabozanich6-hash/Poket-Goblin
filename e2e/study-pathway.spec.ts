@@ -27,7 +27,7 @@ test('a study schedule becomes a reviewable path, downloadable calendar tasks an
   await expect(page).toHaveURL(/\/den/, { timeout: 20_000 })
 
   await page.goto('/life/documents')
-  await page.getByLabel(/Choose a bill, letter/).setInputFiles({
+  await page.getByLabel(/Upload up to 10 documents/).setInputFiles({
     name: 'University Study Schedule.txt',
     mimeType: 'text/plain',
     buffer: Buffer.from(
