@@ -198,7 +198,10 @@ app.onError(async (error, c) => {
       403,
     )
   }
-  console.error(error)
+  // Never log raw exception messages or stacks: they may contain document text,
+  // OAuth values, SQL parameters, or other customer information.
+  const errorName = error instanceof Error ? error.name : 'Error'
+  console.error(`Unhandled API error: ${errorName.slice(0, 80)}`)
   try {
     await c.env.DB.prepare(
       `INSERT INTO app_errors (id, method, route, status, error_name)
