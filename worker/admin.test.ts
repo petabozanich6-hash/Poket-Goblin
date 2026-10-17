@@ -783,6 +783,31 @@ describe('free Premium giveaways', () => {
     ).toEqual([{ n: 1 }])
   })
 
+  it('refuses the same giveaway again even after its Premium period expires', async () => {
+    h.elevate(owner)
+    const { id } = await json(await create())
+    const award = () =>
+      h.request(`/api/admin/deals/giveaways/${id}/grant`, {
+        cookie: owner.cookie,
+        admin: true,
+        body: { email: 'alice@example.com' },
+      })
+    expect((await award()).status).toBe(201)
+    h.run(
+      `UPDATE user_entitlements
+       SET current_period_end = '2000-01-01T00:00:00.000Z'
+       WHERE user_id = ? AND source = 'giveaway'`,
+      alice.id,
+    )
+    expect((await award()).status).toBe(409)
+    expect(
+      h.query(
+        'SELECT COUNT(*) AS n FROM premium_giveaway_grants WHERE campaign_id = ?',
+        id,
+      ),
+    ).toEqual([{ n: 1 }])
+  })
+
   it('enforces the recipient cap on the server', async () => {
     h.elevate(owner)
     const bob = await h.register('bob@example.com')
