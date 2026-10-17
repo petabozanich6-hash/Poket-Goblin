@@ -141,7 +141,11 @@ export function TellTheGoblin({ prominent = false }: { prominent?: boolean }) {
     const words = text.trim()
     if (!words && !files.length) return
     setError(null)
-    send.mutate({ words, attachments: files, mode: keepFile ? 'keep' : 'sort' })
+    send.mutate({
+      words,
+      attachments: files,
+      mode: keepFile ? 'keep' : 'sort',
+    })
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -154,7 +158,9 @@ export function TellTheGoblin({ prominent = false }: { prominent?: boolean }) {
       setError('Choose up to 10 documents at a time.')
       return
     }
-    const oversized = chosen.find((item) => item.size > MAX_FILE_MB * 1024 * 1024)
+    const oversized = chosen.find(
+      (item) => item.size > MAX_FILE_MB * 1024 * 1024,
+    )
     if (oversized) {
       setError(`Each file must be under ${MAX_FILE_MB} MB: ${oversized.name}`)
       return
@@ -185,7 +191,9 @@ export function TellTheGoblin({ prominent = false }: { prominent?: boolean }) {
         {files.length ? (
           <div className={styles.attachment}>
             <Paperclip size={14} aria-hidden />
-            <span className={styles.fileName}>{files.map((item) => item.name).join(', ')}</span>
+            <span className={styles.fileName}>
+              {files.map((item) => item.name).join(', ')}
+            </span>
             <label className={styles.keep}>
               <input
                 type="checkbox"
