@@ -52,12 +52,12 @@ jobs:
       already_done: ${{ steps.check.outputs.already_done }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
 
@@ -114,12 +114,12 @@ jobs:
       OWNER_EXPECTED_EMAIL: ${{ secrets.OWNER_EXPECTED_EMAIL }}
     steps:
       - name: Checkout (same commit as preflight)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
