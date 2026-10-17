@@ -589,6 +589,22 @@ export function withDeadlinePlan<
   const hasWeeklyStudy = plan.suggestions.some(
     (suggestion) => suggestion.group === 'Week by week',
   )
+  // A PDF extracted from a university unit guide can start out as "general"
+  // before its deadlines are parsed. Keep its academic study steps together
+  // for pathway approval; never apply this rule to a bill or medical notice.
+  const hasAcademicContext =
+    /\b(?:study\s+schedule|study\s+plan|course\s+outline|unit\s+guide|university|semester|trimester|assessment\s+\d+|module\s+\d+|learning\s+outcomes?)\b/i.test(
+      text,
+    )
+  const hasAcademicSteps = plan.suggestions.some(
+    (suggestion) =>
+      suggestion.type === 'task' &&
+      typeof suggestion.group === 'string' &&
+      /\b(?:assessment|assignment|essay|exam|research\s+project|portfolio|thesis|study\s+plan)\b/i.test(
+        suggestion.group,
+      ),
+  )
+  const isAcademicPlan = !simple && hasAcademicContext && hasAcademicSteps
   if (
     hasWeeklyStudy ||
     plan.deadlines.length >= 2 ||
@@ -606,6 +622,10 @@ export function withDeadlinePlan<
       .map((s) => ({ ...s, group: 'Also spotted', uncertain: true }))
     return {
       ...understanding,
+      documentType:
+        hasWeeklyStudy || isAcademicPlan
+          ? 'education'
+          : understanding.documentType,
       summary: options.fromAi
         ? `${understanding.summary} ${plan.summary}`
         : plan.summary,
