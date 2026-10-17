@@ -889,7 +889,9 @@ adminRoutes.get(
   async (c) => {
     const campaign = await c.env.DB.prepare(
       'SELECT stripe_promotion_code_id AS stripeCodeId FROM promotion_campaigns WHERE id = ?',
-    ).bind(c.req.param('id')).first<{ stripeCodeId: string | null }>()
+    )
+      .bind(c.req.param('id'))
+      .first<{ stripeCodeId: string | null }>()
     if (!campaign) return c.json({ error: 'Campaign not found' }, 404)
     if (!campaign.stripeCodeId)
       return c.json({ linked: false, source: 'draft', redemptions: 0 })

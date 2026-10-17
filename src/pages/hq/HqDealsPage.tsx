@@ -268,10 +268,8 @@ function StripeUsageTracker({ campaignId }: { campaignId: string }) {
   return (
     <p>
       Stripe-confirmed redemptions: <strong>{stats.redemptions}</strong>
-      {stats.maxRedemptions !== null
-        ? ` / ${stats.maxRedemptions}`
-        : ''}{' '}
-      · Remaining: {stats.remaining ?? 'Unlimited'} · Status:{' '}
+      {stats.maxRedemptions !== null ? ` / ${stats.maxRedemptions}` : ''} ·
+      Remaining: {stats.remaining ?? 'Unlimited'} · Status:{' '}
       {stats.active ? 'Active' : 'Inactive'}
       {stats.expiresAt
         ? ` · Expires ${new Date(stats.expiresAt).toLocaleDateString()}`
