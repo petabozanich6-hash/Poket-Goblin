@@ -100,9 +100,7 @@ test('a study schedule becomes a reviewable path, downloadable calendar tasks an
   expect(content).toContain('Understanding evidence')
 
   // The uploaded original can be discarded without losing the approved plan.
-  await page
-    .getByRole('button', { name: /Done — delete the file/ })
-    .click()
+  await page.getByRole('button', { name: /Done — delete the file/ }).click()
   await expect(page.getByText('DOCUMENT DEVOURED!')).toBeVisible()
   await page.getByRole('button', { name: 'Feed me another' }).click()
   await expect(
