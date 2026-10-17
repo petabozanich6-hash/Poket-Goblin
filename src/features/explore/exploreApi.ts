@@ -329,6 +329,7 @@ export type SavedStudyPathway = {
     status: string
     taskId: string | null
     taskStatus: string | null
+    taskDueDate: string | null
   }>
 }
 
