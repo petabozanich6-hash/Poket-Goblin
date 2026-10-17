@@ -1,140 +1,43 @@
-# Release readiness — Free + Premium launch
+# Pocket Goblin — launch readiness (17 October 2026)
 
-Branch: `claude/pocket-goblin-pwa-voice-991yas`. It contains PR #31 (Free
-plan safeguards), PR #32 (email verification) and the launch fixes below.
-Nothing here is merged, deployed or switched to live payments.
+This is the current release checklist, replacing an obsolete pre-launch checklist written before live billing, recent integrations, and migrations. It records what was checked and distinguishes code/CI evidence from live customer testing; it is not a penetration-test certificate or legal sign-off.
 
-## What changed for launch
+## Owner-confirmed live smoke tests
 
-- **Billing:**
-  - replacement subscriptions activate correctly
-  - `invoice.paid` and `invoice.payment_failed` events are handled
-  - an hourly reconciliation re-checks subscriptions with Stripe
-  - no double subscriptions; if someone pays twice, the second is followed when the first ends
-  - account deletion follows the real billing state
-- **Free plan:**
-  - rule-only helpers no longer use up the 3 AI requests a day
-  - undo and confirm behave correctly when they hit a limit
-  - a clear upgrade notice appears whenever a limit is reached
-- **Reminders:**
-  - impossible reminder times are rejected
-  - repeating reminders are refused rather than stored and never delivered
-  - quiet hours and nudges follow the customer's local clock
-  - no copy promises push notifications
-- **Auth:**
-  - rate limits are stored in D1 (migration 0018)
-  - a per-account lockout on repeated wrong passwords that strangers can't use to lock the owner out
-  - a cross-site request guard is in place
-  - registration is atomic and race-safe
-  - changing a password revokes old reset links
-  - a "your password was changed" email is sent
-  - the resend result is truthful
-- **Emails:** branded, mobile-friendly layout with a plain-text version.
-- **Trust:**
-  - Terms and Privacy are corrected and published at `/terms` and `/privacy` (still drafts for legal review)
-  - support contact is available while signed out
-- **Layout:** fixed sideways scroll on phones; support messages are rate limited.
+- Registration and billing/coupon checkout journey: owner reports passing with a separate test account.
+- Live Stripe Checkout opens; a first-invoice promotional code changed the displayed price.
+- Branded giveaway notification email: owner reports successful delivery.
+- Owner manually checked onboarding through a new-account registration, so no separate onboarding walkthrough is scheduled.
 
-## Evidence
+These are owner-reported observations, not independently audited payment settlement, production webhook processing, or security testing.
 
-- `npm run check` passes: typecheck, lint, format, 39 test files / 568
-  tests, production build. `wrangler deploy --dry-run` passes.
-- Browser (Playwright, production build on `wrangler dev`): 25 journeys pass.
-  They cover first run, the action Goblin, voice/PWA install and offline
-  sync, Document Devourer, Owner HQ (desktop, tablet and phone) and a new
-  Free customer.
-- All 18 migrations apply in order to an empty database, and the
-  migration-order check passes.
-- **Not tested:** real phones, real email delivery, real Stripe (test or
-  live), production `platform_settings`.
+## Repository controls and prior test coverage
 
-## Configuration
+- Authentication uses hashed passwords and HttpOnly session cookies. User-scoped data access is enforced in API routes; cross-record references have ownership checks.
+- Owner HQ requires server-side permissions, CSRF protections and recent passkey step-up, with admin audit logging.
+- Account-deletion tests verify one account's records are removed without deleting another account's records.
+- Giveaway tests cover entitlement assignment, one claim per account, campaign caps, and email sending even when the provider fails; no Stripe subscription is created by gifts.
+- Published Stripe promotion codes currently support only tightly restricted first-invoice percentage offers, one total redemption and new-customer eligibility. Other drafts (including multicycle/founding offers) remain inactive.
+- Stripe usage tracker retrieves live counts from Stripe. The legacy internal financial and claim ledger is **not** a reconciled invoice-level accounting system.
+- Account export is tested for coverage of user-id tables and explicitly excludes some secrets/internal records. Kept original documents are downloaded separately.
 
-| Name                                        | Kind     | Required | Notes                                                       |
-| ------------------------------------------- | -------- | -------- | ----------------------------------------------------------- |
-| `AUTH_SECRET`                               | secret   | yes      | 32+ chars; production refuses to serve without it           |
-| `STRIPE_SECRET_KEY`                         | secret   | billing  | `sk_test_…` until live approval                             |
-| `STRIPE_WEBHOOK_SECRET`                     | secret   | billing  | from the Stripe webhook endpoint                            |
-| `STRIPE_PRICE_MONTHLY/YEARLY`               | var      | billing  | already in `wrangler.toml`                                  |
-| `STRIPE_LIVE_ENABLED`                       | var      | no       | **leave unset** until the owner approves real charges       |
-| `EMAIL_VERIFICATION_REQUIRED`               | var      | no       | `"true"` gates new sign-ups on a confirmed email            |
-| `AI_PROVIDER`, `AI_MODEL`                   | var      | yes      | `workers_ai`, allow-listed Llama model (in `wrangler.toml`) |
-| `AI_DAILY_GLOBAL_LIMIT`                     | var      | yes      | 300 today; Free may use half                                |
-| `EMAIL` (send_email), `AI`, `DB`, `UPLOADS` | bindings | yes      | unchanged                                                   |
+## Production state checked
 
-No new secrets or paid services. The "Workers Builds" PR check is red by
-design: preview builds are switched off because they would use production
-data.
+- Owner ran and verified D1 migrations through `0022_stripe_promotion_links.sql`: 22 applied, 0 pending on 17 October 2026.
+- `STRIPE_LIVE_ENABLED = "true"` was approved by the owner and committed to production `wrangler.toml`; monthly and annual Stripe price IDs are present.
+- Stripe request API header is pinned to `2025-03-31.basil` to support Managed Payments.
+- API keys, webhook secrets and account passwords must be stored only in Cloudflare secrets, not source control.
 
-## Deployment plan (owner approval required)
+## Final release gates — verify separately
 
-Merging to `main` deploys automatically (Workers Builds), and the
-migration workflow only runs from `main`. The code tolerates a short gap
-before the migrations:
+1. **Security:** Run current CI and cross-account API tests on the final `main` commit; verify user A cannot read, download, mutate, or link user B's tasks, notes, calendar entries, documents, pathways, or billing information. Check that unauthenticated and non-owner callers cannot access HQ endpoints. Automated tests reduce risk but are not a security penetration test.
+2. **Billing settlement and webhooks:** Confirm a genuine completed Stripe test/live subscription grants the correct plan, webhook signatures are checked, repeated webhook delivery is idempotent, failed payments and cancellation transitions are handled, and access matches Stripe after renewal. Merely opening Checkout and previewing a coupon does not prove settlement and entitlements.
+3. **Promotion accounting:** Stripe currently supplies aggregate redemption counts. Per-customer invoice reconciliation and accurate realised discounts remain unfinished; do not treat the legacy ledger's zero values as audited revenue.
+4. **Policy review:** Terms, Privacy, Billing/Refunds and AI/Document guide are published from `docs/legal`. Confirm contact address, registered business details, supported currencies/prices, processing disclosures and consumer-law requirements with the owner's legal reviewer.
+5. **Operational checks:** Verify production domain, email delivery for real flows, error logs, backups, migrations, alerts, support contact and recoverability. Do not expose tokens, Stripe keys, session cookies or other customer identifiers in support screenshots.
 
-- Missing 0016 triggers: the app-level limit checks still apply.
-- Missing 0017 column: sign-in falls back safely while verification is off.
-- Missing 0018 table: limits fall back to in-memory counters.
+## Launch scope decisions
 
-1. Back up production D1 (Time Travel bookmark).
-2. Merge the PR into `main`. Workers Builds deploys it.
-3. Straight away, run **D1 migrations (production)**: preflight first,
-   which should list 0016, 0017 and 0018 as pending; then apply.
-4. Smoke test on pocketgoblin.org:
-   - sign in
-   - add a task
-   - tell the Goblin "I need milk"
-   - open `/terms` and `/privacy`
-   - Settings → Plan shows Free with the correct allowances
-5. In Owner HQ → Platform settings, confirm AI limits and storage quotas
-   say "Using the default", or set Free 3 a day / 10 MB.
-6. In the Stripe dashboard (test mode), add `invoice.paid` and
-   `invoice.payment_failed` to the webhook. Set "after retries fail" to
-   **cancel subscription**, and turn on the customer portal.
-7. Run a test-mode purchase end to end, cancel it, then buy again (the
-   replacement path).
-8. Email: onboard the domain to Cloudflare Email Sending (SPF/DKIM), add
-   DMARC, and test reset and verification emails to a Gmail and an Outlook
-   inbox. Only then consider `EMAIL_VERIFICATION_REQUIRED = "true"`.
-9. Live billing: a separate, explicit approval. Repeat the Stripe steps in
-   live mode and set `STRIPE_LIVE_ENABLED = "true"`.
-
-## Rollback plan
-
-- **Code:** revert the merge commit on `main`. Workers Builds redeploys
-  the previous version. Every migration is additive, so the old code runs
-  against the new schema.
-- **Quota triggers misbehaving:** first set the affected customers to
-  Premium from Owner HQ, which needs no deploy. As a last resort, a new
-  migration can `DROP TRIGGER` the five `free_*` triggers. That changes no
-  data, but it needs the owner's approval.
-- **Email verification:** turning the flag off only stops gating new
-  sign-ups. People already pending stay pending (by design, see
-  `EMAIL_VERIFICATION.md`).
-- **Billing:** keep `STRIPE_LIVE_ENABLED` unset. Removing
-  `STRIPE_SECRET_KEY` turns billing off without touching entitlements.
-
-## Needs the owner
-
-- Legal review of `docs/legal/*` (every ⚠️). The pages are live as
-  drafts.
-- Check that the Stripe prices and currencies in the dashboard match
-  A$9.95 and A$99.
-- Confirm `support@pocketgoblin.org` is a monitored mailbox.
-- Confirm whether `www.pocketgoblin.org` is used. The cross-site guard
-  and CORS only allow `https://pocketgoblin.org`.
-- Check that the Owner HQ exchange-rate source (Frankfurter) responds in
-  production; if not, AUD costs show as unavailable rather than invented.
-
-## Can wait
-
-- Web push notifications. Reminders are in-app, plus the phone-calendar
-  link.
-- Repeating reminders (use repeating tasks).
-- Batching multi-row Goblin and breakdown writes, so a race at a limit
-  can't half-apply.
-- An atomic storage check for simultaneous "keep" requests (it can go
-  over by one file).
-- A unique index on the default shopping list.
-- Excluding the Owner from the HQ customer count.
-- A "Help with my account or billing" support category.
+- Do not expand feature scope or reopen onboarding testing unless a regression appears.
+- Do not activate six-cycle or calendar-month discount drafts until billing-interval-safe rules are implemented.
+- No additional migration is required for this documentation-only revision.
