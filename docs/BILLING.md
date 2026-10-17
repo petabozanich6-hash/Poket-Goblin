@@ -64,6 +64,15 @@ That needs the Owner's explicit approval.
 - Linking the price IDs does **not** require putting Stripe secrets in GitHub. Live billing must remain disabled until credentials, signing secret, webhook, portal and live checkout are verified, with explicit owner approval.
 - Existing Stripe promotion-code entry remains separate from Goblin Deals. Review this before turning on custom campaign redemptions.
 
+## Launch promotion codes: Stripe versus local drafts
+
+- **Stripe Dashboard codes are live independently of Goblin HQ drafts.** Both the monthly and annual Premium prices belong to the same Stripe product. Checkout already accepts Stripe promotion codes via `allow_promotion_codes`.
+- **Goblin HQ → Deals & Mischief → Stripe promotion codes** is a read-only list of the latest 100 codes in the configured Stripe account. It shows Stripe's current active flag, redemption count and cap; it does not create, redeem, pause or edit anything. A promotion can exist in Stripe even if no corresponding local draft exists.
+- **Local campaign records** are not redeemable unless separately published by the existing, deliberately narrow first-invoice function. Their invoice-cycle number is not a calendar duration: a founders offer lasting one year should be configured using a repeating **12-month Stripe coupon**, not 12 annual billing cycles.
+- Unlinked, unused local drafts may be discarded with an explicit confirmation; Stripe-linked, active or previously claimed records cannot be removed this way. The Stripe Dashboard remains the authoritative place to change a live coupon/code.
+- On launch, do not re-create an existing Stripe promotion from Goblin HQ, and do not assume a local draft marked inactive means a working Stripe code is inactive. Inspect a checkout preview in the customer's currency before advertising.
+- This read-only/cleanup improvement does **not** implement general campaign publishing, local redemption accounting, discount stacking controls or automatic student verification.
+
 ## Free and Premium: what is enforced (verified 16 October 2026)
 
 Free is permanent: no trial, countdown or card. Reaching a limit never
