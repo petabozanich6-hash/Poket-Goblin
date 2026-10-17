@@ -851,10 +851,11 @@ describe('free Premium giveaways', () => {
     } as unknown as typeof h.env.EMAIL
     h.elevate(owner)
     const { id } = await json(await create())
-    const response = await h.request(
-      `/api/admin/deals/giveaways/${id}/grant`,
-      { cookie: owner.cookie, admin: true, body: { email: alice.email } },
-    )
+    const response = await h.request(`/api/admin/deals/giveaways/${id}/grant`, {
+      cookie: owner.cookie,
+      admin: true,
+      body: { email: alice.email },
+    })
     expect(response.status).toBe(201)
     expect((await json(response)).emailSent).toBe(false)
     const current = await json(
