@@ -303,10 +303,12 @@ export function editStudyPathwaySession(
   sessionId: string,
   date: string,
   minutes: number,
+  availableMinutes: number,
 ) {
+  const offset = new Date().getTimezoneOffset()
   return api.patch<{ sessionId: string; date: string; minutes: number }>(
-    `/documents/${encodeURIComponent(documentId)}/pathway-sessions/${encodeURIComponent(sessionId)}`,
-    { date, minutes },
+    `/documents/${encodeURIComponent(documentId)}/pathway-sessions/${encodeURIComponent(sessionId)}?timezoneOffsetMinutes=${offset}`,
+    { date, minutes, availableMinutes },
   )
 }
 
@@ -321,6 +323,7 @@ export type SavedStudyPathway = {
     stepId: string
     title: string
     date: string
+    deadlineDate: string | null
     minutes: number
     sequence: number
     status: string
