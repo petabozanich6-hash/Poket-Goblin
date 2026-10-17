@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { Button } from '@/components/ui/Button'
+import { exportUrl } from '@/features/calendar/calendarApi'
 import { StudyReplanPanel } from './StudyReplanPanel'
 import {
   approveStudyPathway,
@@ -31,6 +32,7 @@ export function StudyPathwayPreviewPanel({
   const [error, setError] = useState<string | null>(null)
   const [stored, setStored] = useState<SavedStudyPathway | null>(null)
   const [sessionSaving, setSessionSaving] = useState<string | null>(null)
+  const [calendarChanged, setCalendarChanged] = useState(false)
 
   async function refreshSaved() {
     const data = await getSavedStudyPathway(documentId)
@@ -104,6 +106,7 @@ export function StudyPathwayPreviewPanel({
         preview.preview.sessions,
       )
       setSaved(true)
+      setCalendarChanged(true)
       await refreshSaved()
     } catch (cause) {
       setError(
@@ -123,6 +126,7 @@ export function StudyPathwayPreviewPanel({
       await undoStudyPathway(documentId)
       setSaved(false)
       setPreview(null)
+      setCalendarChanged(true)
       await refreshSaved()
     } catch (cause) {
       setError(
@@ -149,6 +153,7 @@ export function StudyPathwayPreviewPanel({
         minutesValue,
         availableMinutes,
       )
+      setCalendarChanged(true)
       await refreshSaved()
     } catch (cause) {
       setError(
@@ -164,6 +169,22 @@ export function StudyPathwayPreviewPanel({
   return (
     <section aria-label="Study pathway preview">
       <h4>Plan my study time</h4>
+      {stored?.pathway?.status === 'active' || calendarChanged ? (
+        <div>
+          <p>
+            <a href={exportUrl()} download>
+              Download the latest calendar file (.ics)
+            </a>
+          </p>
+          <p>
+            A downloaded calendar file is a one-time copy. Changes to study
+            dates and Undo will not remove or update events you previously
+            imported into your phone calendar. Remove outdated imports there
+            yourself, or use Pocket Goblin&apos;s live calendar subscription for
+            automatic updates.
+          </p>
+        </div>
+      ) : null}
       {stored?.pathway?.status === 'active' ? (
         <div>
           <h5>Saved study sessions</h5>
@@ -256,7 +277,10 @@ export function StudyPathwayPreviewPanel({
           <StudyReplanPanel
             documentId={documentId}
             sessions={stored.sessions}
-            onUpdated={refreshSaved}
+            onUpdated={async () => {
+              setCalendarChanged(true)
+              return refreshSaved()
+            }}
           />
           <p>
             Undo removes untouched, unfinished study tasks created by this
