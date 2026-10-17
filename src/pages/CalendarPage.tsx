@@ -182,10 +182,15 @@ export function CalendarPage() {
                 <div key={key} className={styles.monthCell}>
                   <strong>{day.getDate()}</strong>
                   {dayItems.slice(0, 2).map((item) => (
-                    <p key={`${item.kind}-${item.id}`} className={styles.monthEvent}>
+                    <p
+                      key={`${item.kind}-${item.id}`}
+                      className={styles.monthEvent}
+                    >
                       {item.kind === 'study' ? '📚 ' : ''}
                       {item.title}
-                      {item.kind === 'study' ? ` · ${item.session.minutes} min` : ''}
+                      {item.kind === 'study'
+                        ? ` · ${item.session.minutes} min`
+                        : ''}
                     </p>
                   ))}
                 </div>
@@ -197,12 +202,17 @@ export function CalendarPage() {
         {(view === 'agenda' || view === 'week') && (
           <ul className={styles.stack}>
             {calendarItems.length === 0 ? (
-              <p className={styles.sub}>No appointments or study sessions in this period.</p>
+              <p className={styles.sub}>
+                No appointments or study sessions in this period.
+              </p>
             ) : (
               calendarItems.map((item) => (
                 <li key={`${item.kind}-${item.id}`} className={styles.listRow}>
                   <div>
-                    <strong>{item.kind === 'study' ? '📚 ' : ''}{item.title}</strong>
+                    <strong>
+                      {item.kind === 'study' ? '📚 ' : ''}
+                      {item.title}
+                    </strong>
                     <p className={styles.sub}>
                       {item.kind === 'study'
                         ? `${item.date} · ${item.session.minutes} min study · planned day (no set start time)`
@@ -210,7 +220,9 @@ export function CalendarPage() {
                       {item.kind === 'event' && item.event.location
                         ? ` · ${item.event.location}`
                         : ''}
-                      {item.kind === 'event' && item.event.allDay ? ' · all day' : ''}
+                      {item.kind === 'event' && item.event.allDay
+                        ? ' · all day'
+                        : ''}
                     </p>
                     {item.kind === 'study' ? (
                       <Link to="/life/documents">View saved study pathway</Link>
