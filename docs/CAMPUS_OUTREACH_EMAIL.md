@@ -13,6 +13,51 @@ email and a matching plain-text version. It uses the existing mascot logo,
 forest-green and gold colours, with a clear button linking to
 https://pocketgoblin.org and an opt-out contact.
 
+## Free inbound setup (replies to the existing Side-Quest Gmail inbox)
+
+Desired public university contact: **hello@pocketgoblin.org**.
+The owner has confirmed that replies should still arrive at the existing
+verified Side-Quest Gmail destination. Cloudflare Email Routing forwards
+incoming mail for free; it does **not** send outgoing campaign email.
+
+Configure in the Cloudflare dashboard under
+**Email Service > Email Routing > Routing Rules** for `pocketgoblin.org`:
+
+1. Create a routing rule for the address pattern `hello`.
+2. Set action to **Send to an email**.
+3. Choose the existing verified Side-Quest Gmail destination already used
+   for Pocket Goblin support. Do not assume the address spelling.
+4. Save and enable the rule; send an inbound test from a separate address.
+5. Keep support and no-reply account-email configuration untouched.
+
+**Do not change MX records:** inbound support already uses Cloudflare
+routing. Adding a rule is sufficient. This rule must be configured by
+the owner in Cloudflare; it is **not** created by this PR.
+
+## Free outbound choices and restrictions
+
+- Cloudflare Email Service is **transactional-only**, and is not permitted
+  for the university promotional campaign.
+- Brevo has a free tier of 300 emails/day and can authenticate a branded
+  domain for campaigns, but requires explicit recipient consent. Do not
+  upload unsolicited university contact lists and send a cold bulk campaign.
+- Zoho Mail's normal email service likewise disallows promotional,
+  marketing, bulk and automated outreach; a free mailbox does not change
+  those conditions.
+- For initial worldwide discovery, submit individual requests through
+  university channels that explicitly invite external student benefits or
+  offers. When an organisation opts in, the branded email can be sent
+  through a compliant provider.
+- Authenticate any eventual marketing sender via its required DNS records
+  without overwriting existing routing MX or DKIM records. Avoid duplicate
+  SPF records, which break email authentication.
+
+Provider sources:
+- https://developers.cloudflare.com/email-service/reference/faq/
+- https://help.brevo.com/hc/en-us/articles/209405205-What-is-the-anti-spam-policy-of-Brevo
+- https://www.zoho.com/mail/help/usage-policy.html
+- https://developers.cloudflare.com/email-service/configuration/email-routing-addresses/
+
 ## Sending: deliberately NOT enabled by this PR
 
 This change creates the email **template**, not an outbound marketing sender.
