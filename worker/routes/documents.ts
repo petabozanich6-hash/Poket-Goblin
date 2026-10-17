@@ -912,7 +912,7 @@ documentRoutes.post('/:id/pathway-undo', async (c) => {
     `SELECT s.id, s.task_id as taskId, s.title,
             s.scheduled_date as scheduledDate,
             t.title as taskTitle, t.due_date as taskDueDate,
-            t.notes as taskNotes
+            t.status as taskStatus, t.notes as taskNotes
      FROM study_pathway_sessions s
      LEFT JOIN tasks t ON t.id = s.task_id AND t.user_id = s.user_id
      WHERE s.pathway_id = ? AND s.user_id = ? AND s.status = 'planned'`,
@@ -925,6 +925,7 @@ documentRoutes.post('/:id/pathway-undo', async (c) => {
       scheduledDate: string
       taskTitle: string | null
       taskDueDate: string | null
+      taskStatus: string | null
       taskNotes: string | null
     }>()
   const statements = []
@@ -934,12 +935,13 @@ documentRoutes.post('/:id/pathway-undo', async (c) => {
     // disposable generated suggestion. Preserve it even when Undo is used.
     const generatedNotes =
       session.taskNotes !== null &&
-      /^Pocket Goblin approved study session · [1-9]\\d* min · pathway /.test(
+      /^Pocket Goblin approved study session · [1-9][0-9]* min · pathway /.test(
         session.taskNotes,
       ) &&
       session.taskNotes.endsWith(`pathway ${pathway.id}`)
     if (
       session.taskId &&
+      session.taskStatus === 'open' &&
       session.taskTitle === session.title &&
       session.taskDueDate === session.scheduledDate &&
       generatedNotes
