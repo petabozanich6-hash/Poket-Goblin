@@ -240,6 +240,21 @@ type Redemption = {
   revenuePaidCents: number
 }
 
+type StripeCode = {
+  id: string
+  code: string
+  active: boolean
+  redemptions: number
+  maxRedemptions: number | null
+  expiresAt: string | null
+}
+
+type StripeCodesResponse = {
+  live: boolean
+  hasMore: boolean
+  codes: StripeCode[]
+}
+
 type StripeUsage = {
   linked: boolean
   source: 'stripe' | 'draft'
@@ -324,13 +339,19 @@ export function HqDealsPage() {
   const [kind, setKind] = useState<'percent' | 'fixed'>('percent')
   const [preset, setPreset] = useState('custom')
   const [section, setSection] = useState<'gifts' | 'discounts'>('gifts')
+  const stripeCodes = useQuery({
+    queryKey: ['hq', 'deals', 'stripe-codes'],
+    queryFn: () => api.admin.get<StripeCodesResponse>('/deals/stripe-codes'),
+    enabled: section === 'discounts',
+    staleTime: 0,
+  })
   const [expandedTracker, setExpandedTracker] = useState<string | null>(null)
   const refresh = () => qc.invalidateQueries({ queryKey: ['hq', 'deals'] })
   const create = useMutation({
     mutationFn: (data: Record<string, unknown>) =>
       api.admin.send('POST', '/deals', data),
     onSuccess: () => {
-      setMessage('New campaign saved inactive.')
+      setMessage('Local draft saved. It cannot be used in Stripe Checkout.')
       void refresh()
     },
     onError: (e: Error) => setMessage(e.message),
@@ -363,6 +384,15 @@ export function HqDealsPage() {
       void refresh()
     },
     onError: (e: Error) => setMessage(e.message),
+  })
+  const discard = useMutation({
+    mutationFn: (id: string) =>
+      api.admin.send('DELETE', `/deals/${encodeURIComponent(id)}`),
+    onSuccess: () => {
+      setMessage('Unused local draft discarded. No Stripe codes were changed.')
+      void refresh()
+    },
+    onError: (error: Error) => setMessage(error.message),
   })
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -397,9 +427,10 @@ export function HqDealsPage() {
     <section className={styles.page}>
       <h2>🧌 Goblin Deals &amp; Mischief</h2>
       <p>
-        Create targeted offers with limits, budgets and time windows. All
-        discount campaigns remain inactive until secure redemption is
-        implemented.
+        Stripe is responsible for the real discount codes used at checkout.
+        Codes created in Stripe are listed below, including your live launch
+        promotion. The campaign form creates local planning drafts only, unless
+        a supported one-invoice offer is explicitly published to Stripe.
       </p>
       <nav
         aria-label="Deals & Mischief sections"
@@ -423,12 +454,92 @@ export function HqDealsPage() {
       ) : (
         <>
           <p role="status">{message}</p>
+          <Card>
+            <h3>💳 Stripe promotion codes</h3>
+            <p>
+              These codes come directly from Stripe, including promotions you
+              created in the Stripe dashboard. Stripe is the source of truth.
+              Viewing this list does not activate, redeem or change a code.
+            </p>
+            {stripeCodes.isLoading ? (
+              <p>Checking Stripe's code ledger…</p>
+            ) : null}
+            {stripeCodes.isError ? (
+              <p role="alert">
+                Unable to read Stripe's promotions. Check the Stripe dashboard
+                before advertising a code.
+              </p>
+            ) : null}
+            {stripeCodes.data ? (
+              <>
+                <p>
+                  {stripeCodes.data.live
+                    ? 'Live Stripe account'
+                    : 'Stripe test mode'}{' '}
+                  · Latest 100 codes
+                </p>
+                {stripeCodes.data.codes.length === 0 ? (
+                  <p>No promotion codes found in this Stripe mode.</p>
+                ) : (
+                  <ul>
+                    {stripeCodes.data.codes.map((code) => (
+                      <li key={code.id}>
+                        <strong>{code.code}</strong>
+                        <span>
+                          {' — '}
+                          {code.active
+                            ? 'Active in Stripe'
+                            : 'Inactive in Stripe'}
+                        </span>
+                        <span>
+                          {' · Redeemed '}
+                          {code.redemptions}
+                          {code.maxRedemptions === null
+                            ? ' times'
+                            : ` / ${code.maxRedemptions}`}
+                        </span>
+                        {code.expiresAt ? (
+                          <span>
+                            {' · Redemption deadline '}
+                            {new Date(code.expiresAt).toLocaleDateString()}
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {stripeCodes.data.hasMore ? (
+                  <p>
+                    More codes exist. See the Stripe dashboard for the full
+                    list.
+                  </p>
+                ) : null}
+              </>
+            ) : null}
+            <Button
+              variant="secondary"
+              onClick={() => void stripeCodes.refetch()}
+            >
+              Refresh Stripe codes
+            </Button>
+            <p>
+              <a
+                href="https://dashboard.stripe.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open Stripe dashboard
+              </a>{' '}
+              to edit live coupons, redemption limits and duration.
+            </p>
+          </Card>
           <p>
-            Discount codes are drafts only. Billing-safe redemption is not yet
-            enabled.
+            Below are Pocket Goblin's <strong>local campaign records</strong>.
+            An unlinked draft is not a working promotion code and does not
+            affect Stripe Checkout.
           </p>
           <Card>
-            <h3>Create a campaign</h3>
+            <h3>Create a local campaign draft</h3>
             <form
               onSubmit={submit}
               style={{ display: 'grid', gap: 12, maxWidth: 600 }}
@@ -565,7 +676,7 @@ export function HqDealsPage() {
                 <input name="budget" type="number" step="0.01" min="0.01" />
               </label>
               <Button type="submit" disabled={create.isPending}>
-                Save inactive campaign
+                Save local draft
               </Button>
             </form>
           </Card>
@@ -580,7 +691,10 @@ export function HqDealsPage() {
               <Card key={p.id}>
                 <h3>
                   {p.name} — <code>{p.code}</code> (
-                  {p.active ? 'Active' : 'Inactive'})
+                  {p.stripe_promotion_code_id
+                    ? 'Linked to Stripe — check live status below'
+                    : 'Local draft — not valid at checkout'}
+                  )
                 </h3>
                 <p>
                   {p.kind === 'percent' ? `${p.amount}%` : money(p.amount)} off
@@ -651,6 +765,24 @@ export function HqDealsPage() {
                   <RedemptionTracker campaignId={p.id} />
                 ) : null}
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {!p.stripe_promotion_code_id &&
+                  !p.active &&
+                  p.redemptions === 0 ? (
+                    <Button
+                      variant="secondary"
+                      disabled={discard.isPending}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            'Discard this unused local draft? This does not remove or deactivate anything in Stripe.',
+                          )
+                        )
+                          discard.mutate(p.id)
+                      }}
+                    >
+                      Discard local draft
+                    </Button>
+                  ) : null}
                   <Button
                     variant="secondary"
                     disabled={!p.active || edit.isPending}

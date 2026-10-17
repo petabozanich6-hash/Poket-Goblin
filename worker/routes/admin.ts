@@ -881,6 +881,52 @@ adminRoutes.get(
   },
 )
 
+// Stripe codes created directly in the dashboard are just as real as those
+// published from Goblin HQ. Keep this view READ-ONLY: listing live codes must
+// never create, change or disable a discount during a public launch.
+adminRoutes.get(
+  '/deals/stripe-codes',
+  requirePermission('subscriptions.read'),
+  async (c) => {
+    const config = billingConfig(c.env)
+    if (!config.enabled)
+      return c.json({ error: 'Stripe billing is unavailable.' }, 503)
+    try {
+      const result = await stripe<{
+        data: Array<{
+          id: string
+          code: string
+          active: boolean
+          times_redeemed: number
+          max_redemptions: number | null
+          expires_at: number | null
+        }>
+        has_more: boolean
+      }>(config, 'GET', '/promotion_codes', { limit: 100 })
+      return c.json({
+        live: config.live,
+        hasMore: result.has_more,
+        codes: (result.data ?? []).map((entry) => ({
+          id: entry.id,
+          code: entry.code,
+          active: entry.active,
+          redemptions: entry.times_redeemed ?? 0,
+          maxRedemptions: entry.max_redemptions,
+          expiresAt: entry.expires_at
+            ? new Date(entry.expires_at * 1000).toISOString()
+            : null,
+        })),
+      })
+    } catch (error) {
+      console.error(
+        'Stripe promotion listing failed',
+        error instanceof StripeError ? error.status : 'network',
+      )
+      return c.json({ error: 'Could not list Stripe promotions.' }, 502)
+    }
+  },
+)
+
 // Stripe is the source of truth for published codes. Previewing a discount
 // does not redeem it: the redemption count increases only on actual use.
 adminRoutes.get(
@@ -1060,6 +1106,48 @@ adminRoutes.post('/deals', requirePermission('settings.write'), async (c) => {
   })
   return c.json({ id, code, active: false }, 201)
 })
+
+// Only unlinked, unused local drafts can be discarded. A code linked to Stripe
+// must be managed in Stripe; this endpoint NEVER calls a Stripe mutation.
+adminRoutes.delete(
+  '/deals/:id',
+  requirePermission('settings.write'),
+  async (c) => {
+    const id = c.req.param('id')
+    const existing = await c.env.DB.prepare(
+      'SELECT id FROM promotion_campaigns WHERE id = ?',
+    )
+      .bind(id)
+      .first()
+    if (!existing) return c.json({ error: 'Campaign not found' }, 404)
+    const result = await c.env.DB.prepare(
+      `DELETE FROM promotion_campaigns
+       WHERE id = ? AND active = 0 AND stripe_promotion_code_id IS NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM promotion_redemptions WHERE campaign_id = ?
+         )`,
+    )
+      .bind(id, id)
+      .run()
+    if (!result.meta.changes) {
+      return c.json(
+        {
+          error:
+            'Only unused local drafts can be discarded. Published campaigns and claims must be kept.',
+        },
+        409,
+      )
+    }
+    await writeAudit(c.env.DB, {
+      ...actor(c),
+      action: 'deals.discard_draft',
+      targetType: 'promotion',
+      targetId: id,
+      detail: { stripeUnchanged: true },
+    })
+    return c.json({ ok: true })
+  },
+)
 
 // Owner-controlled first-invoice codes only. Multicycle / founder offers remain
 // inactive until interval-safe redemption and accounting are implemented.
