@@ -881,6 +881,59 @@ adminRoutes.get(
   },
 )
 
+// Stripe is the source of truth for published codes. Previewing a discount
+// does not redeem it: the redemption count increases only on actual use.
+adminRoutes.get(
+  '/deals/:id/stripe-usage',
+  requirePermission('subscriptions.read'),
+  async (c) => {
+    const campaign = await c.env.DB.prepare(
+      'SELECT stripe_promotion_code_id AS stripeCodeId FROM promotion_campaigns WHERE id = ?',
+    ).bind(c.req.param('id')).first<{ stripeCodeId: string | null }>()
+    if (!campaign) return c.json({ error: 'Campaign not found' }, 404)
+    if (!campaign.stripeCodeId)
+      return c.json({ linked: false, source: 'draft', redemptions: 0 })
+    const config = billingConfig(c.env)
+    if (!config.enabled)
+      return c.json({ error: 'Stripe billing is unavailable.' }, 503)
+    try {
+      const code = await stripe<{
+        id: string
+        active: boolean
+        times_redeemed: number
+        max_redemptions: number | null
+        expires_at: number | null
+      }>(
+        config,
+        'GET',
+        '/promotion_codes/' + encodeURIComponent(campaign.stripeCodeId),
+      )
+      const redemptions = code.times_redeemed ?? 0
+      const remaining =
+        code.max_redemptions === null
+          ? null
+          : Math.max(0, code.max_redemptions - redemptions)
+      return c.json({
+        linked: true,
+        source: 'stripe',
+        active: code.active,
+        redemptions,
+        maxRedemptions: code.max_redemptions,
+        remaining,
+        expiresAt: code.expires_at
+          ? new Date(code.expires_at * 1000).toISOString()
+          : null,
+      })
+    } catch (error) {
+      console.error(
+        'Stripe promotion usage read failed',
+        error instanceof StripeError ? error.status : 'network',
+      )
+      return c.json({ error: 'Could not retrieve Stripe usage.' }, 502)
+    }
+  },
+)
+
 // Read-only campaign claim history. Financial and status details are scoped
 // to passkey-elevated Owner HQ; customers cannot fetch another user's claims.
 adminRoutes.get(
