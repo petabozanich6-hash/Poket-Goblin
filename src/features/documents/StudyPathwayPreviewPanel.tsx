@@ -119,7 +119,9 @@ export function StudyPathwayPreviewPanel({
       setCalendarChanged(true)
       await refreshSaved()
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['study-calendar-sessions'] }),
+        queryClient.invalidateQueries({
+          queryKey: ['study-calendar-sessions'],
+        }),
         queryClient.invalidateQueries({ queryKey: ['tasks'] }),
         queryClient.invalidateQueries({ queryKey: ['study-pathways'] }),
       ])
@@ -143,7 +145,9 @@ export function StudyPathwayPreviewPanel({
       setPreview(null)
       setCalendarChanged(true)
       await refreshSaved()
-      await queryClient.invalidateQueries({ queryKey: ['study-calendar-sessions'] })
+      await queryClient.invalidateQueries({
+        queryKey: ['study-calendar-sessions'],
+      })
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : 'Could not undo the pathway.',
@@ -171,7 +175,9 @@ export function StudyPathwayPreviewPanel({
       )
       setCalendarChanged(true)
       await refreshSaved()
-      await queryClient.invalidateQueries({ queryKey: ['study-calendar-sessions'] })
+      await queryClient.invalidateQueries({
+        queryKey: ['study-calendar-sessions'],
+      })
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -189,7 +195,9 @@ export function StudyPathwayPreviewPanel({
       {stored?.pathway?.status === 'active' || calendarChanged ? (
         <div>
           <p>
-            <Link to="/life/calendar">View your study sessions in Pocket Goblin's calendar</Link>
+            <Link to="/life/calendar">
+              View your study sessions in Pocket Goblin's calendar
+            </Link>
             {' · '}
             <a href={exportUrl()} download>
               Download your calendar (.ics)
@@ -197,8 +205,8 @@ export function StudyPathwayPreviewPanel({
           </p>
           <p>
             Your approved study sessions appear on their assigned days with
-            estimated durations. They are day plans, not timed appointments:
-            no clock time has been chosen for you.
+            estimated durations. They are day plans, not timed appointments: no
+            clock time has been chosen for you.
           </p>
           <p>
             A downloaded calendar file is a one-time copy. Changes to study
@@ -213,7 +221,8 @@ export function StudyPathwayPreviewPanel({
         <div>
           <h5>Saved study sessions</h5>
           <p role="status">
-            Your plan is saved. Each session is on its planned day in My Life → Calendar.
+            Your plan is saved. Each session is on its planned day in My Life →
+            Calendar.
           </p>
           <p>
             You can move unfinished sessions before their original assessment
