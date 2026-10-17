@@ -8,6 +8,7 @@ export function isStudyPathwayGroup(group: string): boolean {
   if (!label) return false
   return (
     /^week\s+by\s+week$/i.test(label) ||
+    /^study module$/i.test(label) ||
     /^week\s+\d+\b/i.test(label) ||
     /\b(?:assessment|assignment|essay|exam|study plan|research project|research proposal|coursework|portfolio|thesis)\b/i.test(
       label,
