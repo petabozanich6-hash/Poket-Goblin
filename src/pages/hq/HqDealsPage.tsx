@@ -94,21 +94,39 @@ function GiveawaysPanel() {
         }}
       >
         <label>
-          Giveaway name <input name="name" required minLength={3} maxLength={100} />
+          Giveaway name{' '}
+          <input name="name" required minLength={3} maxLength={100} />
         </label>
         <label>
           Free Premium duration (days){' '}
-          <input name="days" type="number" min={1} max={365} defaultValue={7} required />
+          <input
+            name="days"
+            type="number"
+            min={1}
+            max={365}
+            defaultValue={7}
+            required
+          />
         </label>
         <label>
           Maximum recipients{' '}
-          <input name="max" type="number" min={1} max={10000} defaultValue={1} required />
+          <input
+            name="max"
+            type="number"
+            min={1}
+            max={10000}
+            defaultValue={1}
+            required
+          />
         </label>
-        <Button type="submit" disabled={create.isPending}>Create giveaway</Button>
+        <Button type="submit" disabled={create.isPending}>
+          Create giveaway
+        </Button>
       </form>
       {campaigns.isError ? (
         <p role="alert">
-          Could not load giveaways. Check that the giveaway database migration is applied.
+          Could not load giveaways. Check that the giveaway database migration
+          is applied.
         </p>
       ) : null}
       {campaigns.data?.giveaways.map((gift) => (
