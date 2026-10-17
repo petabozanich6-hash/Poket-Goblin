@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { Button } from '@/components/ui/Button'
 import { exportUrl } from '@/features/calendar/calendarApi'
@@ -20,6 +22,7 @@ export function StudyPathwayPreviewPanel({
 }: {
   documentId: string
 }) {
+  const queryClient = useQueryClient()
   const [minutes, setMinutes] = useState(60)
   const [includeWeekends, setIncludeWeekends] = useState(false)
   const [horizonDays, setHorizonDays] = useState(21)
@@ -115,6 +118,13 @@ export function StudyPathwayPreviewPanel({
       setSaved(true)
       setCalendarChanged(true)
       await refreshSaved()
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ['study-calendar-sessions'],
+        }),
+        queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+        queryClient.invalidateQueries({ queryKey: ['study-pathways'] }),
+      ])
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : 'Could not save the pathway.',
@@ -135,6 +145,9 @@ export function StudyPathwayPreviewPanel({
       setPreview(null)
       setCalendarChanged(true)
       await refreshSaved()
+      await queryClient.invalidateQueries({
+        queryKey: ['study-calendar-sessions'],
+      })
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : 'Could not undo the pathway.',
@@ -162,6 +175,9 @@ export function StudyPathwayPreviewPanel({
       )
       setCalendarChanged(true)
       await refreshSaved()
+      await queryClient.invalidateQueries({
+        queryKey: ['study-calendar-sessions'],
+      })
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -179,9 +195,18 @@ export function StudyPathwayPreviewPanel({
       {stored?.pathway?.status === 'active' || calendarChanged ? (
         <div>
           <p>
+            <Link to="/life/calendar">
+              View your study sessions in Pocket Goblin's calendar
+            </Link>
+            {' · '}
             <a href={exportUrl()} download>
-              Download the latest calendar file (.ics)
+              Download your calendar (.ics)
             </a>
+          </p>
+          <p>
+            Your approved study sessions appear on their assigned days with
+            estimated durations. They are day plans, not timed appointments: no
+            clock time has been chosen for you.
           </p>
           <p>
             A downloaded calendar file is a one-time copy. Changes to study
@@ -195,6 +220,10 @@ export function StudyPathwayPreviewPanel({
       {stored?.pathway?.status === 'active' ? (
         <div>
           <h5>Saved study sessions</h5>
+          <p role="status">
+            Your plan is saved. Each session is on its planned day in My Life →
+            Calendar.
+          </p>
           <p>
             You can move unfinished sessions before their original assessment
             deadlines. Confirm how much time you have on the new day; the goblin

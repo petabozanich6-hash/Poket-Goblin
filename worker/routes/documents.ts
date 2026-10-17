@@ -181,6 +181,58 @@ documentRoutes.get('/', async (c) => {
   })
 })
 
+/** Approved study sessions as calendar entries (not duplicate appointments).
+ * Task due_date is the current day even when a user moved the linked task.
+ * Completed/cancelled/undone sessions are never shown as upcoming work.
+ */
+documentRoutes.get('/study-sessions', async (c) => {
+  const user = c.get('user')
+  const from = c.req.query('from')
+  const to = c.req.query('to')
+  const validDate = (value: string | undefined): value is string => {
+    if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+    const timestamp = Date.parse(`${value}T00:00:00Z`)
+    return (
+      Number.isFinite(timestamp) &&
+      new Date(timestamp).toISOString().slice(0, 10) === value
+    )
+  }
+  if (
+    !validDate(from) ||
+    !validDate(to) ||
+    from > to ||
+    Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`) >
+      120 * 86_400_000
+  ) {
+    return c.json(
+      { error: 'Choose a valid calendar range of up to 120 days.' },
+      400,
+    )
+  }
+
+  const rows = await c.env.DB.prepare(
+    `SELECT s.id, s.title, s.minutes, t.due_date as date,
+            s.pathway_id as pathwayId, p.document_id as documentId
+     FROM study_pathway_sessions s
+     JOIN study_pathways p ON p.id = s.pathway_id AND p.user_id = s.user_id
+     JOIN tasks t ON t.id = s.task_id AND t.user_id = s.user_id
+     WHERE s.user_id = ? AND p.status = 'active' AND s.status = 'planned'
+       AND t.status = 'open' AND t.due_date BETWEEN ? AND ?
+     ORDER BY t.due_date, s.sequence, s.id
+     LIMIT 1000`,
+  )
+    .bind(user.id, from, to)
+    .all<{
+      id: string
+      title: string
+      minutes: number
+      date: string
+      pathwayId: string
+      documentId: string
+    }>()
+  return c.json({ sessions: rows.results ?? [] })
+})
+
 /** Saved study pathways remain accessible after a temporary upload is deleted. */
 documentRoutes.get('/study-pathways', async (c) => {
   const user = c.get('user')

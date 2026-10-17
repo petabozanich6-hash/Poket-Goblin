@@ -1,10 +1,12 @@
 import { useMemo, useState, type FormEvent } from 'react'
+import { Link } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input, TextArea } from '@/components/ui/Input'
 import { PhoneCalendarCard } from '@/features/calendar/PhoneCalendarCard'
+import { fetchStudyCalendarSessions } from '@/features/calendar/calendarApi'
 import { createEvent, deleteEvent, fetchEvents } from '@/features/life/lifeApi'
 
 import styles from './Page.module.css'
@@ -44,6 +46,15 @@ export function CalendarPage() {
     queryFn: () => fetchEvents(range.from, range.to),
   })
 
+  const studyQuery = useQuery({
+    queryKey: ['study-calendar-sessions', range.from, range.to],
+    queryFn: () =>
+      fetchStudyCalendarSessions(
+        range.from.slice(0, 10),
+        range.to.slice(0, 10),
+      ),
+  })
+
   const createMutation = useMutation({
     mutationFn: createEvent,
     onSuccess: async () => {
@@ -76,6 +87,23 @@ export function CalendarPage() {
   }
 
   const events = eventsQuery.data?.events ?? []
+  const studySessions = studyQuery.data?.sessions ?? []
+  const calendarItems = [
+    ...events.map((event) => ({
+      kind: 'event' as const,
+      id: event.id,
+      title: event.title,
+      date: toLocalDateInput(new Date(event.startsAt)),
+      event,
+    })),
+    ...studySessions.map((session) => ({
+      kind: 'study' as const,
+      id: session.id,
+      title: session.title,
+      date: session.date,
+      session,
+    })),
+  ].sort((a, b) => a.date.localeCompare(b.date))
   const monthLabel = cursor.toLocaleString(undefined, {
     month: 'long',
     year: 'numeric',
@@ -99,8 +127,8 @@ export function CalendarPage() {
         <div>
           <h1>Calendar</h1>
           <p className={styles.sub}>
-            Appointments and due dates live here — add them yourself, tell the
-            Goblin, or let it read a document.
+            Appointments and approved study sessions live here — add them
+            yourself, tell the Goblin, or let it read a document.
           </p>
         </div>
       </header>
@@ -149,15 +177,20 @@ export function CalendarPage() {
           <div className={styles.monthGrid}>
             {monthDays.map((day) => {
               const key = toLocalDateInput(day)
-              const dayEvents = events.filter(
-                (event) => toLocalDateInput(new Date(event.startsAt)) === key,
-              )
+              const dayItems = calendarItems.filter((item) => item.date === key)
               return (
                 <div key={key} className={styles.monthCell}>
                   <strong>{day.getDate()}</strong>
-                  {dayEvents.slice(0, 2).map((event) => (
-                    <p key={event.id} className={styles.monthEvent}>
-                      {event.title}
+                  {dayItems.slice(0, 2).map((item) => (
+                    <p
+                      key={`${item.kind}-${item.id}`}
+                      className={styles.monthEvent}
+                    >
+                      {item.kind === 'study' ? '📚 ' : ''}
+                      {item.title}
+                      {item.kind === 'study'
+                        ? ` · ${item.session.minutes} min`
+                        : ''}
                     </p>
                   ))}
                 </div>
@@ -168,26 +201,42 @@ export function CalendarPage() {
 
         {(view === 'agenda' || view === 'week') && (
           <ul className={styles.stack}>
-            {events.length === 0 ? (
-              <p className={styles.sub}>No upcoming appointments yet.</p>
+            {calendarItems.length === 0 ? (
+              <p className={styles.sub}>
+                No appointments or study sessions in this period.
+              </p>
             ) : (
-              events.map((event) => (
-                <li key={event.id} className={styles.listRow}>
+              calendarItems.map((item) => (
+                <li key={`${item.kind}-${item.id}`} className={styles.listRow}>
                   <div>
-                    <strong>{event.title}</strong>
+                    <strong>
+                      {item.kind === 'study' ? '📚 ' : ''}
+                      {item.title}
+                    </strong>
                     <p className={styles.sub}>
-                      {new Date(event.startsAt).toLocaleString()}
-                      {event.location ? ` · ${event.location}` : ''}
-                      {event.allDay ? ' · all day' : ''}
+                      {item.kind === 'study'
+                        ? `${item.date} · ${item.session.minutes} min study · planned day (no set start time)`
+                        : new Date(item.event.startsAt).toLocaleString()}
+                      {item.kind === 'event' && item.event.location
+                        ? ` · ${item.event.location}`
+                        : ''}
+                      {item.kind === 'event' && item.event.allDay
+                        ? ' · all day'
+                        : ''}
                     </p>
+                    {item.kind === 'study' ? (
+                      <Link to="/life/documents">View saved study pathway</Link>
+                    ) : null}
                   </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => deleteMutation.mutate(event.id)}
-                  >
-                    Remove
-                  </Button>
+                  {item.kind === 'event' ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => deleteMutation.mutate(item.event.id)}
+                    >
+                      Remove
+                    </Button>
+                  ) : null}
                 </li>
               ))
             )}
