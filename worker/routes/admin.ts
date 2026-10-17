@@ -1126,7 +1126,7 @@ adminRoutes.post(
     const body = await readJson(c)
     const email =
       typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
-    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || email.length > 254)
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254)
       return c.json({ error: 'Enter an existing customer email.' }, 400)
     const owner = c.get('user')
     const recipient = await c.env.DB.prepare(
