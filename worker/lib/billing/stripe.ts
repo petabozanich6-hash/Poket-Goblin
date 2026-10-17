@@ -243,6 +243,21 @@ export async function applySubscription(
     userId = known?.userId ?? null
   }
   if (!userId) return null
+  // A Stripe customer or subscription already linked to another account
+  // must never be assigned using metadata or a checkout hint.
+  const linked = await db
+    .prepare(
+      `SELECT user_id AS userId FROM user_entitlements
+       WHERE source = 'stripe'
+         AND (stripe_customer_id = ? OR stripe_subscription_id = ?)
+       LIMIT 1`,
+    )
+    .bind(sub.customer, sub.id)
+    .first<{ userId: string }>()
+  if (linked && linked.userId !== userId) {
+    console.error('Stripe account ownership conflict')
+    return null
+  }
   const exists = await db
     .prepare(`SELECT 1 FROM users WHERE id = ?`)
     .bind(userId)

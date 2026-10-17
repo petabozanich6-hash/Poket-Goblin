@@ -181,6 +181,18 @@ describe('the subscription area', () => {
   })
 })
 
+describe('Stripe customer isolation', () => {
+  it('never assigns an existing Stripe customer to a second account', async () => {
+    const bob = await h.register('bob@example.com')
+    const first = sub('sub_alice', 'active', alice.id)
+    expect(await applySubscription(h.env.DB, first)).toBe(alice.id)
+    const conflicting = sub('sub_bob', 'active', bob.id)
+    expect(await applySubscription(h.env.DB, conflicting)).toBeNull()
+    expect((await plan(bob)).plan).toBe('free')
+    expect((await plan(alice)).plan).toBe('premium')
+  })
+})
+
 describe('checkout', () => {
   it('opens Stripe Checkout tied to this person', async () => {
     const res = await h.request('/api/billing/checkout', {
