@@ -49,9 +49,7 @@ describe('standalone study modules', () => {
       true,
     )
     const availability = Array.from({ length: 14 }, (_, index) => ({
-      date: new Date(Date.UTC(2026, 9, 17 + index))
-        .toISOString()
-        .slice(0, 10),
+      date: new Date(Date.UTC(2026, 9, 17 + index)).toISOString().slice(0, 10),
       availableMinutes: 90,
     }))
     const missing = previewDocumentPathway(
@@ -76,8 +74,8 @@ describe('standalone study modules', () => {
   })
 
   it('does not turn unrelated bills into study modules', () => {
-    expect(
-      suggestModuleStudy('Electricity bill due 20 October 2026.'),
-    ).toEqual([])
+    expect(suggestModuleStudy('Electricity bill due 20 October 2026.')).toEqual(
+      [],
+    )
   })
 })
