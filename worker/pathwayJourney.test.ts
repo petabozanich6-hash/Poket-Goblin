@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -197,11 +198,9 @@ describe('document to approved study pathway journey', () => {
 
   it('extracts a real Chrome-generated university PDF into reviewable assessment steps', async () => {
     const bytes = readFileSync(
-      fileURLToPath(
-        new URL(
-          '../shared/documents/fixtures/chrome-letter-spaced.pdf',
-          import.meta.url,
-        ),
+      join(
+        dirname(fileURLToPath(import.meta.url)),
+        '../shared/documents/fixtures/chrome-letter-spaced.pdf',
       ),
     )
     const data = new FormData()
