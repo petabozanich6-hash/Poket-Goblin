@@ -893,6 +893,10 @@ adminRoutes.post('/deals', requirePermission('settings.write'), async (c) => {
     body.maxRedemptions == null || body.maxRedemptions === ''
       ? null
       : body.maxRedemptions
+  const activationWindow =
+    body.activationWindowDays == null || body.activationWindowDays === ''
+      ? null
+      : body.activationWindowDays
   const budget =
     body.budgetCents == null || body.budgetCents === ''
       ? null
@@ -919,6 +923,10 @@ adminRoutes.post('/deals', requirePermission('settings.write'), async (c) => {
     !['new', 'existing', 'all'].includes(String(audience)) ||
     !['none', 'manual'].includes(String(verification)) ||
     (max !== null && (!Number.isInteger(max) || Number(max) < 1)) ||
+    (activationWindow !== null &&
+      (!Number.isInteger(activationWindow) ||
+        Number(activationWindow) < 1 ||
+        Number(activationWindow) > 365)) ||
     (budget !== null && (!Number.isInteger(budget) || Number(budget) < 1)) ||
     (body.startAt && !start) ||
     (body.expiresAt && !end) ||
@@ -930,8 +938,8 @@ adminRoutes.post('/deals', requirePermission('settings.write'), async (c) => {
     await c.env.DB.prepare(
       `INSERT INTO promotion_campaigns
       (id,code,name,kind,amount,billing_cycles,audience,verification,verification_note,
-       max_redemptions,budget_cents,start_at,expires_at,active)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,0)`,
+       max_redemptions,budget_cents,start_at,expires_at,activation_window_days,active)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)`,
     )
       .bind(
         id,
@@ -947,6 +955,7 @@ adminRoutes.post('/deals', requirePermission('settings.write'), async (c) => {
         budget,
         start,
         end,
+        activationWindow,
       )
       .run()
   } catch {
