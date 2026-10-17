@@ -68,6 +68,8 @@ export function campusOutreachEmail(input: {
     "I'm the founder of Pocket Goblin, an Australian-built personal organisation platform available worldwide. I created it while juggling university study, parenting, homeschooling and all the everyday chaos that comes with trying to keep everything organised."
   const why =
     "I wanted to create something that went beyond another to-do list and actually helped people work out how to get things done."
+  const beyondStudy =
+    "And Pocket Goblin isn't just for university. It's designed for the rest of life too — work, appointments, household tasks, family commitments and everything else competing for attention. It's useful for parents, professionals, homeschooling families and anyone trying to keep everyday chaos under control, long after graduation."
   const offer =
     "I'd love to offer your students 10% off Pocket Goblin Premium for their first 12 months, using the code " +
     CODE +
@@ -86,6 +88,9 @@ export function campusOutreachEmail(input: {
     '',
     'Pocket Goblin helps students:',
     ...features.map(([title, detail]) => '- ' + title + ': ' + detail),
+    '',
+    'Useful far beyond university',
+    beyondStudy,
     '',
     offer,
     '',
@@ -150,6 +155,10 @@ export function campusOutreachEmail(input: {
     '<tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">' +
       listHtml +
       '</table></td></tr>',
+    '<tr><td style="padding:6px 0 18px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background:#f7f4ef;border-left:4px solid #d8b86d;border-radius:8px;padding:16px 18px">',
+    '<div style="font-family:Georgia,serif;font-size:19px;font-weight:bold;color:#2f4a36;padding-bottom:8px">Useful far beyond university</div>',
+    '<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.6;color:#302f2a">' + escapeHtml(beyondStudy) + '</div>',
+    '</td></tr></table></td></tr>',
     '<tr><td style="padding:10px 0 20px">',
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" style="background:#f1ead5;border:1px solid #dcc78b;border-radius:12px;padding:24px 14px">',
     '<div style="font-family:Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;color:#69552e">A LITTLE SOMETHING FOR STUDENTS</div>',
