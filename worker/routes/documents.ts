@@ -241,6 +241,7 @@ documentRoutes.post('/:id/pathway-preview', async (c) => {
   const body = (await c.req.json().catch(() => null)) as {
     availability?: DayAvailability[]
     completedStepIds?: string[]
+    planningTargetDate?: string | null
   } | null
   if (
     !body ||
@@ -338,6 +339,7 @@ documentRoutes.post('/:id/pathway-preview', async (c) => {
       suggestions,
       availability,
       completedStepIds,
+      body.planningTargetDate,
     ),
     assumptions: {
       taskMinutes: 30,
@@ -365,6 +367,7 @@ documentRoutes.post('/:id/pathway-approve', async (c) => {
   const body = (await c.req.json().catch(() => null)) as {
     availability?: DayAvailability[]
     expectedSessions?: unknown[]
+    planningTargetDate?: string | null
   } | null
   if (
     !body ||
@@ -447,7 +450,13 @@ documentRoutes.post('/:id/pathway-approve', async (c) => {
       }
     }),
   )
-  const result = previewDocumentPathway(documentId, suggestions, availability)
+  const result = previewDocumentPathway(
+    documentId,
+    suggestions,
+    availability,
+    [],
+    body.planningTargetDate,
+  )
   // Refuse silent partial approval or stale preview. The user needs to
   // review a new preview whenever deadlines or commitments change.
   if (
