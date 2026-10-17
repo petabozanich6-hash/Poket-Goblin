@@ -421,7 +421,9 @@ documentRoutes.post('/:id/pathway-approve', async (c) => {
   const prior = await c.env.DB.prepare(
     `SELECT id FROM study_pathways
      WHERE user_id = ? AND document_id = ? AND status = 'active'`,
-  ).bind(user.id, documentId).first<{ id: string }>()
+  )
+    .bind(user.id, documentId)
+    .first<{ id: string }>()
   if (prior) return c.json({ pathwayId: prior.id, alreadySaved: true }, 200)
 
   const body = (await c.req.json().catch(() => null)) as {
