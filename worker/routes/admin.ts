@@ -1238,7 +1238,10 @@ adminRoutes.post(
           'No payment details are needed. This gift will not start a subscription or renew automatically.',
           'Sign in to Pocket Goblin to enjoy your gift!',
         ],
-        action: { label: 'Open Pocket Goblin', url: 'https://pocketgoblin.org/' },
+        action: {
+          label: 'Open Pocket Goblin',
+          url: 'https://pocketgoblin.org/',
+        },
         footer: 'Questions? Contact our support team.',
       }),
     )
