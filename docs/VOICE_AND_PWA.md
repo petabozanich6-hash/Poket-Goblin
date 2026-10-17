@@ -111,7 +111,7 @@ suspended or the device is locked, and this one doesn’t try.
 | Browser                    | Install                                   | Voice input                                                      | Shortcuts (long-press)      |
 | -------------------------- | ----------------------------------------- | ---------------------------------------------------------------- | --------------------------- |
 | Android Chrome             | Install prompt / menu                     | Yes (Google’s servers)                                           | Yes, “Talk to Goblin”       |
-| Samsung Internet           | Avoid WebAPK install while Play Protect warnings persist; use Chrome or browser | Varies by version — feature-detected               | Support varies; verify      |
+| Samsung Internet           | Chrome instead; see warning below         | Varies by version — feature-detected                             | Support varies; verify      |
 | iPhone/iPad Safari         | Share → Add to Home Screen (instructions) | Safari 14.5+ (Apple, server or on-device)                        | Not supported by iOS        |
 | iOS installed web app      | —                                         | Historically unreliable in home-screen mode; typing always works | Not supported               |
 | Desktop Chrome / Edge      | Install icon / prompt                     | Yes (vendor servers)                                             | Yes, in the app’s jump list |
