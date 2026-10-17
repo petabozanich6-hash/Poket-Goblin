@@ -13,6 +13,7 @@ export async function persistApprovedPathway(
   sessions: ScheduledSession[],
   stepDeadlines: ReadonlyMap<string, string | null> = new Map(),
   stepOrders: ReadonlyMap<string, number> = new Map(),
+  approvedReviewItemIds: readonly string[] = [],
 ) {
   if (!sessions.length || sessions.length > 500) {
     throw new Error('A pathway needs between 1 and 500 sessions')
@@ -102,6 +103,20 @@ export async function persistApprovedPathway(
           session.goalId,
           stepOrder,
         ),
+    )
+  }
+  // Proposal rows leave the review queue in the SAME transaction as the
+  // approved tasks. An interrupted request must never produce either half.
+  // Only IDs the approval route used to build this exact schedule are marked.
+  for (const reviewId of new Set(approvedReviewItemIds)) {
+    statements.push(
+      db.prepare(
+        `UPDATE review_items
+         SET status = 'accepted', reviewed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+             updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+         WHERE id = ? AND user_id = ? AND source_type = 'document'
+           AND source_id = ? AND status IN ('pending', 'edited', 'snoozed')`,
+      ).bind(reviewId, userId, documentId),
     )
   }
   // D1 batch runs in a single transaction; failure rolls back every write.
