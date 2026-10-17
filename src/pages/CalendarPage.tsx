@@ -136,8 +136,8 @@ export function CalendarPage() {
 
       {(datedTasksQuery.isError || eventsQuery.isError) && (
         <p role="alert">
-          Couldn't load everything for this calendar period. Try refreshing
-          the page. Your saved tasks have not been deleted.
+          Couldn't load everything for this calendar period. Try refreshing the
+          page. Your saved tasks have not been deleted.
         </p>
       )}
 
@@ -194,7 +194,11 @@ export function CalendarPage() {
                       key={`${item.kind}-${item.id}`}
                       className={styles.monthEvent}
                     >
-                      {item.kind === 'task' ? (item.task.studyMinutes ? '📚 ' : '☑ ') : ''}
+                      {item.kind === 'task'
+                        ? item.task.studyMinutes
+                          ? '📚 '
+                          : '☑ '
+                        : ''}
                       {item.title}
                       {item.kind === 'task' && item.task.studyMinutes
                         ? ` · ${item.task.studyMinutes} min`
@@ -222,7 +226,11 @@ export function CalendarPage() {
                 <li key={`${item.kind}-${item.id}`} className={styles.listRow}>
                   <div>
                     <strong>
-                      {item.kind === 'task' ? (item.task.studyMinutes ? '📚 ' : '☑ ') : ''}
+                      {item.kind === 'task'
+                        ? item.task.studyMinutes
+                          ? '📚 '
+                          : '☑ '
+                        : ''}
                       {item.title}
                     </strong>
                     <p className={styles.sub}>
@@ -239,8 +247,16 @@ export function CalendarPage() {
                         : ''}
                     </p>
                     {item.kind === 'task' ? (
-                      <Link to={item.task.documentId ? '/life/documents' : '/life/tasks'}>
-                        {item.task.documentId ? 'View saved study pathway' : 'View task'}
+                      <Link
+                        to={
+                          item.task.documentId
+                            ? '/life/documents'
+                            : '/life/tasks'
+                        }
+                      >
+                        {item.task.documentId
+                          ? 'View saved study pathway'
+                          : 'View task'}
                       </Link>
                     ) : null}
                   </div>
