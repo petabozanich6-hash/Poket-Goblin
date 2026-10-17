@@ -487,7 +487,9 @@ export function HqDealsPage() {
                         <strong>{code.code}</strong>
                         <span>
                           {' — '}
-                          {code.active ? 'Active in Stripe' : 'Inactive in Stripe'}
+                          {code.active
+                            ? 'Active in Stripe'
+                            : 'Inactive in Stripe'}
                         </span>
                         <span>
                           {' · Redeemed '}
@@ -508,7 +510,8 @@ export function HqDealsPage() {
                 )}
                 {stripeCodes.data.hasMore ? (
                   <p>
-                    More codes exist. See the Stripe dashboard for the full list.
+                    More codes exist. See the Stripe dashboard for the full
+                    list.
                   </p>
                 ) : null}
               </>
@@ -690,7 +693,8 @@ export function HqDealsPage() {
                   {p.name} — <code>{p.code}</code> (
                   {p.stripe_promotion_code_id
                     ? 'Linked to Stripe — check live status below'
-                    : 'Local draft — not valid at checkout'})
+                    : 'Local draft — not valid at checkout'}
+                  )
                 </h3>
                 <p>
                   {p.kind === 'percent' ? `${p.amount}%` : money(p.amount)} off
