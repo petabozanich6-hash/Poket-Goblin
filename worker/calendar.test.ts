@@ -188,6 +188,7 @@ describe('live phone calendar link', () => {
     // Calendar apps fetch it with no cookie.
     const feed = await h.request(path)
     expect(feed.status).toBe(200)
+    expect(feed.headers.get('Cache-Control')).toBe('private, no-store')
     const ics = await feed.text()
     expect(ics).toContain('X-WR-TIMEZONE:Europe/London')
     expect(ics).toContain('SUMMARY:To do: Pay rent')

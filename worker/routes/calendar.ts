@@ -179,7 +179,7 @@ icsFeedRoutes.get('/:file', async (c) => {
   )
   return c.body(body, 200, {
     ...ICS_HEADERS,
-    'Cache-Control': 'private, max-age=900',
+    'Cache-Control': 'private, no-store',
     'X-Robots-Tag': 'noindex',
   })
 })
