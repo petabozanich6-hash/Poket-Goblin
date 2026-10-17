@@ -106,6 +106,42 @@ Enabled in settings, then started explicitly on the voice screen. It:
 **No system-wide wake word.** No website can listen while the app is closed,
 suspended or the device is locked, and this one doesn’t try.
 
+## Android 16 Play Protect warning (17 October 2026)
+
+A real Android device showed Google's **"Unsafe app blocked"** warning:
+_"This app was built for an older version of Android and doesn't include
+the latest privacy protections."_ Treat this as an unresolved install blocker,
+not proof the website is malicious or proof that it is safe to bypass the check.
+
+Pocket Goblin is a PWA. This repository has no distributable Android APK,
+Gradle project or `targetSdkVersion`: on Android, Chrome and Samsung Internet
+may generate a WebAPK through their own packaging service. The warning can be
+caused by the **generated wrapper**, which the website manifest cannot configure.
+The affected phone/browser and actual generated package have **not yet been
+inspected**, so this is a leading hypothesis, not a confirmed diagnosis.
+
+**Temporary release-safe mitigation:** hide the in-app install button on Android
+Chrome-like and Samsung browsers, and explain that users can continue on
+`https://pocketgoblin.org` in their browser. If Android shows Play Protect's
+warning, choose **OK**, not **Install anyway**. The site's code cannot prevent
+users from choosing installation in the browser menu, nor can it update a
+browser-minted APK. iOS, desktop and Android Firefox shortcut behaviour is
+unchanged.
+
+Before restoring the Android install button:
+
+1. Record whether the warning was from Chrome or Samsung Internet, Android
+   version, browser version and installation path (Pocket Goblin button or menu).
+2. Determine the generated WebAPK's package identity/target SDK using safe
+   Android tooling, without bypassing Play Protect.
+3. Report any browser-package incompatibility to its maintainer and retest
+   on actual Android 16 hardware. Do **not** attempt to fix an Android
+   `targetSdkVersion` via `manifest.webmanifest`.
+
+Background: [web.dev — PWA installation and WebAPKs](https://web.dev/learn/pwa/installation/),
+[Google — Play Protect warning guidance](https://developers.google.com/android/play-protect/warning-dev-guidance),
+[Chromium issue 569517876](https://issuetracker.google.com/issues/569517876).
+
 ## Browser support (as implemented; real devices not yet tested)
 
 | Browser                    | Install                                   | Voice input                                                      | Shortcuts (long-press)      |

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button'
 import {
   detectPlatform,
   getPwaState,
+  isAndroidInstallPaused,
   promptInstall,
   subscribePwa,
 } from '@/lib/pwa'
@@ -19,6 +20,7 @@ export function InstallGuide() {
   const pwa = useSyncExternalStore(subscribePwa, getPwaState)
   const [platform] = useState(() => detectPlatform())
   const [outcome, setOutcome] = useState<string | null>(null)
+  const androidInstallPaused = isAndroidInstallPaused(platform)
 
   if (pwa.standalone) {
     return (
@@ -41,7 +43,7 @@ export function InstallGuide() {
           Installed. Look for Pocket Goblin on your home screen or in your apps.
         </p>
       ) : null}
-      {pwa.canPrompt ? (
+      {pwa.canPrompt && !androidInstallPaused ? (
         <Button
           onClick={() =>
             void promptInstall().then((result) =>
@@ -57,7 +59,22 @@ export function InstallGuide() {
         </Button>
       ) : null}
       {outcome ? <p className={styles.sub}>{outcome}</p> : null}
-      {platform === 'ios-safari' ? (
+      {androidInstallPaused ? (
+        <div role="status">
+          <p className={styles.sub}>
+            Android app installation is temporarily paused while we investigate
+            Google Play Protect warnings about browser-generated app packages.
+            You can still use Pocket Goblin at <strong>pocketgoblin.org</strong>{' '}
+            in your browser.
+          </p>
+          <p className={styles.sub}>
+            If your browser menu offers <strong>Install app</strong> and Play
+            Protect warns that the app was built for an older Android version,
+            choose <strong>OK</strong>, not <strong>Install anyway</strong>. You
+            don’t need to install anything to use Pocket Goblin.
+          </p>
+        </div>
+      ) : platform === 'ios-safari' ? (
         <ol className={styles.sub}>
           <li>
             Tap the <strong>Share</strong> button (the square with an arrow).
@@ -81,12 +98,6 @@ export function InstallGuide() {
           Share → Add to Home Screen. Newer iOS versions also offer it from
           Share in other browsers.
         </p>
-      ) : platform === 'samsung' ? (
-        <p className={styles.sub}>
-          Tap the menu (☰) and choose <strong>Add page to</strong> →{' '}
-          <strong>Home screen</strong>, or the install icon in the address bar
-          if it appears.
-        </p>
       ) : platform === 'firefox' ? (
         <p className={styles.sub}>
           Firefox on Android: menu → <strong>Install</strong> (or Add to Home
@@ -106,11 +117,13 @@ export function InstallGuide() {
           apps.
         </p>
       ) : null}
-      <p className={styles.sub}>
-        No app store, no download beyond the website itself. Once installed,
-        long-press the icon (Android, desktop Chrome/Edge) for a{' '}
-        <strong>Talk to Goblin</strong> shortcut.
-      </p>
+      {!androidInstallPaused ? (
+        <p className={styles.sub}>
+          No app-store account required. Your browser handles installation. Once
+          installed, long-press the icon (Android, desktop Chrome/Edge) for a{' '}
+          <strong>Talk to Goblin</strong> shortcut.
+        </p>
+      ) : null}
     </>
   )
 }
