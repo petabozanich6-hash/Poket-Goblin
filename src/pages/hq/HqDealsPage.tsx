@@ -337,7 +337,10 @@ export function HqDealsPage() {
         discount campaigns remain inactive until secure redemption is
         implemented.
       </p>
-      <nav aria-label="Deals & Mischief sections" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+      <nav
+        aria-label="Deals & Mischief sections"
+        style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}
+      >
         <Button
           variant={section === 'gifts' ? 'primary' : 'secondary'}
           onClick={() => setSection('gifts')}
@@ -356,249 +359,272 @@ export function HqDealsPage() {
       ) : (
         <>
           <p role="status">{message}</p>
-          <p>Discount codes are drafts only. Billing-safe redemption is not yet enabled.</p>
-          <Card>
-        <h3>Create a campaign</h3>
-        <form
-          onSubmit={submit}
-          style={{ display: 'grid', gap: 12, maxWidth: 600 }}
-        >
-          <label>
-            Mischief recipe{' '}
-            <select
-              value={preset}
-              onChange={(e) => {
-                const next = e.target.value
-                setPreset(next)
-                if (next === 'giveaway') setKind('percent')
-                if (next === 'fixed') setKind('fixed')
-                if (next === 'percent') setKind('percent')
-              }}
-            >
-              <option value="custom">Custom deal</option>
-              <option value="percent">Percentage discount</option>
-              <option value="fixed">Fixed-dollar discount (AUD)</option>
-              <option value="student">Student / verified eligibility</option>
-              <option value="founder">Founding goblins / limited places</option>
-              <option value="flash">Flash sale / time-limited deal</option>
-              <option value="giveaway">
-                Free Premium giveaway (draft only)
-              </option>
-            </select>
-          </label>
-          {preset === 'giveaway' ? (
-            <p role="note">
-              Free giveaways need a separate, time-limited Premium entitlement
-              with no checkout or recurring charges. Save a campaign draft for
-              now; giveaway redemption is not enabled yet.
-            </p>
-          ) : null}
-          <label>
-            Code{' '}
-            <input
-              name="code"
-              required
-              minLength={3}
-              maxLength={32}
-              placeholder="UNI20"
-            />
-          </label>
-          <label>
-            Campaign name{' '}
-            <input name="name" required minLength={3} maxLength={100} />
-          </label>
-          <label>
-            Discount type{' '}
-            <select
-              value={kind}
-              onChange={(e) => setKind(e.target.value as 'percent' | 'fixed')}
-            >
-              <option value="percent">Percentage</option>
-              <option value="fixed">Fixed amount (AUD)</option>
-            </select>
-          </label>
-          <label>
-            Discount {kind === 'percent' ? '(%)' : '(A$)'}{' '}
-            <input
-              name="amount"
-              type="number"
-              min={kind === 'percent' ? 1 : 0.01}
-              max={kind === 'percent' ? 100 : undefined}
-              step={kind === 'percent' ? 1 : 0.01}
-              required
-            />
-          </label>
-          <label>
-            Discounted invoices (not months){' '}
-            <input
-              name="cycles"
-              type="number"
-              min={1}
-              max={36}
-              defaultValue={1}
-              required
-            />
-          </label>
-          <p role="note">
-            CAUTION: A billing cycle means one invoice, not one calendar month.
-            Six cycles means six months on a monthly plan but six years on an
-            annual plan. These draft codes cannot be activated or redeemed.
-            Calendar-duration and plan-specific discount rules are being
-            designed separately. Free Premium gifts are handled above.
+          <p>
+            Discount codes are drafts only. Billing-safe redemption is not yet
+            enabled.
           </p>
-          <label>
-            Audience{' '}
-            <select name="audience">
-              <option value="new">New subscribers</option>
-              <option value="existing">Existing subscribers</option>
-              <option value="all">All subscribers</option>
-            </select>
-          </label>
-          <label>
-            Eligibility{' '}
-            <select name="verification">
-              <option value="none">No verification required</option>
-              <option value="manual">Manual verification required</option>
-            </select>
-          </label>
-          <label>
-            Start date (optional) <input name="startAt" type="datetime-local" />
-          </label>
-          <label>
-            Expiry date (optional){' '}
-            <input name="expiresAt" type="datetime-local" />
-          </label>
-          <label>
-            Days after activation before expiry (optional){' '}
-            <input
-              name="activationWindowDays"
-              type="number"
-              min={1}
-              max={365}
-            />
-          </label>
-          <label>
-            Maximum redemptions (optional){' '}
-            <input name="max" type="number" min={1} />
-          </label>
-          <label>
-            Maximum committed discount budget (A$, optional){' '}
-            <input name="budget" type="number" step="0.01" min="0.01" />
-          </label>
-          <Button type="submit" disabled={create.isPending}>
-            Save inactive campaign
-          </Button>
-        </form>
-      </Card>
-      {deals.isLoading ? (
-        <p>Counting mischief…</p>
-      ) : deals.isError ? (
-        <p role="alert">
-          Unable to load campaigns. Check database migration 0015.
-        </p>
-      ) : (
-        deals.data?.campaigns.map((p) => (
-          <Card key={p.id}>
-            <h3>
-              {p.name} — <code>{p.code}</code> (
-              {p.active ? 'Active' : 'Inactive'})
-            </h3>
-            <p>
-              {p.kind === 'percent' ? `${p.amount}%` : money(p.amount)} off for{' '}
-              {p.billing_cycles} billing cycle(s). Audience: {p.audience}.{' '}
-              {p.verification === 'manual'
-                ? 'Manual eligibility verification required.'
-                : ''}
-            </p>
-            <p>
-              Redemptions: {p.redemptions}
-              {p.max_redemptions !== null ? ` / ${p.max_redemptions}` : ''} ·
-              Revenue: {money(p.revenue_cents)} · Discounts given:{' '}
-              {money(p.realised_cents)}
-            </p>
-            <p>
-              Committed: {money(p.committed_cents)} · Outstanding:{' '}
-              {money(Math.max(0, p.committed_cents - p.realised_cents))} ·
-              Budget left:{' '}
-              {p.budget_cents === null
-                ? 'Unlimited'
-                : money(Math.max(0, p.budget_cents - p.committed_cents))}
-            </p>
-            {p.activation_window_days ? (
-              <p>Expires {p.activation_window_days} days after activation.</p>
-            ) : null}
-            <Button
-              variant="secondary"
-              onClick={() =>
-                setExpandedTracker(expandedTracker === p.id ? null : p.id)
-              }
+          <Card>
+            <h3>Create a campaign</h3>
+            <form
+              onSubmit={submit}
+              style={{ display: 'grid', gap: 12, maxWidth: 600 }}
             >
-              {expandedTracker === p.id ? 'Hide claims' : 'View claim tracker'}
-            </Button>
-            {expandedTracker === p.id ? (
-              <RedemptionTracker campaignId={p.id} />
-            ) : null}
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <Button
-                variant="secondary"
-                disabled={!p.active || edit.isPending}
-                onClick={() =>
-                  edit.mutate({ id: p.id, fields: { active: false } })
-                }
-              >
-                Deactivate
+              <label>
+                Mischief recipe{' '}
+                <select
+                  value={preset}
+                  onChange={(e) => {
+                    const next = e.target.value
+                    setPreset(next)
+                    if (next === 'giveaway') setKind('percent')
+                    if (next === 'fixed') setKind('fixed')
+                    if (next === 'percent') setKind('percent')
+                  }}
+                >
+                  <option value="custom">Custom deal</option>
+                  <option value="percent">Percentage discount</option>
+                  <option value="fixed">Fixed-dollar discount (AUD)</option>
+                  <option value="student">
+                    Student / verified eligibility
+                  </option>
+                  <option value="founder">
+                    Founding goblins / limited places
+                  </option>
+                  <option value="flash">Flash sale / time-limited deal</option>
+                  <option value="giveaway">
+                    Free Premium giveaway (draft only)
+                  </option>
+                </select>
+              </label>
+              {preset === 'giveaway' ? (
+                <p role="note">
+                  Free giveaways need a separate, time-limited Premium
+                  entitlement with no checkout or recurring charges. Save a
+                  campaign draft for now; giveaway redemption is not enabled
+                  yet.
+                </p>
+              ) : null}
+              <label>
+                Code{' '}
+                <input
+                  name="code"
+                  required
+                  minLength={3}
+                  maxLength={32}
+                  placeholder="UNI20"
+                />
+              </label>
+              <label>
+                Campaign name{' '}
+                <input name="name" required minLength={3} maxLength={100} />
+              </label>
+              <label>
+                Discount type{' '}
+                <select
+                  value={kind}
+                  onChange={(e) =>
+                    setKind(e.target.value as 'percent' | 'fixed')
+                  }
+                >
+                  <option value="percent">Percentage</option>
+                  <option value="fixed">Fixed amount (AUD)</option>
+                </select>
+              </label>
+              <label>
+                Discount {kind === 'percent' ? '(%)' : '(A$)'}{' '}
+                <input
+                  name="amount"
+                  type="number"
+                  min={kind === 'percent' ? 1 : 0.01}
+                  max={kind === 'percent' ? 100 : undefined}
+                  step={kind === 'percent' ? 1 : 0.01}
+                  required
+                />
+              </label>
+              <label>
+                Discounted invoices (not months){' '}
+                <input
+                  name="cycles"
+                  type="number"
+                  min={1}
+                  max={36}
+                  defaultValue={1}
+                  required
+                />
+              </label>
+              <p role="note">
+                CAUTION: A billing cycle means one invoice, not one calendar
+                month. Six cycles means six months on a monthly plan but six
+                years on an annual plan. These draft codes cannot be activated
+                or redeemed. Calendar-duration and plan-specific discount rules
+                are being designed separately. Free Premium gifts are handled
+                above.
+              </p>
+              <label>
+                Audience{' '}
+                <select name="audience">
+                  <option value="new">New subscribers</option>
+                  <option value="existing">Existing subscribers</option>
+                  <option value="all">All subscribers</option>
+                </select>
+              </label>
+              <label>
+                Eligibility{' '}
+                <select name="verification">
+                  <option value="none">No verification required</option>
+                  <option value="manual">Manual verification required</option>
+                </select>
+              </label>
+              <label>
+                Start date (optional){' '}
+                <input name="startAt" type="datetime-local" />
+              </label>
+              <label>
+                Expiry date (optional){' '}
+                <input name="expiresAt" type="datetime-local" />
+              </label>
+              <label>
+                Days after activation before expiry (optional){' '}
+                <input
+                  name="activationWindowDays"
+                  type="number"
+                  min={1}
+                  max={365}
+                />
+              </label>
+              <label>
+                Maximum redemptions (optional){' '}
+                <input name="max" type="number" min={1} />
+              </label>
+              <label>
+                Maximum committed discount budget (A$, optional){' '}
+                <input name="budget" type="number" step="0.01" min="0.01" />
+              </label>
+              <Button type="submit" disabled={create.isPending}>
+                Save inactive campaign
               </Button>
-              <Button
-                variant="secondary"
-                disabled={edit.isPending}
-                onClick={() => {
-                  const s = window.prompt('New campaign name', p.name)
-                  if (s) edit.mutate({ id: p.id, fields: { name: s } })
-                }}
-              >
-                Rename
-              </Button>
-              <Button
-                variant="secondary"
-                disabled={edit.isPending}
-                onClick={() => {
-                  const s = window.prompt(
-                    'Maximum redemption count (blank = unlimited)',
-                    String(p.max_redemptions ?? ''),
-                  )
-                  if (s !== null)
-                    edit.mutate({
-                      id: p.id,
-                      fields: { maxRedemptions: s === '' ? null : Number(s) },
-                    })
-                }}
-              >
-                Redemption cap
-              </Button>
-              <Button
-                variant="secondary"
-                disabled={edit.isPending}
-                onClick={() => {
-                  const s = window.prompt(
-                    'Discount commitment budget in AUD (blank = unlimited)',
-                    p.budget_cents === null ? '' : String(p.budget_cents / 100),
-                  )
-                  if (s !== null)
-                    edit.mutate({
-                      id: p.id,
-                      fields: {
-                        budgetCents:
-                          s === '' ? null : Math.round(Number(s) * 100),
-                      },
-                    })
-                }}
-              >
-                Budget
-              </Button>
-            </div>
+            </form>
           </Card>
-        ))
-      )}
+          {deals.isLoading ? (
+            <p>Counting mischief…</p>
+          ) : deals.isError ? (
+            <p role="alert">
+              Unable to load campaigns. Check database migration 0015.
+            </p>
+          ) : (
+            deals.data?.campaigns.map((p) => (
+              <Card key={p.id}>
+                <h3>
+                  {p.name} — <code>{p.code}</code> (
+                  {p.active ? 'Active' : 'Inactive'})
+                </h3>
+                <p>
+                  {p.kind === 'percent' ? `${p.amount}%` : money(p.amount)} off
+                  for {p.billing_cycles} billing cycle(s). Audience:{' '}
+                  {p.audience}.{' '}
+                  {p.verification === 'manual'
+                    ? 'Manual eligibility verification required.'
+                    : ''}
+                </p>
+                <p>
+                  Redemptions: {p.redemptions}
+                  {p.max_redemptions !== null
+                    ? ` / ${p.max_redemptions}`
+                    : ''}{' '}
+                  · Revenue: {money(p.revenue_cents)} · Discounts given:{' '}
+                  {money(p.realised_cents)}
+                </p>
+                <p>
+                  Committed: {money(p.committed_cents)} · Outstanding:{' '}
+                  {money(Math.max(0, p.committed_cents - p.realised_cents))} ·
+                  Budget left:{' '}
+                  {p.budget_cents === null
+                    ? 'Unlimited'
+                    : money(Math.max(0, p.budget_cents - p.committed_cents))}
+                </p>
+                {p.activation_window_days ? (
+                  <p>
+                    Expires {p.activation_window_days} days after activation.
+                  </p>
+                ) : null}
+                <Button
+                  variant="secondary"
+                  onClick={() =>
+                    setExpandedTracker(expandedTracker === p.id ? null : p.id)
+                  }
+                >
+                  {expandedTracker === p.id
+                    ? 'Hide claims'
+                    : 'View claim tracker'}
+                </Button>
+                {expandedTracker === p.id ? (
+                  <RedemptionTracker campaignId={p.id} />
+                ) : null}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <Button
+                    variant="secondary"
+                    disabled={!p.active || edit.isPending}
+                    onClick={() =>
+                      edit.mutate({ id: p.id, fields: { active: false } })
+                    }
+                  >
+                    Deactivate
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    disabled={edit.isPending}
+                    onClick={() => {
+                      const s = window.prompt('New campaign name', p.name)
+                      if (s) edit.mutate({ id: p.id, fields: { name: s } })
+                    }}
+                  >
+                    Rename
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    disabled={edit.isPending}
+                    onClick={() => {
+                      const s = window.prompt(
+                        'Maximum redemption count (blank = unlimited)',
+                        String(p.max_redemptions ?? ''),
+                      )
+                      if (s !== null)
+                        edit.mutate({
+                          id: p.id,
+                          fields: {
+                            maxRedemptions: s === '' ? null : Number(s),
+                          },
+                        })
+                    }}
+                  >
+                    Redemption cap
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    disabled={edit.isPending}
+                    onClick={() => {
+                      const s = window.prompt(
+                        'Discount commitment budget in AUD (blank = unlimited)',
+                        p.budget_cents === null
+                          ? ''
+                          : String(p.budget_cents / 100),
+                      )
+                      if (s !== null)
+                        edit.mutate({
+                          id: p.id,
+                          fields: {
+                            budgetCents:
+                              s === '' ? null : Math.round(Number(s) * 100),
+                          },
+                        })
+                    }}
+                  >
+                    Budget
+                  </Button>
+                </div>
+              </Card>
+            ))
+          )}
         </>
       )}
     </section>
