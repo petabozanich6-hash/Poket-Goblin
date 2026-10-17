@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       models:
-        description: "Select model trial"
+        description: 'Select model trial'
         required: true
         type: choice
         default: qwen
@@ -14,7 +14,7 @@ on:
           - baseline
           - all-four
       confirm_charge:
-        description: "Type RUN to authorise a small real inference test (possibly billable)"
+        description: 'Type RUN to authorise a small real inference test (possibly billable)'
         required: true
         type: string
 permissions:
