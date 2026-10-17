@@ -631,7 +631,9 @@ export function DocumentDevourer({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (reading) return
-    const input = event.currentTarget.elements.namedItem('file') as HTMLInputElement
+    const input = event.currentTarget.elements.namedItem(
+      'file',
+    ) as HTMLInputElement
     const files = Array.from(input.files ?? [])
     if (!files.length) {
       setError('Choose at least one file first.')
@@ -652,7 +654,9 @@ export function DocumentDevourer({
     const chosenMode = mode
     setError(null)
     setResult(null)
-    setBatch(files.map((file, id) => ({ id, name: file.name, status: 'waiting' })))
+    setBatch(
+      files.map((file, id) => ({ id, name: file.name, status: 'waiting' })),
+    )
     setReading(true)
     event.currentTarget.reset()
     // Process one file at a time. Every file retains the existing server-side
@@ -812,12 +816,17 @@ export function DocumentDevourer({
           <ul>
             {batch.map((item) => (
               <li key={item.id}>
-                <strong>{item.name}</strong> — {
-                  item.status === 'waiting' ? 'Waiting' :
-                  item.status === 'reading' ? 'Reading…' :
-                  item.status === 'failed' ? 'Could not read' : 'Ready for review'
-                }
-                {item.error ? <p className={styles.error}>{item.error}</p> : null}
+                <strong>{item.name}</strong> —{' '}
+                {item.status === 'waiting'
+                  ? 'Waiting'
+                  : item.status === 'reading'
+                    ? 'Reading…'
+                    : item.status === 'failed'
+                      ? 'Could not read'
+                      : 'Ready for review'}
+                {item.error ? (
+                  <p className={styles.error}>{item.error}</p>
+                ) : null}
                 {item.result ? (
                   <Button
                     type="button"
