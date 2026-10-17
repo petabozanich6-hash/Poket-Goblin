@@ -191,7 +191,10 @@ export function TellTheGoblin({ prominent = false }: { prominent?: boolean }) {
         {files.length ? (
           <div className={styles.attachment}>
             <Paperclip size={14} aria-hidden />
-            <div className={styles.fileName} aria-label="Documents ready to upload">
+            <div
+              className={styles.fileName}
+              aria-label="Documents ready to upload"
+            >
               <strong>{files.length} document(s) selected</strong>
               <ul>
                 {files.map((item, index) => (
