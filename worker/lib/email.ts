@@ -64,6 +64,7 @@ const COLOURS = {
   paper: '#f7f4ef',
   card: '#ffffff',
   border: '#e2ddd3',
+  gold: '#d8b86d',
 }
 
 /**
@@ -88,6 +89,7 @@ export function accountEmail(input: {
     '',
     input.footer,
     '',
+    'Your brain has enough tabs open. Let the goblin handle it.',
     `Pocket Goblin · ${SUPPORT}`,
   ].join('\n')
   const c = COLOURS
@@ -95,7 +97,7 @@ export function accountEmail(input: {
   const button = input.action
     ? `<tr><td style="padding:8px 0 4px">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td style="border-radius:10px;background:${c.forest}">
-<a href="${escapeHtml(input.action.url)}" style="display:inline-block;padding:12px 22px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px">${escapeHtml(input.action.label)}</a>
+<a href="${escapeHtml(input.action.url)}" style="display:inline-block;padding:14px 24px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px">${escapeHtml(input.action.label)}</a>
 </td></tr></table></td></tr>
 <tr><td style="padding:12px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:${c.muted}">
 If the button doesn’t work, copy this link into your browser:<br>
@@ -113,24 +115,24 @@ If the button doesn’t work, copy this link into your browser:<br>
 <body style="margin:0;padding:0;background:${c.paper}">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0">${preheader}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${c.paper}">
-<tr><td align="center" style="padding:24px 12px">
+<tr><td align="center" style="padding:32px 12px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px">
-<tr><td style="padding:0 0 16px">
+<tr><td style="background:${c.forest};border-radius:18px 18px 0 0;padding:22px 24px 18px">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-<td style="vertical-align:middle"><img src="${LOGO_URL}" width="48" height="48" alt="" style="display:block;border:0;border-radius:12px"></td>
-<td style="vertical-align:middle;padding-left:12px;font-family:Georgia,'Times New Roman',serif;font-size:20px;font-weight:700;color:${c.forest}">Pocket Goblin</td>
+<td style="vertical-align:middle"><img src="${LOGO_URL}" width="54" height="54" alt="Pocket Goblin mascot" style="display:block;border:0;border-radius:14px;background:${c.paper}"></td>
+<td style="vertical-align:middle;padding-left:14px;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:700;color:#ffffff">Pocket Goblin<br><span style="font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:400;letter-spacing:1px;color:${c.gold}">A LITTLE LESS CHAOS. A LOT MORE GOBLIN.</span></td>
 </tr></table>
 </td></tr>
-<tr><td style="background:${c.card};border:1px solid ${c.border};border-radius:14px;padding:24px">
+<tr><td style="background:${c.card};border:1px solid ${c.border};border-top:4px solid ${c.gold};border-radius:0 0 18px 18px;padding:28px 24px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-<tr><td style="padding:0 0 12px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.55;color:${c.ink}">${escapeHtml(input.greeting)}</td></tr>
+<tr><td style="padding:0 0 18px;font-family:Georgia,'Times New Roman',serif;font-size:25px;font-weight:bold;line-height:1.25;color:${c.forest}">${escapeHtml(input.greeting)}</td></tr>
 ${input.lines.map((l) => `<tr><td style="padding:0 0 12px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.55;color:${c.ink}">${escapeHtml(l)}</td></tr>`).join('\n')}
 ${button}
 <tr><td style="padding:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:${c.muted}">${escapeHtml(input.footer)}</td></tr>
 </table>
 </td></tr>
 <tr><td style="padding:16px 4px 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:${c.faint}">
-Pocket Goblin · Questions? Reply to this email or write to <a href="mailto:${SUPPORT}" style="color:${c.faint}">${SUPPORT}</a>.
+<strong style="color:${c.forest}">Your brain has enough tabs open. Let the goblin handle it.</strong><br>Questions? Write to <a href="mailto:${SUPPORT}" style="color:${c.forest}">${SUPPORT}</a>.
 </td></tr>
 </table>
 </td></tr>
