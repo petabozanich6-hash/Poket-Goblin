@@ -575,7 +575,13 @@ export function withDeadlinePlan<
   // no assessment due date. The learner chooses their own completion target
   // in the pathway preview. Never turn "Available / OPEN" into a due date.
   const moduleActivities = suggestModuleStudy(text, options.filename)
-  if (moduleActivities.length) {
+  // A full course timetable with weekly topics or assessment deadlines
+  // already has a better, date-grounded pathway. The module activity fallback
+  // is only for standalone material with no reliable scheduled requirements.
+  const hasDatedStudyPlan =
+    (plan?.deadlines.length ?? 0) > 0 ||
+    (plan?.suggestions.some((item) => item.group === 'Week by week') ?? false)
+  if (moduleActivities.length && !hasDatedStudyPlan) {
     const actualDeadlines = plan?.deadlines ?? []
     return {
       ...understanding,
