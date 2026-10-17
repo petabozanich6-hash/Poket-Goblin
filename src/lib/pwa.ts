@@ -65,6 +65,14 @@ export type Platform =
   | 'firefox'
   | 'other'
 
+/** Samsung Internet currently produces Play Protect warnings for some PWAs.
+ * Do not trigger its installation prompt until the browser issue is resolved.
+ * Installation via another browser remains optional and is never a prerequisite.
+ */
+export function canOfferInstallPrompt(platform: Platform, available: boolean) {
+  return available && platform !== 'samsung'
+}
+
 export function detectPlatform(ua = navigator.userAgent): Platform {
   const iOS =
     /iPad|iPhone|iPod/.test(ua) ||
