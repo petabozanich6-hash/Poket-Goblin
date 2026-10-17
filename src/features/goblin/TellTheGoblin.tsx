@@ -100,11 +100,9 @@ export function TellTheGoblin({ prominent = false }: { prominent?: boolean }) {
           const devour = await devourDocument(attachment, mode)
           add({ kind: 'document', devour })
         } catch (err) {
-          failures.push(
-            `${attachment.name}: ${
-              err instanceof ApiError ? err.message : 'Could not read this file.'
-            }`,
-          )
+          const message =
+            err instanceof ApiError ? err.message : 'Could not read this file.'
+          failures.push(`${attachment.name}: ${message}`)
         }
       }
       if (failures.length) setError(failures.join(' · '))
