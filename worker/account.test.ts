@@ -223,9 +223,7 @@ describe('opt-in verified email registration gate', () => {
       verificationRequired: true,
       emailSent: false,
     })
-    expect((await test.login('delivery-recovery@example.com')).status).toBe(
-      403,
-    )
+    expect((await test.login('delivery-recovery@example.com')).status).toBe(403)
     const resend = await test.request('/api/auth/verify-email/resend', {
       body: { email: 'delivery-recovery@example.com' },
     })
@@ -235,9 +233,7 @@ describe('opt-in verified email registration gate', () => {
       body: { token: lastToken('verify-email') },
     })
     expect(verify.status).toBe(200)
-    expect((await test.login('delivery-recovery@example.com')).status).toBe(
-      200,
-    )
+    expect((await test.login('delivery-recovery@example.com')).status).toBe(200)
   })
 
   it('sends email but denies access until the proof link is used', async () => {
