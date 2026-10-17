@@ -19,8 +19,10 @@ import {
 /** Approvals always require the backend to revalidate the displayed pathway. */
 export function StudyPathwayPreviewPanel({
   documentId,
+  onApproved,
 }: {
   documentId: string
+  onApproved?: () => void
 }) {
   const queryClient = useQueryClient()
   const [minutes, setMinutes] = useState(60)
@@ -118,6 +120,7 @@ export function StudyPathwayPreviewPanel({
       setSaved(true)
       setCalendarChanged(true)
       await refreshSaved()
+      onApproved?.()
       await Promise.all([
         queryClient.invalidateQueries({
           queryKey: ['dated-calendar-tasks'],
@@ -332,6 +335,8 @@ export function StudyPathwayPreviewPanel({
           </Button>
         </div>
       ) : null}
+      {stored?.pathway?.status !== 'active' ? (
+      <>
       <p>
         See how these steps could fit into your available study days. Previewing
         does not change your tasks or calendar. Only approving a complete plan
@@ -458,6 +463,8 @@ export function StudyPathwayPreviewPanel({
             </Button>
           )}
         </div>
+      ) : null}
+      </>
       ) : null}
     </section>
   )
