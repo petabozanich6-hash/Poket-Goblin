@@ -197,9 +197,11 @@ describe('document to approved study pathway journey', () => {
 
   it('extracts a real Chrome-generated university PDF into reviewable assessment steps', async () => {
     const bytes = readFileSync(
-      new URL(
-        '../shared/documents/fixtures/chrome-letter-spaced.pdf',
-        import.meta.url,
+      fileURLToPath(
+        new URL(
+          '../shared/documents/fixtures/chrome-letter-spaced.pdf',
+          import.meta.url,
+        ),
       ),
     )
     const data = new FormData()
