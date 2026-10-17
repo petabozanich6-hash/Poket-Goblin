@@ -780,7 +780,9 @@ describe('launch-time promotion safety', () => {
       admin: true,
     })
     expect(discarded.status).toBe(200)
-    expect(h.query('SELECT id FROM promotion_campaigns WHERE id = ?', id)).toEqual([])
+    expect(
+      h.query('SELECT id FROM promotion_campaigns WHERE id = ?', id),
+    ).toEqual([])
     expect(
       h.query(
         "SELECT action FROM admin_audit_log WHERE target_id = ? AND action = 'deals.discard_draft'",
@@ -798,7 +800,9 @@ describe('launch-time promotion safety', () => {
       linkedId,
     )
     const linked = await h.request(`/api/admin/deals/${linkedId}`, {
-      cookie: owner.cookie, method: 'DELETE', admin: true,
+      cookie: owner.cookie,
+      method: 'DELETE',
+      admin: true,
     })
     expect(linked.status).toBe(409)
     const claimedId = await draft('DRAFTCLAIMED')
@@ -811,11 +815,17 @@ describe('launch-time promotion safety', () => {
       alice.id,
     )
     const claimed = await h.request(`/api/admin/deals/${claimedId}`, {
-      cookie: owner.cookie, method: 'DELETE', admin: true,
+      cookie: owner.cookie,
+      method: 'DELETE',
+      admin: true,
     })
     expect(claimed.status).toBe(409)
     expect(
-      h.query('SELECT id FROM promotion_campaigns WHERE id IN (?, ?) ORDER BY id', linkedId, claimedId),
+      h.query(
+        'SELECT id FROM promotion_campaigns WHERE id IN (?, ?) ORDER BY id',
+        linkedId,
+        claimedId,
+      ),
     ).toHaveLength(2)
   })
 
@@ -835,14 +845,16 @@ describe('launch-time promotion safety', () => {
       return new Response(
         JSON.stringify({
           has_more: false,
-          data: [{
-            id: 'promo_live_1',
-            code: 'GOBLINFOUNDERS30',
-            active: true,
-            times_redeemed: 0,
-            max_redemptions: 100,
-            expires_at: null,
-          }],
+          data: [
+            {
+              id: 'promo_live_1',
+              code: 'GOBLINFOUNDERS30',
+              active: true,
+              times_redeemed: 0,
+              max_redemptions: 100,
+              expires_at: null,
+            },
+          ],
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       )
@@ -855,12 +867,14 @@ describe('launch-time promotion safety', () => {
       expect(await json(result)).toMatchObject({
         live: true,
         hasMore: false,
-        codes: [{
-          code: 'GOBLINFOUNDERS30',
-          active: true,
-          redemptions: 0,
-          maxRedemptions: 100,
-        }],
+        codes: [
+          {
+            code: 'GOBLINFOUNDERS30',
+            active: true,
+            redemptions: 0,
+            maxRedemptions: 100,
+          },
+        ],
       })
       expect(requests).toHaveLength(1)
       expect(requests[0]?.method).toBe('GET')
