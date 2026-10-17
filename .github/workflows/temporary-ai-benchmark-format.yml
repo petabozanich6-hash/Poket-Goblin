@@ -15,12 +15,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx prettier --write scripts/compare-pocket-ai.mjs scripts/compare-pocket-ai.test.mjs docs/MANUAL-AI-MODEL-COMPARISON.md .github/workflows/manual-compare-pocket-ai.yml
+      - run: npx prettier --write scripts/compare-pocket-ai.mjs scripts/compare-pocket-ai.test.mjs docs/MANUAL-AI-MODEL-COMPARISON.md
       - name: Commit formatted benchmark files
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add scripts/compare-pocket-ai.mjs scripts/compare-pocket-ai.test.mjs docs/MANUAL-AI-MODEL-COMPARISON.md .github/workflows/manual-compare-pocket-ai.yml
+          git add scripts/compare-pocket-ai.mjs scripts/compare-pocket-ai.test.mjs docs/MANUAL-AI-MODEL-COMPARISON.md
           if ! git diff --cached --quiet; then
             git commit -m "Format manual AI benchmark tooling"
             git push origin HEAD:chore/manual-cloudflare-model-benchmarks-20261017
