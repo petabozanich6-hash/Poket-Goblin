@@ -17,8 +17,8 @@ function aud(value: number) {
 }
 
 /**
- * Cloudflare Workers AI billing is neuron/token based. The existing database
- * only records request counts; do not disguise those as actual expenses.
+ * The per-inference table measures call duration and reported/approximate tokens.
+ * Only exact published model rates produce gross estimates, never invoices.
  */
 export function HqCostsPage() {
   const [rawUsd, setRawUsd] = useState('')
@@ -32,6 +32,7 @@ export function HqCostsPage() {
     staleTime: 60 * 60_000,
   })
   const quote = fx.data?.quote ?? null
+  const inference = overview.data?.ai.costs
   const usd = rawUsd.trim() !== '' ? Number(rawUsd) : null
   const amountValid =
     usd !== null && Number.isFinite(usd) && usd >= 0 && usd <= 1_000_000_000
@@ -72,11 +73,72 @@ export function HqCostsPage() {
           </div>
         </div>
         <p className={styles.note}>
-          <strong>Actual AI spending in AUD: not yet available.</strong> The
-          database counts requests but does not record chargeable model usage. A
-          request is not a fixed-cost unit; displaying an invented total would
-          be misleading. Cloudflare billing is the source of truth.
+          <strong>Cloudflare's actual AI bill is not available here.</strong>{' '}
+          {inference?.available
+            ? `We measured ${inference.trackedCalls30d} model calls over the last 30 days. ${inference.unpricedCalls30d} successful calls have no verified dollar estimate. Historical calls before tracking began are not included.`
+            : inference?.reason ?? 'Loading inference measurements.'}{' '}
+          Your Cloudflare billing page remains the source of truth.
         </p>
+      </Card>
+
+      <Card>
+        <h2 className={styles.sectionTitle}>AI model performance (last 30 days)</h2>
+        <p className={styles.sectionLead}>
+          Call counts, mean inference duration and indicative gross costs — no
+          prompts, document contents or personal details are stored.
+        </p>
+        {inference?.available ? (
+          <>
+            <p className={styles.note}>
+              Tracking began: {inference.trackedSince ?? 'No calls yet'}.
+              Estimated gross for priced models only: US${inference.estimatedGrossUsd30d.toFixed(4)}
+              {quote
+                ? ` (approximately ${aud(inference.estimatedGrossUsd30d * quote.rate)} at the reference rate)`
+                : ''}.
+              {inference.unpricedCalls30d > 0
+                ? ' Some calls are unpriced; do not treat this as a total.'
+                : ''}
+            </p>
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>Model / type</th>
+                    <th>Calls</th>
+                    <th>Failures</th>
+                    <th>Average</th>
+                    <th>Token basis</th>
+                    <th>Gross estimate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {inference.models.map((m) => (
+                    <tr key={`${m.model}:${m.modality}`}>
+                      <td>{m.model} ({m.modality})</td>
+                      <td>{m.calls}</td>
+                      <td>{m.failures}</td>
+                      <td>{(m.avgMs / 1000).toFixed(2)} s</td>
+                      <td>{m.reportedTokens} reported, {m.approximateTokens} approximate, {m.unknownTokens} unknown</td>
+                      <td>
+                        {m.unpricedCalls > 0
+                          ? `Unpriced (${m.unpricedCalls} calls)`
+                          : `US${m.estimatedGrossUsd.toFixed(4)}`}
+                      </td>
+                    </tr>
+                  ))}
+                  {inference.models.length === 0 && (
+                    <tr><td colSpan={6}>No AI calls measured yet.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <p className={styles.note}>{inference.note}</p>
+          </>
+        ) : (
+          <p className={styles.note}>
+            {inference?.reason ?? 'Loading AI model measurements.'}
+          </p>
+        )}
       </Card>
 
       <Card>
