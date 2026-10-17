@@ -8,7 +8,7 @@ Migrations in `migrations/` are applied to the production database by a
 | ---------- | ----------------------------------------- |
 | Database   | `pocket-goblin`                           |
 | D1 ID      | `91a90710-dbd7-4a0c-8c90-b97cd3c86d90`    |
-| Migrations | `migrations/0001_…` to `0007_…`, in order |
+| Migrations | `migrations/0001_…` to `0020_…`, in order (including pending changes on PR #38) |
 
 The workflow only ever targets that database. The ID is pinned in the
 workflow and in `scripts/d1-migrations.mjs`. Every run checks that
@@ -17,6 +17,33 @@ contacting Cloudflare.
 
 It does **not** deploy the Worker or the website, change R2, routes, the
 domain, DNS or SSL, or create any Cloudflare resource.
+
+## Pocket Goblin Phase 1 pathway rollout (PR #38)
+
+**Do not apply these migrations while the PR is still in draft.** The study
+pathway feature depends on the two new additive migrations and the Worker code
+being released together:
+
+- `0019_study_pathways.sql` creates the versioned approved pathways and
+  sessions, with account-deletion cascades and a unique active pathway per
+  document. No existing tasks or documents are changed.
+- `0020_study_pathway_deadlines.sql` adds the separate immutable source
+  deadline for each session. It is intentionally nullable to preserve old
+  records; no existing data is rewritten.
+
+Before release, merge the reviewed feature to `main`, run the workflow's
+**read-only preflight** and check the exact pending migration list and restore
+point process. Then run the approval-gated **apply** job and verify zero pending
+migrations. **Only after the schema is confirmed current** should the new Worker
+code be deployed. Do not point the new approval endpoints at an unmigrated
+database.
+
+A local upgrade regression test in `worker/migrations.test.ts` verifies that
+versions 0019–0020 apply on top of version 0018 without altering pre-existing
+tasks. It also checks one-active-pathway constraints and account deletion.
+
+This document explains the rollout; it is **not** authorization to merge,
+apply production migrations, or deploy.
 
 ## Safety model
 
