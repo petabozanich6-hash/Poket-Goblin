@@ -113,3 +113,27 @@ test('Tell page keeps earlier actionable results visible after several messages'
   // Older Undo controls must not disappear when the fourth response arrives.
   await expect(page.getByRole('button', { name: 'Undo' })).toHaveCount(4)
 })
+
+test('Tell the Goblin accepts multiple files and keeps separate reviews', async ({
+  page,
+}) => {
+  await register(page, `tell_files_${stamp}@example.com`)
+  await page.goto('/tell')
+  await page.getByLabel('Choose a document').setInputFiles([
+    {
+      name: 'first-bill.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('Energy bill amount due $40 on 28 October 2030.'),
+    },
+    {
+      name: 'second-letter.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('Appointment on 22 November 2030 at 2pm.'),
+    },
+  ])
+  await page.getByRole('button', { name: 'Give it to the Goblin' }).click()
+  await expect(page.getByText('first-bill.txt', { exact: false })).toBeVisible()
+  await expect(
+    page.getByText('second-letter.txt', { exact: false }),
+  ).toBeVisible()
+})

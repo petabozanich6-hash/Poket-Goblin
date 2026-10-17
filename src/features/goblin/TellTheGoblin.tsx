@@ -44,7 +44,7 @@ export function TellTheGoblin({ prominent = false }: { prominent?: boolean }) {
   const queryClient = useQueryClient()
   const overwhelm = useOverwhelm()
   const [text, setText] = useState('')
-  const [file, setFile] = useState<File | null>(null)
+  const [files, setFiles] = useState<File[]>([])
   const [keepFile, setKeepFile] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [results, setResults] = useState<Result[]>([])
@@ -87,18 +87,25 @@ export function TellTheGoblin({ prominent = false }: { prominent?: boolean }) {
   const send = useMutation({
     mutationFn: async ({
       words,
-      attachment,
+      attachments,
+      mode,
     }: {
       words: string
-      attachment: File | null
+      attachments: File[]
+      mode: 'keep' | 'sort'
     }) => {
-      if (attachment) {
-        const devour = await devourDocument(
-          attachment,
-          keepFile ? 'keep' : 'sort',
-        )
-        add({ kind: 'document', devour })
+      const failures: string[] = []
+      for (const attachment of attachments) {
+        try {
+          const devour = await devourDocument(attachment, mode)
+          add({ kind: 'document', devour })
+        } catch (err) {
+          const message =
+            err instanceof ApiError ? err.message : 'Could not read this file.'
+          failures.push(`${attachment.name}: ${message}`)
+        }
       }
+      if (failures.length) setError(failures.join(' · '))
       if (!words) return
       // 1. The Goblin acts on what it can against the user's own records.
       const acted = await goblinAct(words)
@@ -117,9 +124,8 @@ export function TellTheGoblin({ prominent = false }: { prominent?: boolean }) {
     },
     onSuccess: async () => {
       setText('')
-      setFile(null)
+      setFiles([])
       setKeepFile(false)
-      setError(null)
       await refresh()
     },
     onError: (err) =>
@@ -133,24 +139,34 @@ export function TellTheGoblin({ prominent = false }: { prominent?: boolean }) {
   function submit(event?: FormEvent) {
     event?.preventDefault()
     const words = text.trim()
-    if (!words && !file) return
-    send.mutate({ words, attachment: file })
+    if (!words && !files.length) return
+    setError(null)
+    send.mutate({
+      words,
+      attachments: files,
+      mode: keepFile ? 'keep' : 'sort',
+    })
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) submit()
   }
 
-  function chooseFile(chosen: File | undefined) {
-    if (!chosen) return
-    if (chosen.size > MAX_FILE_MB * 1024 * 1024) {
-      setError(
-        `That file is over ${MAX_FILE_MB} MB. Try a smaller copy or a PDF.`,
-      )
+  function chooseFiles(chosen: File[]) {
+    if (!chosen.length) return
+    if (chosen.length > 10) {
+      setError('Choose up to 10 documents at a time.')
+      return
+    }
+    const oversized = chosen.find(
+      (item) => item.size > MAX_FILE_MB * 1024 * 1024,
+    )
+    if (oversized) {
+      setError(`Each file must be under ${MAX_FILE_MB} MB: ${oversized.name}`)
       return
     }
     setError(null)
-    setFile(chosen)
+    setFiles(chosen)
   }
 
   return (
@@ -172,10 +188,12 @@ export function TellTheGoblin({ prominent = false }: { prominent?: boolean }) {
           placeholder="Pay the electricity bill Friday, book the dentist, milk and bread…"
           rows={prominent ? 3 : 2}
         />
-        {file ? (
+        {files.length ? (
           <div className={styles.attachment}>
             <Paperclip size={14} aria-hidden />
-            <span className={styles.fileName}>{file.name}</span>
+            <span className={styles.fileName}>
+              {files.map((item) => item.name).join(', ')}
+            </span>
             <label className={styles.keep}>
               <input
                 type="checkbox"
@@ -187,7 +205,7 @@ export function TellTheGoblin({ prominent = false }: { prominent?: boolean }) {
             <button
               type="button"
               className={styles.iconButton}
-              onClick={() => setFile(null)}
+              onClick={() => setFiles([])}
               aria-label="Remove file"
             >
               <X size={16} aria-hidden />
@@ -221,27 +239,30 @@ export function TellTheGoblin({ prominent = false }: { prominent?: boolean }) {
               onClick={() => fileInput.current?.click()}
             >
               <Paperclip size={18} aria-hidden />
-              <span>Add a letter or photo</span>
+              <span>Add documents or photos</span>
             </button>
             <input
               ref={fileInput}
               type="file"
               hidden
+              multiple
               accept=".pdf,.docx,.txt,.md,image/jpeg,image/png,image/webp,image/gif"
               aria-label="Choose a document"
               onChange={(e) => {
-                chooseFile(e.target.files?.[0])
+                chooseFiles(Array.from(e.target.files ?? []))
                 e.target.value = ''
               }}
             />
           </div>
           <Button
             type="submit"
-            disabled={send.isPending || (!text.trim() && !file)}
+            disabled={send.isPending || (!text.trim() && !files.length)}
           >
             <Send size={16} aria-hidden />
             {send.isPending
-              ? send.variables?.attachment?.type.startsWith('image/')
+              ? send.variables?.attachments.some((item) =>
+                  item.type.startsWith('image/'),
+                )
                 ? 'Reading your photo — about 15 seconds…'
                 : 'Thinking…'
               : 'Give it to the Goblin'}
