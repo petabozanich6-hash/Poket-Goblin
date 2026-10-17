@@ -7,3 +7,5 @@ worker/dist
 .wrangler
 .mf
 *.toml
+# Hand-tuned HTML email markup: retain table/inline-style formatting
+worker/lib/campusOutreachEmail.ts
