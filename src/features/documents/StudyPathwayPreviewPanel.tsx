@@ -258,6 +258,11 @@ export function StudyPathwayPreviewPanel({
             sessions={stored.sessions}
             onUpdated={refreshSaved}
           />
+          <p>
+            Undo removes untouched, unfinished study tasks created by this
+            pathway. Completed tasks and tasks you have personalised stay in
+            your task list.
+          </p>
           <Button
             variant="secondary"
             onClick={() => void undo()}
