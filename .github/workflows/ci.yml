@@ -27,12 +27,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # TEMPORARY: output exact Prettier patch so this PR can be corrected.
-      - name: Print calendar and approval formatting diff
-        run: |
-          npx prettier --write src/features/documents/DocumentDevourer.tsx src/features/documents/StudyPathwayPreviewPanel.tsx src/pages/CalendarPage.tsx worker/calendar.test.ts worker/lib/documents/pathwayApproval.ts worker/pathwayJourney.test.ts worker/routes/calendar.ts worker/routes/documents.ts e2e/study-pathway.spec.ts
-          git diff -- src/features/documents/DocumentDevourer.tsx src/features/documents/StudyPathwayPreviewPanel.tsx src/pages/CalendarPage.tsx worker/calendar.test.ts worker/lib/documents/pathwayApproval.ts worker/pathwayJourney.test.ts worker/routes/calendar.ts worker/routes/documents.ts e2e/study-pathway.spec.ts
-
       - name: Typecheck
         run: npm run typecheck
 
