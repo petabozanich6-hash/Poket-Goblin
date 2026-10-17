@@ -124,7 +124,7 @@ with a scripted recogniser, denied permission, missing recognition, phone
 layout and personalisation. **Not verified:** any physical phone, real speech
 services, Samsung Internet, Safari/iOS.
 
-\n**Android Play Protect / Samsung Internet (October 2026):** Samsung Internet
+**Android Play Protect / Samsung Internet (October 2026):** Samsung Internet
 may generate a PWA installation package that Play Protect blocks with
 “built for an older version of Android” and missing privacy protections.
 This is a browser-generated Android package issue, not a setting in the
@@ -135,7 +135,7 @@ it. Chrome installation is not guaranteed on every device. Do not recommend
 disabling Play Protect. Track upstream reports at
 https://github.com/SamsungInternet/support/issues/123 and
 https://issuetracker.google.com/issues/569517876.
-\n
+
 ## Offline
 
 - The app shell (HTML, built JS/CSS, icons) is cached; pages open offline.
