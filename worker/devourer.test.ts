@@ -469,7 +469,14 @@ describe('untrusted content and AI', () => {
         ),
     )
     vi.stubGlobal('fetch', fetchMock)
-    const { body } = await upload(alice, INJECTION, { env })
+    const { body } = await upload(
+      alice,
+      INJECTION.replace('Payment due:', 'Reference date:').replace(
+        'Amount due: $10.00',
+        '',
+      ),
+      { env, name: 'note.txt' },
+    )
     expect(fetchMock).toHaveBeenCalledTimes(1)
     // The document text was sent fenced as data, under the safety prompt.
     const sent = JSON.parse(
@@ -495,6 +502,62 @@ describe('untrusted content and AI', () => {
     expect(h.query(`SELECT * FROM tasks`)).toEqual([])
   })
 
+  it('uses clear rule-based results without calling AI or consuming usage', async () => {
+    const run = vi.fn(async () => {
+      throw new Error('must not call AI')
+    })
+    const env = {
+      ...h.env,
+      AI_PROVIDER: 'workers_ai',
+      AI: { run } as unknown as Ai,
+    }
+    const { body } = await upload(alice, BILL, { env })
+    expect(body.processing.mode).toBe('rules')
+    expect(body.processing.warnings).not.toContain(
+      'The AI reader had a problem, so the built-in goblin read it instead.',
+    )
+    expect(body.suggestions.length).toBeGreaterThan(0)
+    expect(run).not.toHaveBeenCalled()
+    expect(h.query('SELECT * FROM ai_usage_daily')).toEqual([])
+    expect(
+      h.query(
+        "SELECT * FROM ai_request_limits WHERE scope NOT LIKE 'document-month:%'",
+      ),
+    ).toEqual([])
+    expect(h.query('SELECT extracted_text FROM documents')).toEqual([
+      { extracted_text: '' },
+    ])
+  })
+
+  it('keeps standalone study steps in review without an AI call', async () => {
+    const run = vi.fn(async () => {
+      throw new Error('must not call AI')
+    })
+    const env = {
+      ...h.env,
+      AI_PROVIDER: 'workers_ai',
+      AI: { run } as unknown as Ai,
+    }
+    const { body } = await upload(
+      alice,
+      'University Module 1: Learning outcomes\nRequired reading\nRead chapter 1 of the textbook.\nLearning activity\nReflect on what you learned and write a short response.',
+      { env, name: 'module-1.txt' },
+    )
+    expect(body.processing.mode).toBe('rules')
+    expect(body.suggestions.some((s: Json) => s.group === 'Study module')).toBe(
+      true,
+    )
+    const rows = h.query('SELECT payload_json FROM review_items') as {
+      payload_json: string
+    }[]
+    expect(
+      rows.some((row) => JSON.parse(row.payload_json).requiresReview === true),
+    ).toBe(true)
+    expect(h.query('SELECT * FROM tasks')).toEqual([])
+    expect(run).not.toHaveBeenCalled()
+    expect(h.query('SELECT * FROM ai_usage_daily')).toEqual([])
+  })
+
   it('falls back to the built-in reader when the AI fails', async () => {
     const env = {
       ...h.env,
@@ -505,7 +568,11 @@ describe('untrusted content and AI', () => {
       'fetch',
       vi.fn(async () => new Response('nope', { status: 500 })),
     )
-    const { status, body } = await upload(alice, BILL, { env })
+    const { status, body } = await upload(
+      alice,
+      'Electricity bill. Amount due: $10.00. Please contact us about payment.',
+      { env },
+    )
     expect(status).toBe(201)
     expect(body.document.status).toBe('ready')
     expect(body.processing.mode).toBe('rules')
