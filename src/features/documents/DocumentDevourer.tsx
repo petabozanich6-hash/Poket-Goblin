@@ -438,11 +438,13 @@ export function DevourReview({
 
       {pathwayAssigned ? (
         <p role="status" className={styles.addedNote}>
-          <Check size={16} aria-hidden /> Your study pathway is assigned.
-          The proposals are off your review list and the dated sessions are
-          on your <Link to="/life/calendar">calendar</Link>. You won't need
-          to add them again.{' '}
-          <a href={exportUrl()} download>Download your calendar (.ics)</a>
+          <Check size={16} aria-hidden /> Your study pathway is assigned. The
+          proposals are off your review list and the dated sessions are on your{' '}
+          <Link to="/life/calendar">calendar</Link>. You won't need to add them
+          again.{' '}
+          <a href={exportUrl()} download>
+            Download your calendar (.ics)
+          </a>
         </p>
       ) : null}
 
@@ -479,8 +481,11 @@ export function DevourReview({
                 setOpen((list) =>
                   list.filter(
                     (item) =>
-                      !(item.type === 'task' && item.group &&
-                        isStudyPathwayGroup(item.group)),
+                      !(
+                        item.type === 'task' &&
+                        item.group &&
+                        isStudyPathwayGroup(item.group)
+                      ),
                   ),
                 )
                 void refresh()
