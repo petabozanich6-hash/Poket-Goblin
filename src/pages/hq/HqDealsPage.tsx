@@ -341,8 +341,7 @@ export function HqDealsPage() {
             </select>
           </label>
           <label>
-            Start date (optional){' '}
-            <input name="startAt" type="datetime-local" />
+            Start date (optional) <input name="startAt" type="datetime-local" />
           </label>
           <label>
             Expiry date (optional){' '}
