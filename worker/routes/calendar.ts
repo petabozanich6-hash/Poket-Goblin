@@ -46,12 +46,22 @@ calendarRoutes.get('/dated-tasks', async (c) => {
   const validDate = (value: string | undefined): value is string => {
     if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
     const timestamp = Date.parse(`${value}T00:00:00Z`)
-    return Number.isFinite(timestamp) &&
+    return (
+      Number.isFinite(timestamp) &&
       new Date(timestamp).toISOString().slice(0, 10) === value
+    )
   }
-  if (!validDate(from) || !validDate(to) || from > to ||
-      Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`) > 120 * 86_400_000) {
-    return c.json({ error: 'Choose a valid calendar range of up to 120 days.' }, 400)
+  if (
+    !validDate(from) ||
+    !validDate(to) ||
+    from > to ||
+    Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`) >
+      120 * 86_400_000
+  ) {
+    return c.json(
+      { error: 'Choose a valid calendar range of up to 120 days.' },
+      400,
+    )
   }
   const result = await c.env.DB.prepare(
     `SELECT t.id, t.title, t.due_date as date, t.priority,
@@ -66,14 +76,16 @@ calendarRoutes.get('/dated-tasks', async (c) => {
        AND t.due_date BETWEEN ? AND ?
      ORDER BY t.due_date, t.id
      LIMIT 1500`,
-  ).bind(user.id, from, to).all<{
-    id: string
-    title: string
-    date: string
-    priority: string
-    studyMinutes: number | null
-    documentId: string | null
-  }>()
+  )
+    .bind(user.id, from, to)
+    .all<{
+      id: string
+      title: string
+      date: string
+      priority: string
+      studyMinutes: number | null
+      documentId: string | null
+    }>()
   return c.json({ tasks: result.results ?? [] })
 })
 
