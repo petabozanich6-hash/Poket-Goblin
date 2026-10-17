@@ -8,8 +8,7 @@
 import type { OutgoingEmail } from './email'
 
 const SITE = 'https://pocketgoblin.org'
-const FACEBOOK =
-  'https://www.facebook.com/profile.php?id=61595286215724'
+const FACEBOOK = 'https://www.facebook.com/profile.php?id=61595286215724'
 const SUPPORT = 'support@pocketgoblin.org'
 const LOGO = SITE + '/icons/icon-192.png'
 const SUBJECT = 'A little help for your students — Pocket Goblin 👹'
@@ -102,6 +101,8 @@ export function campusOutreachEmail(input: {
     address,
   ].join('\n')
 
+  // Keep the verbose, hand-optimised email-client table markup readable.
+  // prettier-ignore
   const listHtml = features
     .map(
       ([title, detail]) =>
@@ -114,6 +115,7 @@ export function campusOutreachEmail(input: {
     )
     .join('\n')
 
+  // prettier-ignore
   const html = [
     '<!doctype html><html lang="en"><head>',
     '<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">',
