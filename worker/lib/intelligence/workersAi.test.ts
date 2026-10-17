@@ -5,7 +5,7 @@ import { createHarness } from '../../testing/harness'
 import { callDocumentAi } from '../documents/aiDocument'
 import { interpretIntelligence, resolveProvider } from './provider'
 import { loadAiPolicy } from './usage'
-import { callWorkersAi, reserveWorkersAi, WORKERS_AI_MODEL } from './workersAi'
+import { callWorkersAi, reserveWorkersAi, strictJsonObject, workersAiModel, WORKERS_AI_MODEL, WORKERS_AI_TRIAL_MODELS } from './workersAi'
 
 const fixtures: ReturnType<typeof createHarness>[] = []
 afterEach(() => {
@@ -156,6 +156,65 @@ describe('Workers AI provider', () => {
     const policy = await loadAiPolicy(h.db, env, 'alice')
     await interpretIntelligence(policy.env, 'Call mum')
     expect(run).not.toHaveBeenCalled()
+  })
+})
+
+describe('optional lower-cost Workers AI model trials', () => {
+  it('keeps the existing model as default and routes documents independently', async () => {
+    const { env, run, h } = setup()
+    expect(workersAiModel(env)).toBe(WORKERS_AI_MODEL)
+    expect(workersAiModel(env, 'document')).toBe(WORKERS_AI_MODEL)
+
+    const documentEnv: Env = {
+      ...env,
+      AI_DOCUMENT_MODEL: '@cf/google/gemma-4-26b-a4b-it',
+    }
+    run.mockResolvedValueOnce({
+      response: '```json\\n{"documentType":"general","summary":"A study guide.","suggestions":[]}\\n```',
+    })
+    const raw = await callDocumentAi(documentEnv, { text: 'Reading guide.' }, '2026-10-17')
+    expect(raw).toMatchObject({ documentType: 'general', summary: 'A study guide.' })
+    expect(run).toHaveBeenCalledTimes(1)
+    expect(run.mock.calls[0]?.[0]).toBe('@cf/google/gemma-4-26b-a4b-it')
+    expect(run.mock.calls[0]?.[1].response_format).toBeUndefined()
+    expect(workersAiModel(documentEnv)).toBe(WORKERS_AI_MODEL)
+    expect(h.query("SELECT request_count FROM ai_request_limits WHERE scope = 'global-day'"))
+      .toEqual([{ request_count: 1 }])
+  })
+
+  it.each(WORKERS_AI_TRIAL_MODELS)(
+    'allows %s only when explicitly selected and omits undocumented JSON mode',
+    async (candidate) => {
+      const { env, run } = setup()
+      run.mockResolvedValueOnce({ response: '{"suggestions":[],"summary":"OK"}' })
+      await callWorkersAi({ ...env, AI_MODEL: candidate }, 'Return JSON only.', 'A thought')
+      expect(run).toHaveBeenCalledExactlyOnceWith(
+        candidate,
+        expect.objectContaining({ max_tokens: 1024, stream: false }),
+      )
+      expect(run.mock.calls[0]?.[1].response_format).toBeUndefined()
+    },
+  )
+
+  it('rejects invalid or unusable document models without an inference call', async () => {
+    const { env, run } = setup()
+    const bad = { ...env, AI_DOCUMENT_MODEL: '@cf/nonexistent-model' }
+    await expect(callDocumentAi(bad, { text: 'Hello' }, '2026-10-17'))
+      .rejects.toThrow(/not configured/)
+    expect(run).not.toHaveBeenCalled()
+  })
+
+  it('rejects prose-wrapped and invalid JSON rather than guessing what was meant', () => {
+    expect(strictJsonObject(' {"a":1} ')).toEqual({ a: 1 })
+    expect(strictJsonObject('```json\\n{"a":1}\\n```')).toEqual({ a: 1 })
+    for (const invalid of [
+      'thinking... {"a":1}',
+      '{"a":1} explanation',
+      '[{"a":1}]',
+      '{"a":1} {"b":2}',
+    ]) {
+      expect(() => strictJsonObject(invalid)).toThrow()
+    }
   })
 })
 
