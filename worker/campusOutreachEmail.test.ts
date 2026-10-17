@@ -20,7 +20,9 @@ describe('campus outreach email', () => {
     expect(email.text).toContain('CAMPUS10')
     expect(email.text).toContain('permanent free version')
     expect(email.text).toContain('Useful far beyond university')
-    expect(email.text).toContain('parents, professionals, homeschooling families')
+    expect(email.text).toContain(
+      'parents, professionals, homeschooling families',
+    )
     expect(email.html).toContain('Useful far beyond university')
     expect(email.html).toContain('long after graduation')
     expect(email.html).toContain('10% OFF PREMIUM')
