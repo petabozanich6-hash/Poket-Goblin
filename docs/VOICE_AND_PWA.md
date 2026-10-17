@@ -109,8 +109,8 @@ suspended or the device is locked, and this one doesn’t try.
 ## Android 16 Play Protect warning (17 October 2026)
 
 A real Android device showed Google's **"Unsafe app blocked"** warning:
-*"This app was built for an older version of Android and doesn't include
-the latest privacy protections."* Treat this as an unresolved install blocker,
+_"This app was built for an older version of Android and doesn't include
+the latest privacy protections."_ Treat this as an unresolved install blocker,
 not proof the website is malicious or proof that it is safe to bypass the check.
 
 Pocket Goblin is a PWA. This repository has no distributable Android APK,
@@ -129,6 +129,7 @@ browser-minted APK. iOS, desktop and Android Firefox shortcut behaviour is
 unchanged.
 
 Before restoring the Android install button:
+
 1. Record whether the warning was from Chrome or Samsung Internet, Android
    version, browser version and installation path (Pocket Goblin button or menu).
 2. Determine the generated WebAPK's package identity/target SDK using safe
