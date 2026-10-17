@@ -10,6 +10,7 @@ export type SavedSessionForReplan = {
   minutes: number
   status: string
   taskStatus: string | null
+  taskDueDate?: string | null
   taskId: string | null
 }
 
