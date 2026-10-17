@@ -45,9 +45,8 @@ export function previewDocumentPathway(
     typeof planningTargetDate === 'string' &&
     /^\d{4}-\d{2}-\d{2}$/.test(planningTargetDate) &&
     Number.isFinite(Date.parse(planningTargetDate + 'T00:00:00Z')) &&
-    new Date(planningTargetDate + 'T00:00:00Z')
-      .toISOString()
-      .slice(0, 10) === planningTargetDate &&
+    new Date(planningTargetDate + 'T00:00:00Z').toISOString().slice(0, 10) ===
+      planningTargetDate &&
     availability.some((day) => day.date === planningTargetDate)
   const target = targetValid ? planningTargetDate : null
 
@@ -104,9 +103,11 @@ export function previewDocumentPathway(
     deadlines: steps.map((step) => ({
       stepId: step.id,
       // Only an explicitly sourced date is an immutable assessment deadline.
-      deadline: usable.find(({ item, originalIndex }) =>
-        `${documentId}:${originalIndex}:${item.title}` === step.id,
-      )?.item.dueDate ?? null,
+      deadline:
+        usable.find(
+          ({ item, originalIndex }) =>
+            `${documentId}:${originalIndex}:${item.title}` === step.id,
+        )?.item.dueDate ?? null,
     })),
     stepOrders: steps.map((step, order) => ({ stepId: step.id, order })),
     estimates: steps.map((step) => ({
