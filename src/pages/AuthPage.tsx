@@ -20,6 +20,7 @@ export function AuthPage() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [pendingEmail, setPendingEmail] = useState<string | null>(null)
+  const [initialEmailSent, setInitialEmailSent] = useState(true)
   const [resendMessage, setResendMessage] = useState<string | null>(null)
 
   if (!isLoading && isAuthenticated) {
@@ -37,6 +38,7 @@ export function AuthPage() {
         const created = await register({ email, password, displayName })
         if (created.verificationRequired) {
           setPendingEmail(created.email || email)
+          setInitialEmailSent(created.emailSent === true)
         }
       }
     } catch (err) {
@@ -45,6 +47,7 @@ export function AuthPage() {
         err.message.includes('confirm your email')
       ) {
         setPendingEmail(email)
+        setInitialEmailSent(true)
       } else {
         setError(err instanceof ApiError ? err.message : 'Something went wrong')
       }
@@ -106,9 +109,18 @@ export function AuthPage() {
         {pendingEmail ? (
           <div className={styles.form} data-testid="email-verification-pending">
             <p role="status">
-              <strong>Check your inbox!</strong> We sent a confirmation link to{' '}
-              {pendingEmail}. You can enter the Goblin's den after confirming
-              that the email is yours.
+              {initialEmailSent ? (
+                <>
+                  <strong>Check your inbox!</strong> We sent a confirmation link
+                  to {pendingEmail}.
+                </>
+              ) : (
+                <>
+                  <strong>We couldn't send your confirmation email yet.</strong>{' '}
+                  Your account was created with {pendingEmail}, but it needs
+                  verification before you can sign in. Try resending below.
+                </>
+              )}
             </p>
             <p>
               If it isn't there, check spam. Email delivery may take a few
