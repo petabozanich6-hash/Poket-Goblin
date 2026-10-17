@@ -98,3 +98,18 @@ test('appointment moves ask first', async ({ page }) => {
   await page.getByRole('button', { name: 'Yes', exact: true }).click()
   await expect(page.getByText(/^Done — move/)).toBeVisible()
 })
+
+test('Tell page keeps earlier actionable results visible after several messages', async ({
+  page,
+}) => {
+  await register(page, `tell_history_${stamp}@example.com`)
+  await page.goto('/tell')
+  for (const item of ['apples', 'bananas', 'carrots', 'oranges']) {
+    await tell(page, `I need ${item}`)
+    await expect(
+      page.getByText(new RegExp(`${item} added to your shopping list\\.`, 'i')),
+    ).toBeVisible()
+  }
+  // Older Undo controls must not disappear when the fourth response arrives.
+  await expect(page.getByRole('button', { name: 'Undo' })).toHaveCount(4)
+})
