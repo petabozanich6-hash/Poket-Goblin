@@ -52,7 +52,10 @@ export function usesLegacyJsonMode(model: string): boolean {
 export function strictJsonObject(content: string): Record<string, unknown> {
   const trimmed = content.trim()
   const text = trimmed.startsWith('```')
-    ? trimmed.replace(/^```(?:json)?\s*\n?/i, '').replace(/\s*```$/, '').trim()
+    ? trimmed
+        .replace(/^```(?:json)?\s*\n?/i, '')
+        .replace(/\s*```$/, '')
+        .trim()
     : trimmed
   const parsed: unknown = JSON.parse(text)
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -150,21 +153,23 @@ export async function callWorkersAi(
   try {
     const result = await Promise.race([
       // The "-fast" variant is newer than the bundled type list.
-      (env.AI.run as (model: string, inputs: Record<string, unknown>) => Promise<unknown>)(
-        model,
-        {
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: user },
-          ],
-          temperature: 0.1,
-          max_tokens: 1024,
-          ...(usesLegacyJsonMode(model)
-            ? { response_format: { type: 'json_object' } }
-            : {}),
-          stream: false,
-        },
-      ),
+      (
+        env.AI.run as (
+          model: string,
+          inputs: Record<string, unknown>,
+        ) => Promise<unknown>
+      )(model, {
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+        temperature: 0.1,
+        max_tokens: 1024,
+        ...(usesLegacyJsonMode(model)
+          ? { response_format: { type: 'json_object' } }
+          : {}),
+        stream: false,
+      }),
       new Promise<never>((_, reject) => {
         timer = setTimeout(
           () => reject(new Error('Workers AI timed out')),

@@ -10,19 +10,20 @@ provider subscriptions, prompt logging or new data transfers.
 
 ## Candidate models
 
-| Model | Intended test | Input / output USD per 1M tokens |
-|---|---|---|
-| `@cf/meta/llama-3.1-8b-instruct-fast` | Existing live baseline | Confirm exact price in billing |
-| `@cf/google/gemma-4-26b-a4b-it` | Document interpretation | $0.10 / $0.30 |
-| `@cf/qwen/qwen3-30b-a3b-fp8` | Document extraction and short organisation | $0.0509 / $0.335 |
-| `@cf/zai-org/glm-4.7-flash` | Short text organisation | $0.0605 / $0.40 |
-| `@cf/openai/gpt-oss-20b` | Structured reasoning | $0.20 / $0.30 |
+| Model                                 | Intended test                              | Input / output USD per 1M tokens |
+| ------------------------------------- | ------------------------------------------ | -------------------------------- |
+| `@cf/meta/llama-3.1-8b-instruct-fast` | Existing live baseline                     | Confirm exact price in billing   |
+| `@cf/google/gemma-4-26b-a4b-it`       | Document interpretation                    | $0.10 / $0.30                    |
+| `@cf/qwen/qwen3-30b-a3b-fp8`          | Document extraction and short organisation | $0.0509 / $0.335                 |
+| `@cf/zai-org/glm-4.7-flash`           | Short text organisation                    | $0.0605 / $0.40                  |
+| `@cf/openai/gpt-oss-20b`              | Structured reasoning                       | $0.20 / $0.30                    |
 
 All rates are **published token pricing**, not proof of faster performance or an
 invoice. Some models may have significant thinking-token overhead, latency or
 format incompatibilities. Pricing and availability can change.
 
 Primary sources:
+
 - https://developers.cloudflare.com/workers-ai/models/
 - https://developers.cloudflare.com/workers-ai/platform/pricing/
 - https://developers.cloudflare.com/workers-ai/features/json-mode/
@@ -57,11 +58,11 @@ small neuron allowance. Do not point a test Worker at production D1 or R2.
 - Document: long mixed admin letter. Reject if essential obligations are
   missed, response is invalid JSON or inference times out.
 - Failure: invalid model, provider timeout and malformed output should lead
-  to the existing rule-based fallback and consume no *additional* retry call.
+  to the existing rule-based fallback and consume no _additional_ retry call.
 
 For each model and baseline, record five repeated runs per fixture:
-*total processing time, AI call time, answer validity, completeness, invented
-dates, quality, reported token/neurons, and Cloudflare billable usage*.
+_total processing time, AI call time, answer validity, completeness, invented
+dates, quality, reported token/neurons, and Cloudflare billable usage_.
 Prefer model only when it is **at least as accurate** as baseline and
 meaningfully better on latency, cost, or both. If quality falls, keep baseline.
 
