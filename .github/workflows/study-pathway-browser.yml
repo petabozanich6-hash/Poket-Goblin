@@ -36,7 +36,7 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Configure local-only credentials
         run: |
-          printf 'ENVIRONMENT=development\nAUTH_SECRET=browser-test-only-not-for-production-1234567890\nAI_PROVIDER=none\n' > .dev.vars
+          printf 'ENVIRONMENT=development\nAUTH_SECRET=browser-test-only-not-for-production-1234567890\nAI_PROVIDER=none\nEMAIL_VERIFICATION_REQUIRED=false\n' > .dev.vars
       - name: Prepare isolated local database
         run: npm run db:migrate:local
       - name: Start isolated local servers and run browser acceptance
