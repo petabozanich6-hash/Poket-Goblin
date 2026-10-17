@@ -186,7 +186,8 @@ export function readEverydayDocument(
         (s) =>
           s.title === item.title &&
           s.dueDate === item.dueDate &&
-          s.startTime === item.startTime,
+          s.startTime === item.startTime &&
+          s.sourceExcerpt === item.sourceExcerpt,
       )
     )
       suggestions.push(item)

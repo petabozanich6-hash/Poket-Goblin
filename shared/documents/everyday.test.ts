@@ -93,6 +93,18 @@ describe('everyday correspondence without AI', () => {
     })
   })
 
+  it('preserves different collection requests on the same date', () => {
+    const result = readEverydayDocument(
+      'Please collect your parcel by 28 October 2030.\nPlease collect your prescription by 28 October 2030.',
+      options,
+    )
+    expect(result?.suggestions).toHaveLength(2)
+    expect(result?.suggestions.map((s) => s.sourceExcerpt)).toEqual([
+      'Please collect your parcel by 28 October 2030.',
+      'Please collect your prescription by 28 October 2030.',
+    ])
+  })
+
   it('does not repeat identical actions', () => {
     expect(
       readEverydayDocument(
