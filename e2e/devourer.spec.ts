@@ -115,7 +115,9 @@ test('Just sort it: approve, skip, devour — the task stays, the file goes', as
   }
 })
 
-test('uploads several documents separately and keeps each review accessible', async ({ page }) => {
+test('uploads several documents separately and keeps each review accessible', async ({
+  page,
+}) => {
   await page.goto('/')
   await page.getByRole('tab', { name: 'Register' }).click()
   await page.getByLabel('What should the goblin call you?').fill('Batch Goblin')
@@ -141,8 +143,12 @@ test('uploads several documents separately and keeps each review accessible', as
   const results = page.getByRole('region', { name: 'Document upload results' })
   await expect(results.getByText('bill-a.txt')).toBeVisible()
   await expect(results.getByText('letter-b.txt')).toBeVisible()
-  await expect(results.getByRole('button', { name: 'Review bill-a.txt' })).toBeVisible()
-  await expect(results.getByRole('button', { name: 'Review letter-b.txt' })).toBeVisible()
+  await expect(
+    results.getByRole('button', { name: 'Review bill-a.txt' }),
+  ).toBeVisible()
+  await expect(
+    results.getByRole('button', { name: 'Review letter-b.txt' }),
+  ).toBeVisible()
 
   await results.getByRole('button', { name: 'Review bill-a.txt' }).click()
   await expect(page.getByText(/bill-a[.]txt/)).toBeVisible()
