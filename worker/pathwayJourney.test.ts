@@ -252,7 +252,6 @@ describe('document to approved study pathway journey', () => {
   })
 })
 
-
 describe('realistic standalone university modules', () => {
   it('keeps OPEN/AVAILABLE out of the calendar and requires approval of a personal study target', async () => {
     const module = [
@@ -265,14 +264,21 @@ describe('realistic standalone university modules', () => {
       '26 April 2027',
     ].join('\n')
     const form = new FormData()
-    form.append('file', new File([module], 'Module 1 UNE myLearn.txt', {
-      type: 'text/plain',
-    }))
-    const upload = await app.request('/api/documents', {
-      method: 'POST',
-      headers: { Cookie: owner.cookie },
-      body: form,
-    }, h.env)
+    form.append(
+      'file',
+      new File([module], 'Module 1 UNE myLearn.txt', {
+        type: 'text/plain',
+      }),
+    )
+    const upload = await app.request(
+      '/api/documents',
+      {
+        method: 'POST',
+        headers: { Cookie: owner.cookie },
+        body: form,
+      },
+      h.env,
+    )
     expect(upload.status).toBe(201)
     const data = (await upload.json()) as {
       document: { id: string }
@@ -283,19 +289,27 @@ describe('realistic standalone university modules', () => {
     const items = h.query(
       `SELECT payload_json as payload FROM review_items
        WHERE user_id = ? AND source_type = 'document' AND source_id = ?`,
-      owner.id, id,
+      owner.id,
+      id,
     ) as Array<{ payload: string }>
-    const activities = items.map((item) => JSON.parse(item.payload) as {
-      title: string
-      dueDate: string | null
-      requiresReview?: boolean
-      group?: string
-    })
+    const activities = items.map(
+      (item) =>
+        JSON.parse(item.payload) as {
+          title: string
+          dueDate: string | null
+          requiresReview?: boolean
+          group?: string
+        },
+    )
     expect(activities.length).toBeGreaterThanOrEqual(4)
-    expect(activities.every((item) =>
-      item.group === 'Study module' && item.dueDate === null &&
-      item.requiresReview === true
-    )).toBe(true)
+    expect(
+      activities.every(
+        (item) =>
+          item.group === 'Study module' &&
+          item.dueDate === null &&
+          item.requiresReview === true,
+      ),
+    ).toBe(true)
 
     const availability = availableDays()
     const noDate = await h.request(`/api/documents/${id}/pathway-preview`, {
@@ -328,7 +342,9 @@ describe('realistic standalone university modules', () => {
     expect(proposed.preview.warnings).toEqual([])
     expect(proposed.preview.unschedulable).toEqual([])
     expect(proposed.preview.unscheduledMinutes).toBe(0)
-    expect(proposed.preview.deadlines.every((d) => d.deadline === null)).toBe(true)
+    expect(proposed.preview.deadlines.every((d) => d.deadline === null)).toBe(
+      true,
+    )
 
     const approve = await h.request(`/api/documents/${id}/pathway-approve`, {
       cookie: owner.cookie,
