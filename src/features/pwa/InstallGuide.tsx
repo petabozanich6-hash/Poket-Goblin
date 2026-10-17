@@ -64,14 +64,14 @@ export function InstallGuide() {
           <p className={styles.sub}>
             Android app installation is temporarily paused while we investigate
             Google Play Protect warnings about browser-generated app packages.
-            You can still use Pocket Goblin at{' '}
-            <strong>pocketgoblin.org</strong> in your browser.
+            You can still use Pocket Goblin at <strong>pocketgoblin.org</strong>{' '}
+            in your browser.
           </p>
           <p className={styles.sub}>
             If your browser menu offers <strong>Install app</strong> and Play
             Protect warns that the app was built for an older Android version,
-            choose <strong>OK</strong>, not <strong>Install anyway</strong>.
-            You don’t need to install anything to use Pocket Goblin.
+            choose <strong>OK</strong>, not <strong>Install anyway</strong>. You
+            don’t need to install anything to use Pocket Goblin.
           </p>
         </div>
       ) : platform === 'ios-safari' ? (
@@ -119,9 +119,9 @@ export function InstallGuide() {
       ) : null}
       {!androidInstallPaused ? (
         <p className={styles.sub}>
-          No app-store account required. Your browser handles installation.
-          Once installed, long-press the icon (Android, desktop Chrome/Edge)
-          for a <strong>Talk to Goblin</strong> shortcut.
+          No app-store account required. Your browser handles installation. Once
+          installed, long-press the icon (Android, desktop Chrome/Edge) for a{' '}
+          <strong>Talk to Goblin</strong> shortcut.
         </p>
       ) : null}
     </>
