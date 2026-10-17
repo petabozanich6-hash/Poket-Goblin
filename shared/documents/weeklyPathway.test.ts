@@ -32,4 +32,28 @@ describe('weekly-only study schedules', () => {
       true,
     )
   })
+
+  it('classifies a university assessment deadline as education rather than general paperwork', () => {
+    const reference = new Date('2026-10-17T00:00:00Z')
+    const document = [
+      'Study Schedule',
+      'Global: UNE myLearn Site: TRIMESTER 3 2026',
+      'Assessment 1: Reflective essay (40%) due 20 November 2026',
+    ].join('\n')
+    const understood = withDeadlinePlan(
+      understandDocument(document, 'UNE study outline.pdf', { reference }),
+      document,
+      { reference },
+    )
+    expect(understood.documentType).toBe('education')
+    expect(
+      understood.suggestions.some(
+        (item) =>
+          item.type === 'task' &&
+          /reflective essay/i.test(item.title) &&
+          /assessment/i.test(item.group ?? ''),
+      ),
+    ).toBe(true)
+  })
+
 })
