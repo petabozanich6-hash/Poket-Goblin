@@ -120,6 +120,18 @@ describe('document to approved study pathway journey', () => {
       body: { availability, expectedSessions: view.preview.sessions },
     })
     expect(approval.status).toBe(201)
+    // Approval removes the exact proposed steps from the review queue,
+    // atomically with the generated dated tasks.
+    const proposalsAfterApproval = h.query(
+      `SELECT status FROM review_items
+       WHERE user_id = ? AND source_type = 'document' AND source_id = ?
+         AND json_valid(payload_json) = 1
+         AND json_extract(payload_json, '$.requiresReview') = 1`,
+      owner.id, id,
+    ) as Array<{ status: string }>
+    expect(proposalsAfterApproval.length).toBeGreaterThan(0)
+    expect(proposalsAfterApproval.every((item) => item.status === 'accepted')).toBe(true)
+
     // Pocket Goblin's calendar must show each dated study session without
     // duplicating it as a conventional appointment.
     const calendarUrl =
@@ -183,7 +195,10 @@ describe('document to approved study pathway journey', () => {
       cookie: owner.cookie,
       body: { availability, expectedSessions: view.preview.sessions },
     })
-    expect(duplicated.status).not.toBe(201)
+    expect(duplicated.status).toBe(200)
+    expect(await duplicated.json()).toMatchObject({
+      alreadySaved: true,
+    })
 
     // Finishing the default temporary upload must not hide or delete the
     // learner's approved pathway. The original document is disposable.
@@ -217,6 +232,7 @@ describe('document to approved study pathway journey', () => {
       method: 'POST',
     })
     expect(undo.status).toBe(200)
+    // The temporary file was finished, so no proposals need restoring.
     const afterUndoSessions = await h.request(calendarUrl, {
       cookie: owner.cookie,
     })
@@ -400,5 +416,41 @@ describe('realistic standalone university modules', () => {
     ) as Array<{ deadlineDate: string | null }>
     expect(rows.length).toBeGreaterThan(0)
     expect(rows.every((s) => s.deadlineDate === null)).toBe(true)
+    const assigned = h.query(
+      `SELECT status FROM review_items
+       WHERE user_id = ? AND source_type = 'document' AND source_id = ?
+         AND json_valid(payload_json) = 1
+         AND json_extract(payload_json, '$.requiresReview') = 1`,
+      owner.id, id,
+    ) as Array<{ status: string }>
+    expect(assigned.length).toBe(activities.length)
+    expect(assigned.every((item) => item.status === 'accepted')).toBe(true)
+
+    const dates = availability.map((day) => day.date)
+    const calendar = await h.request(
+      `/api/calendar/dated-tasks?from=${dates[0]}&to=${dates[dates.length - 1]}`,
+      { cookie: owner.cookie },
+    )
+    expect(calendar.status).toBe(200)
+    const list = (await calendar.json()) as {
+      tasks: Array<{ studyMinutes: number | null; title: string }>
+    }
+    expect(list.tasks.length).toBe(proposed.preview.sessions.length)
+    expect(list.tasks.every((task) => (task.studyMinutes ?? 0) > 0)).toBe(true)
+
+    const undo = await h.request(`/api/documents/${id}/pathway-undo`, {
+      cookie: owner.cookie,
+      method: 'POST',
+    })
+    expect(undo.status).toBe(200)
+    const restored = h.query(
+      `SELECT status FROM review_items
+       WHERE user_id = ? AND source_type = 'document' AND source_id = ?
+         AND json_valid(payload_json) = 1
+         AND json_extract(payload_json, '$.requiresReview') = 1`,
+      owner.id, id,
+    ) as Array<{ status: string }>
+    expect(restored.length).toBe(assigned.length)
+    expect(restored.every((item) => item.status === 'pending')).toBe(true)
   })
 })
