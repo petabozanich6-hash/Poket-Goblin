@@ -132,9 +132,7 @@ test('Tell the Goblin accepts multiple files and keeps separate reviews', async 
     },
   ])
   await page.getByRole('button', { name: 'Give it to the Goblin' }).click()
-  await expect(
-    page.getByText('first-bill.txt', { exact: false }),
-  ).toBeVisible()
+  await expect(page.getByText('first-bill.txt', { exact: false })).toBeVisible()
   await expect(
     page.getByText('second-letter.txt', { exact: false }),
   ).toBeVisible()
