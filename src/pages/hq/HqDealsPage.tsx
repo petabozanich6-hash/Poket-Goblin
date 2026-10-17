@@ -41,9 +41,45 @@ type Giveaway = {
   recipients: number
 }
 
+type GiveawayGrant = {
+  id: string
+  email: string
+  issuedAt: string
+  expiresAt: string | null
+  endedAt: string | null
+  status: string
+}
+
+function GiveawayGrantTracker({ giveawayId }: { giveawayId: string }) {
+  const claims = useQuery({
+    queryKey: ['hq', 'giveaways', giveawayId, 'grants'],
+    queryFn: () =>
+      api.admin.get<{ grants: GiveawayGrant[] }>(
+        `/deals/giveaways/${encodeURIComponent(giveawayId)}/grants`,
+      ),
+  })
+  if (claims.isLoading) return <p>Checking the gift ledger…</p>
+  if (claims.isError) return <p role="alert">Could not load gift history.</p>
+  if (!claims.data?.grants.length) return <p>No Premium gifts awarded yet.</p>
+  return (
+    <ul>
+      {claims.data.grants.map((gift) => (
+        <li key={gift.id}>
+          {gift.email} — {gift.status} · Awarded:{' '}
+          {new Date(gift.issuedAt).toLocaleDateString()} · Premium until:{' '}
+          {gift.expiresAt
+            ? new Date(gift.expiresAt).toLocaleDateString()
+            : 'Not specified'}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 function GiveawaysPanel() {
   const qc = useQueryClient()
   const [notice, setNotice] = useState('')
+  const [expandedGift, setExpandedGift] = useState<string | null>(null)
   const [recipientEmails, setRecipientEmails] = useState<
     Record<string, string>
   >({})
@@ -135,6 +171,19 @@ function GiveawaysPanel() {
         <div key={gift.id} style={{ marginTop: 20 }}>
           <strong>{gift.name}</strong> — {gift.durationDays} free days,{' '}
           {gift.recipients} / {gift.maxRecipients} awarded
+          <div>
+            <Button
+              variant="secondary"
+              onClick={() =>
+                setExpandedGift(expandedGift === gift.id ? null : gift.id)
+              }
+            >
+              {expandedGift === gift.id ? 'Hide recipients' : 'View recipients'}
+            </Button>
+            {expandedGift === gift.id ? (
+              <GiveawayGrantTracker giveawayId={gift.id} />
+            ) : null}
+          </div>
           <form
             style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}
             onSubmit={(event) => {
