@@ -792,7 +792,8 @@ export function DocumentDevourer({
         </label>
       </fieldset>
       <label className={styles.field}>
-        Upload up to 10 documents (PDF, Word, text or photos · {maxMb} MB per file)
+        Upload up to 10 documents (PDF, Word, text or photos · {maxMb} MB per
+        file)
         <input
           name="file"
           type="file"
