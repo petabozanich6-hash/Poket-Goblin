@@ -131,12 +131,16 @@ test('uploads several documents separately and keeps each review accessible', as
     {
       name: 'bill-a.txt',
       mimeType: 'text/plain',
-      buffer: Buffer.from('Power bill. Amount due: $75. Due on 22 November 2030.'),
+      buffer: Buffer.from(
+        'Power bill. Amount due: $75. Due on 22 November 2030.',
+      ),
     },
     {
       name: 'letter-b.txt',
       mimeType: 'text/plain',
-      buffer: Buffer.from('Appointment letter. Appointment on 25 November 2030 at 10:30 AM.'),
+      buffer: Buffer.from(
+        'Appointment letter. Appointment on 25 November 2030 at 10:30 AM.',
+      ),
     },
   ])
   await page.getByRole('button', { name: 'Feed it to the goblin' }).click()
