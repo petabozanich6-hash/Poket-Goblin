@@ -226,11 +226,16 @@ describe('approved pathway transactions and Undo', () => {
     ).toBe(0)
     const reading = sessions.find((item) => item.title === 'Read chapter')!
     const draft = sessions.find((item) => item.title === 'Draft essay')!
-    const send = (sessionId: string, date: string, minutes = 60) =>
+    const send = (
+      sessionId: string,
+      date: string,
+      minutes = 60,
+      availableMinutes = 120,
+    ) =>
       h.request(`/api/documents/doc-order/pathway-sessions/${sessionId}`, {
         method: 'PATCH',
         cookie: alice.cookie,
-        body: { date, minutes },
+        body: { date, minutes, availableMinutes },
       })
     const foreign = await h.request(
       `/api/documents/doc-order/pathway-sessions/${draft.id}`,
@@ -246,12 +251,34 @@ describe('approved pathway transactions and Undo', () => {
     expect((await send(draft.id, '2030-05-11')).status).toBe(409)
     expect((await send(draft.id, '2030-05-07', 120)).status).toBe(409)
     expect((await send(draft.id, '2030-05-07', 45)).status).toBe(200)
+    // A later day is allowed before the actual assessment deadline, but only
+    // if its confirmed capacity covers all tasks already planned that day.
+    await h.env.DB.prepare(
+      `INSERT INTO tasks (id, user_id, title, priority, due_date, capacity_cost)
+       VALUES ('existing-study-day-task', ?, 'Housework', 'normal', '2030-05-09', 1)`,
+    )
+      .bind(alice.id)
+      .run()
+    expect((await send(draft.id, '2030-05-09', 45, 60)).status).toBe(409)
+    expect((await send(draft.id, '2030-05-09', 45, 90)).status).toBe(200)
     expect(
       h.query(
-        'SELECT scheduled_date as date, minutes FROM study_pathway_sessions WHERE id = ?',
+        'SELECT scheduled_date as date, minutes, deadline_date as deadline FROM study_pathway_sessions WHERE id = ?',
         draft.id,
       ),
-    ).toEqual([{ date: '2030-05-07', minutes: 45 }])
+    ).toEqual([
+      { date: '2030-05-09', minutes: 45, deadline: '2030-05-10' },
+    ])
+    expect((await send(draft.id, '2030-05-11', 45, 240)).status).toBe(409)
+    const noBudget = await h.request(
+      `/api/documents/doc-order/pathway-sessions/${draft.id}`,
+      {
+        method: 'PATCH',
+        cookie: alice.cookie,
+        body: { date: '2030-05-10', minutes: 45 },
+      },
+    )
+    expect(noBudget.status).toBe(400)
   })
 
   it('removes approved pathways and sessions when a user deletes their account', async () => {
