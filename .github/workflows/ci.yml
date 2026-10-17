@@ -7,7 +7,7 @@ on:
     branches: [main, development]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   check:
@@ -26,6 +26,18 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Format Deals UI (temporary)
+        if: github.event_name == 'pull_request' && github.head_ref == 'feature/deals-options-after-giveaways'
+        run: |
+          npx prettier --write src/pages/hq/HqDealsPage.tsx
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/pages/hq/HqDealsPage.tsx
+          if ! git diff --cached --quiet; then
+            git commit -m "Format Deals campaign UI with Prettier"
+            git push origin HEAD:feature/deals-options-after-giveaways
+          fi
 
       - name: Typecheck
         run: npm run typecheck
