@@ -109,7 +109,6 @@ describe('migration 0007 (Document Devourer)', () => {
   })
 })
 
-
 describe('migrations 0019–0020 (approved study pathways)', () => {
   it('upgrades an existing database without changing previously saved tasks', () => {
     const t = createTestD1({ upTo: 18 })
@@ -130,7 +129,9 @@ describe('migrations 0019–0020 (approved study pathways)', () => {
     ).toEqual([
       { id: 'prior_task', title: 'Existing chore', dueDate: '2026-11-01' },
     ])
-    const columns = t.query('PRAGMA table_info(study_pathway_sessions)') as Array<{
+    const columns = t.query(
+      'PRAGMA table_info(study_pathway_sessions)',
+    ) as Array<{
       name: string
     }>
     expect(columns.map((column) => column.name)).toContain('deadline_date')

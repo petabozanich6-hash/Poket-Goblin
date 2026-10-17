@@ -196,7 +196,10 @@ describe('document to approved study pathway journey', () => {
 
   it('extracts a real Chrome-generated university PDF into reviewable assessment steps', async () => {
     const bytes = readFileSync(
-      new URL('../shared/documents/fixtures/chrome-letter-spaced.pdf', import.meta.url),
+      new URL(
+        '../shared/documents/fixtures/chrome-letter-spaced.pdf',
+        import.meta.url,
+      ),
     )
     const data = new FormData()
     data.append(
@@ -222,16 +225,19 @@ describe('document to approved study pathway journey', () => {
       result.document.id,
     ) as Array<{ payload: string }>
     const studyTasks = rows
-      .map((row) => JSON.parse(row.payload) as {
-        title?: string
-        type?: string
-        requiresReview?: boolean
-      })
+      .map(
+        (row) =>
+          JSON.parse(row.payload) as {
+            title?: string
+            type?: string
+            requiresReview?: boolean
+          },
+      )
       .filter((item) => item.type === 'task' && item.requiresReview === true)
     expect(studyTasks.length).toBeGreaterThan(0)
-    expect(studyTasks.some((item) => /reflective essay/i.test(item.title ?? ''))).toBe(
-      true,
-    )
+    expect(
+      studyTasks.some((item) => /reflective essay/i.test(item.title ?? '')),
+    ).toBe(true)
     const preview = await h.request(
       `/api/documents/${result.document.id}/pathway-preview`,
       { cookie: owner.cookie, body: { availability: availableDays() } },
@@ -242,5 +248,4 @@ describe('document to approved study pathway journey', () => {
     }
     expect(view.preview.sessions.length).toBeGreaterThan(0)
   })
-
 })

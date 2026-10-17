@@ -4,10 +4,10 @@ Migrations in `migrations/` are applied to the production database by a
 **manually started, approval-gated** GitHub Actions workflow:
 `.github/workflows/d1-migrations.yml` ("D1 migrations (production)").
 
-| Item       | Value                                     |
-| ---------- | ----------------------------------------- |
-| Database   | `pocket-goblin`                           |
-| D1 ID      | `91a90710-dbd7-4a0c-8c90-b97cd3c86d90`    |
+| Item       | Value                                                                           |
+| ---------- | ------------------------------------------------------------------------------- |
+| Database   | `pocket-goblin`                                                                 |
+| D1 ID      | `91a90710-dbd7-4a0c-8c90-b97cd3c86d90`                                          |
 | Migrations | `migrations/0001_…` to `0020_…`, in order (including pending changes on PR #38) |
 
 The workflow only ever targets that database. The ID is pinned in the
