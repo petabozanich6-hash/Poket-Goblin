@@ -459,7 +459,19 @@ export function DevourReview({
               : 'Steps go on your task list, due dates go in your calendar. Skip anything you don’t want first.'}
           </p>
           {hasStudyPathway ? (
-            <StudyPathwayPreviewPanel documentId={doc.id} />
+            <StudyPathwayPreviewPanel
+              documentId={doc.id}
+              onApproved={() => {
+                setOpen((list) =>
+                  list.filter(
+                    (item) =>
+                      !(item.type === 'task' && item.group &&
+                        isStudyPathwayGroup(item.group)),
+                  ),
+                )
+                void refresh()
+              }}
+            />
           ) : null}
           {groups.map((group) => (
             <div key={group.label} className={styles.planGroup}>
