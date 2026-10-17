@@ -1,0 +1,32 @@
+name: Format giveaway PR files (temporary)
+on:
+  push:
+    branches:
+      - feature/owner-premium-giveaways
+    paths:
+      - '.github/workflows/format-giveaway-pr.yml'
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Format giveaway files
+        run: npx prettier --write src/pages/hq/HqDealsPage.tsx worker/admin.test.ts worker/routes/admin.ts
+      - name: Commit formatting to same branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/pages/hq/HqDealsPage.tsx worker/admin.test.ts worker/routes/admin.ts
+          if ! git diff --cached --quiet; then
+            git commit -m "Apply Prettier to giveaway implementation"
+            git push origin HEAD:feature/owner-premium-giveaways
+          fi
