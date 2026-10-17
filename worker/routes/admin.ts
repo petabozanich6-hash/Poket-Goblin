@@ -1057,7 +1057,10 @@ adminRoutes.post(
     }
     if (!/^[A-Z0-9]+$/.test(String(row.code)))
       return c.json(
-        { error: 'Stripe promotion codes must contain only letters and numbers.' },
+        {
+          error:
+            'Stripe promotion codes must contain only letters and numbers.',
+        },
         409,
       )
     const couponId = 'pg_' + id
