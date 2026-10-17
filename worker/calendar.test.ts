@@ -105,10 +105,9 @@ describe('Pocket Goblin in-app calendar', () => {
     expect((await h.request(path)).status).toBe(401)
     expect(
       (
-        await h.request(
-          `/api/calendar/dated-tasks?from=2026-02-30&to=${to}`,
-          { cookie: alice.cookie },
-        )
+        await h.request(`/api/calendar/dated-tasks?from=2026-02-30&to=${to}`, {
+          cookie: alice.cookie,
+        })
       ).status,
     ).toBe(400)
   })
@@ -122,9 +121,13 @@ describe('Pocket Goblin in-app calendar', () => {
     const data = (await taskResponse.json()) as { task: { id: string } }
     const calendarPath = `/api/calendar/dated-tasks?from=${soon(0)}&to=${soon(10)}`
     expect(
-      ((await (await h.request(calendarPath, { cookie: alice.cookie })).json()) as {
-        tasks: Array<{ title: string }>
-      }).tasks.some((task) => task.title === 'Read module 1'),
+      (
+        (await (
+          await h.request(calendarPath, { cookie: alice.cookie })
+        ).json()) as {
+          tasks: Array<{ title: string }>
+        }
+      ).tasks.some((task) => task.title === 'Read module 1'),
     ).toBe(true)
     const complete = await h.request(`/api/tasks/${data.task.id}`, {
       method: 'PATCH',
@@ -132,7 +135,9 @@ describe('Pocket Goblin in-app calendar', () => {
       body: { status: 'completed' },
     })
     expect(complete.status).toBe(200)
-    const final = (await (await h.request(calendarPath, { cookie: alice.cookie })).json()) as {
+    const final = (await (
+      await h.request(calendarPath, { cookie: alice.cookie })
+    ).json()) as {
       tasks: Array<{ title: string }>
     }
     expect(final.tasks).toEqual([])
