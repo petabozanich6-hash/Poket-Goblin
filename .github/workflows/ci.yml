@@ -27,6 +27,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # TEMP: emit formatting diffs for PR fix. Remove this step before merge.
+      - name: Show exact calendar formatting changes
+        run: |
+          npx prettier --write worker/routes/documents.ts worker/pathwayJourney.test.ts src/pages/CalendarPage.tsx src/features/documents/StudyPathwayPreviewPanel.tsx e2e/study-pathway.spec.ts
+          git diff -- worker/routes/documents.ts worker/pathwayJourney.test.ts src/pages/CalendarPage.tsx src/features/documents/StudyPathwayPreviewPanel.tsx e2e/study-pathway.spec.ts
+
       - name: Typecheck
         run: npm run typecheck
 
