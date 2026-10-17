@@ -20,30 +20,45 @@ domain, DNS or SSL, or create any Cloudflare resource.
 
 ## Pocket Goblin Phase 1 pathway rollout (PR #38)
 
-**Do not apply these migrations while the PR is still in draft.** The study
-pathway feature depends on the two new additive migrations and the Worker code
-being released together:
+The **schema-only staging change is already on `main`** (PR #43). Migrations
+`0019_study_pathways.sql` and `0020_study_pathway_deadlines.sql` have no
+application routes and can safely be applied before releasing PR #38.
+**Merging PR #38 into `main` automatically triggers a Cloudflare Workers
+production build.** Never merge it before both migrations are verified as
+applied in production.
 
-- `0019_study_pathways.sql` creates the versioned approved pathways and
-  sessions, with account-deletion cascades and a unique active pathway per
-  document. No existing tasks or documents are changed.
-- `0020_study_pathway_deadlines.sql` adds the separate immutable source
-  deadline for each session. It is intentionally nullable to preserve old
-  records; no existing data is rewritten.
+- `0019_study_pathways.sql` creates versioned approved pathways and sessions,
+  with account-deletion cascades and one active pathway per document. It does
+  not change existing tasks or documents.
+- `0020_study_pathway_deadlines.sql` stores a separately immutable original
+  deadline for sessions; the column is nullable to preserve old records.
 
-Before release, merge the reviewed feature to `main`, run the workflow's
-**read-only preflight** and check the exact pending migration list and restore
-point process. Then run the approval-gated **apply** job and verify zero pending
-migrations. **Only after the schema is confirmed current** should the new Worker
-code be deployed. Do not point the new approval endpoints at an unmigrated
-database.
+### Required release order
+
+1. Complete PR #38 review, passing head-commit CI and local browser acceptance,
+   and manually inspect a representative real study PDF. Do not use customer
+   documents in public CI.
+2. While PR #38 is **still unmerged**, run the production D1 workflow's
+   **read-only preflight from `main`**. Confirm only the expected pending
+   migrations, the pinned database identity and backup/restore readiness.
+3. Obtain the owner's separate approval to use the workflow's `apply` option
+   on `main`, type the database name and approve the protected environment.
+   This modifies the database but does **not** deploy the app.
+4. Run preflight again and confirm **zero pending migrations**. Do not merge
+   PR #38 if the migration application or its verification failed.
+5. Only now merge PR #38 into `main`. Workers Builds will deploy the feature
+   automatically; verify production build success and then smoke-test document
+   upload, preview, capacity warnings, approval, replan, Undo, task quotas,
+   account deletion and downloadable calendar export.
+6. If the Worker deployment fails, use the documented code rollback. Do not
+   automatically restore D1 Time Travel: that rewinds customer data as well.
 
 A local upgrade regression test in `worker/migrations.test.ts` verifies that
 versions 0019–0020 apply on top of version 0018 without altering pre-existing
-tasks. It also checks one-active-pathway constraints and account deletion.
+tasks. It also checks the one-active-pathway constraint and account deletion.
 
-This document explains the rollout; it is **not** authorization to merge,
-apply production migrations, or deploy.
+This is a release runbook, **not** authorisation to apply a production
+migration, merge PR #38 or deploy production code.
 
 ## Safety model
 
