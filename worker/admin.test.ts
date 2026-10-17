@@ -695,6 +695,47 @@ describe('own sessions', () => {
   })
 })
 
+describe('Stripe first-invoice promotions', () => {
+  it('does not publish a multi-cycle draft or expose publishing to regular users', async () => {
+    h.elevate(owner)
+    const draft = await h.request('/api/admin/deals', {
+      cookie: owner.cookie,
+      admin: true,
+      body: {
+        code: 'SAFEFIRST20',
+        name: 'Safe test offer',
+        kind: 'percent',
+        amount: 20,
+        billingCycles: 6,
+        audience: 'new',
+        verification: 'none',
+        maxRedemptions: 1,
+      },
+    })
+    expect(draft.status).toBe(201)
+    const { id } = await json(draft)
+    const path = `/api/admin/deals/${id}/publish-first-invoice`
+    const forbidden = await h.request(path, {
+      cookie: alice.cookie,
+      admin: true,
+      body: {},
+    })
+    expect(forbidden.status).toBe(404)
+    const rejected = await h.request(path, {
+      cookie: owner.cookie,
+      admin: true,
+      body: {},
+    })
+    expect(rejected.status).toBe(409)
+    expect(
+      h.query(
+        'SELECT active, stripe_promotion_code_id FROM promotion_campaigns WHERE id = ?',
+        id,
+      ),
+    ).toEqual([{ active: 0, stripe_promotion_code_id: null }])
+  })
+})
+
 describe('free Premium giveaways', () => {
   const create = (name = 'A week of goblin mischief', maxRecipients = 1) =>
     h.request('/api/admin/deals/giveaways', {
