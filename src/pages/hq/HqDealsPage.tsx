@@ -37,6 +37,7 @@ export function HqDealsPage() {
   const deals = useQuery({ queryKey: ['hq', 'deals'], queryFn: fetchDeals })
   const [message, setMessage] = useState('')
   const [kind, setKind] = useState<'percent' | 'fixed'>('percent')
+  const [preset, setPreset] = useState('custom')
   const refresh = () => qc.invalidateQueries({ queryKey: ['hq', 'deals'] })
   const create = useMutation({
     mutationFn: (data: Record<string, unknown>) =>
@@ -79,14 +80,23 @@ export function HqDealsPage() {
       verification: String(f.get('verification')),
       maxRedemptions: max ? Number(max) : null,
       budgetCents: budget ? Math.round(Number(budget) * 100) : null,
+      activationWindowDays: f.get('activationWindowDays')
+        ? Number(f.get('activationWindowDays'))
+        : null,
+      startAt: f.get('startAt')
+        ? new Date(String(f.get('startAt'))).toISOString()
+        : null,
+      expiresAt: f.get('expiresAt')
+        ? new Date(String(f.get('expiresAt'))).toISOString()
+        : null,
     })
   }
   return (
     <section className={styles.page}>
       <h2>🧌 Goblin Deals &amp; Mischief</h2>
       <p>
-        Campaign management in AUD. All offers remain inactive while secure
-        checkout redemption is being completed.
+        Create targeted offers with limits, budgets and time windows. All
+        campaigns remain inactive until secure redemption is implemented.
       </p>
       <p role="status">{message}</p>
       <Card>
@@ -95,6 +105,34 @@ export function HqDealsPage() {
           onSubmit={submit}
           style={{ display: 'grid', gap: 12, maxWidth: 600 }}
         >
+          <label>
+            Mischief recipe{' '}
+            <select
+              value={preset}
+              onChange={(e) => {
+                const next = e.target.value
+                setPreset(next)
+                if (next === 'giveaway') setKind('percent')
+                if (next === 'fixed') setKind('fixed')
+                if (next === 'percent') setKind('percent')
+              }}
+            >
+              <option value="custom">Custom deal</option>
+              <option value="percent">Percentage discount</option>
+              <option value="fixed">Fixed-dollar discount (AUD)</option>
+              <option value="student">Student / verified eligibility</option>
+              <option value="founder">Founding goblins / limited places</option>
+              <option value="flash">Flash sale / time-limited deal</option>
+              <option value="giveaway">Free Premium giveaway (draft only)</option>
+            </select>
+          </label>
+          {preset === 'giveaway' ? (
+            <p role="note">
+              Free giveaways need a separate, time-limited Premium entitlement
+              with no checkout or recurring charges. Save a campaign draft for
+              now; giveaway redemption is not enabled yet.
+            </p>
+          ) : null}
           <label>
             Code{' '}
             <input
@@ -157,6 +195,18 @@ export function HqDealsPage() {
             </select>
           </label>
           <label>
+            Start date (optional){' '}
+            <input name="startAt" type="datetime-local" />
+          </label>
+          <label>
+            Expiry date (optional){' '}
+            <input name="expiresAt" type="datetime-local" />
+          </label>
+          <label>
+            Days after activation before expiry (optional){' '}
+            <input name="activationWindowDays" type="number" min={1} max={365} />
+          </label>
+          <label>
             Maximum redemptions (optional){' '}
             <input name="max" type="number" min={1} />
           </label>
@@ -164,6 +214,11 @@ export function HqDealsPage() {
             Maximum committed discount budget (A$, optional){' '}
             <input name="budget" type="number" step="0.01" min="0.01" />
           </label>
+          <p className={styles.sub}>
+            One redemption per account per campaign is enforced in the
+            database. Campaigns cannot be activated until checkout and
+            redemption safeguards have passed testing.
+          </p>
           <Button type="submit" disabled={create.isPending}>
             Save inactive campaign
           </Button>
