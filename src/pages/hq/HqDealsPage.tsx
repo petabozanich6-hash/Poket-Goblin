@@ -274,6 +274,7 @@ export function HqDealsPage() {
   const [message, setMessage] = useState('')
   const [kind, setKind] = useState<'percent' | 'fixed'>('percent')
   const [preset, setPreset] = useState('custom')
+  const [section, setSection] = useState<'gifts' | 'discounts'>('gifts')
   const [expandedTracker, setExpandedTracker] = useState<string | null>(null)
   const refresh = () => qc.invalidateQueries({ queryKey: ['hq', 'deals'] })
   const create = useMutation({
@@ -336,9 +337,27 @@ export function HqDealsPage() {
         discount campaigns remain inactive until secure redemption is
         implemented.
       </p>
-      <p role="status">{message}</p>
-      <GiveawaysPanel />
-      <Card>
+      <nav aria-label="Deals & Mischief sections" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+        <Button
+          variant={section === 'gifts' ? 'primary' : 'secondary'}
+          onClick={() => setSection('gifts')}
+        >
+          🎁 Free Premium giveaways
+        </Button>
+        <Button
+          variant={section === 'discounts' ? 'primary' : 'secondary'}
+          onClick={() => setSection('discounts')}
+        >
+          💰 Discount campaigns
+        </Button>
+      </nav>
+      {section === 'gifts' ? (
+        <GiveawaysPanel />
+      ) : (
+        <>
+          <p role="status">{message}</p>
+          <p>Discount codes are drafts only. Billing-safe redemption is not yet enabled.</p>
+          <Card>
         <h3>Create a campaign</h3>
         <form
           onSubmit={submit}
@@ -579,6 +598,8 @@ export function HqDealsPage() {
             </div>
           </Card>
         ))
+      )}
+        </>
       )}
     </section>
   )
