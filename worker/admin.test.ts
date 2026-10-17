@@ -727,6 +727,7 @@ describe('promotion owner-only isolation', () => {
     const gift = await json(gifted)
     const paths = [
       '/api/admin/deals',
+      '/api/admin/deals/stripe-codes',
       `/api/admin/deals/${id}/redemptions`,
       `/api/admin/deals/${id}/stripe-usage`,
       '/api/admin/deals/giveaways',
@@ -741,6 +742,132 @@ describe('promotion owner-only isolation', () => {
       { cookie: alice.cookie, admin: true, body: {} },
     )
     expect(published.status).toBe(404)
+  })
+})
+
+describe('launch-time promotion safety', () => {
+  const draft = async (code: string) => {
+    const result = await h.request('/api/admin/deals', {
+      cookie: owner.cookie,
+      admin: true,
+      body: {
+        code,
+        name: 'Local unused draft',
+        kind: 'percent',
+        amount: 30,
+        billingCycles: 12,
+        audience: 'new',
+        verification: 'none',
+        maxRedemptions: 100,
+      },
+    })
+    expect(result.status).toBe(201)
+    return (await json(result)).id as string
+  }
+
+  it('lets the owner discard an unlinked unused draft without touching Stripe', async () => {
+    h.elevate(owner)
+    const id = await draft('DRAFTREMOVE')
+    const unauthorized = await h.request(`/api/admin/deals/${id}`, {
+      cookie: alice.cookie,
+      method: 'DELETE',
+      admin: true,
+    })
+    expect(unauthorized.status).toBe(404)
+    const discarded = await h.request(`/api/admin/deals/${id}`, {
+      cookie: owner.cookie,
+      method: 'DELETE',
+      admin: true,
+    })
+    expect(discarded.status).toBe(200)
+    expect(h.query('SELECT id FROM promotion_campaigns WHERE id = ?', id)).toEqual([])
+    expect(
+      h.query(
+        "SELECT action FROM admin_audit_log WHERE target_id = ? AND action = 'deals.discard_draft'",
+        id,
+      ),
+    ).toEqual([{ action: 'deals.discard_draft' }])
+  })
+
+  it('refuses to delete Stripe-linked or already-claimed campaigns', async () => {
+    h.elevate(owner)
+    const linkedId = await draft('DRAFTLINKED')
+    h.run(
+      'UPDATE promotion_campaigns SET stripe_promotion_code_id = ? WHERE id = ?',
+      'promo_stripe_live',
+      linkedId,
+    )
+    const linked = await h.request(`/api/admin/deals/${linkedId}`, {
+      cookie: owner.cookie, method: 'DELETE', admin: true,
+    })
+    expect(linked.status).toBe(409)
+    const claimedId = await draft('DRAFTCLAIMED')
+    h.run(
+      `INSERT INTO promotion_redemptions
+       (id, campaign_id, user_id, status, commitment_cents)
+       VALUES (?, ?, ?, 'confirmed', 0)`,
+      'claim_1',
+      claimedId,
+      alice.id,
+    )
+    const claimed = await h.request(`/api/admin/deals/${claimedId}`, {
+      cookie: owner.cookie, method: 'DELETE', admin: true,
+    })
+    expect(claimed.status).toBe(409)
+    expect(
+      h.query('SELECT id FROM promotion_campaigns WHERE id IN (?, ?) ORDER BY id', linkedId, claimedId),
+    ).toHaveLength(2)
+  })
+
+  it('lists dashboard-created Stripe codes without mutating coupons or billing', async () => {
+    h.elevate(owner)
+    h.env.STRIPE_SECRET_KEY = 'sk_live_fake_for_test'
+    h.env.STRIPE_WEBHOOK_SECRET = 'whsec_fake_for_test'
+    h.env.STRIPE_LIVE_ENABLED = 'true'
+    h.env.STRIPE_PRICE_MONTHLY = 'price_month_test'
+    const requests: Array<{ url: string; method: string }> = []
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = (async (input, init) => {
+      requests.push({
+        url: String(input),
+        method: init?.method ?? 'GET',
+      })
+      return new Response(
+        JSON.stringify({
+          has_more: false,
+          data: [{
+            id: 'promo_live_1',
+            code: 'GOBLINFOUNDERS30',
+            active: true,
+            times_redeemed: 0,
+            max_redemptions: 100,
+            expires_at: null,
+          }],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )
+    }) as typeof fetch
+    try {
+      const result = await h.request('/api/admin/deals/stripe-codes', {
+        cookie: owner.cookie,
+      })
+      expect(result.status).toBe(200)
+      expect(await json(result)).toMatchObject({
+        live: true,
+        hasMore: false,
+        codes: [{
+          code: 'GOBLINFOUNDERS30',
+          active: true,
+          redemptions: 0,
+          maxRedemptions: 100,
+        }],
+      })
+      expect(requests).toHaveLength(1)
+      expect(requests[0]?.method).toBe('GET')
+      expect(requests[0]?.url).toContain('/promotion_codes?')
+    } finally {
+      globalThis.fetch = originalFetch
+    }
   })
 })
 
