@@ -86,8 +86,12 @@ test('a study schedule becomes a reviewable path, downloadable calendar tasks an
   await expect(
     calendarPage.getByRole('heading', { name: 'Calendar' }),
   ).toBeVisible()
-  await expect(calendarPage.getByText(/Understanding evidence/).first()).toBeVisible()
-  await expect(calendarPage.getByText(/min study · planned day/).first()).toBeVisible()
+  await expect(
+    calendarPage.getByText(/Understanding evidence/).first(),
+  ).toBeVisible()
+  await expect(
+    calendarPage.getByText(/min study · planned day/).first(),
+  ).toBeVisible()
   await calendarPage.close()
 
   const calendar = await page.request.get('/api/calendar/export.ics')
