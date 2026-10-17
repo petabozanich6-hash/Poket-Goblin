@@ -120,7 +120,7 @@ export function StudyPathwayPreviewPanel({
       await refreshSaved()
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: ['study-calendar-sessions'],
+          queryKey: ['dated-calendar-tasks'],
         }),
         queryClient.invalidateQueries({ queryKey: ['tasks'] }),
         queryClient.invalidateQueries({ queryKey: ['study-pathways'] }),
@@ -146,7 +146,7 @@ export function StudyPathwayPreviewPanel({
       setCalendarChanged(true)
       await refreshSaved()
       await queryClient.invalidateQueries({
-        queryKey: ['study-calendar-sessions'],
+        queryKey: ['dated-calendar-tasks'],
       })
     } catch (cause) {
       setError(
@@ -176,7 +176,7 @@ export function StudyPathwayPreviewPanel({
       setCalendarChanged(true)
       await refreshSaved()
       await queryClient.invalidateQueries({
-        queryKey: ['study-calendar-sessions'],
+        queryKey: ['dated-calendar-tasks'],
       })
     } catch (cause) {
       setError(
