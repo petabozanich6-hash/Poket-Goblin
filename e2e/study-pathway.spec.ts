@@ -71,6 +71,12 @@ test('a study schedule becomes a reviewable path, downloadable calendar tasks an
     .getByRole('button', { name: 'Approve and add these study tasks' })
     .click()
   await expect(page.getByText('Saved study sessions')).toBeVisible()
+  await expect(
+    page.getByRole('link', { name: 'Download the latest calendar file (.ics)' }),
+  ).toHaveAttribute('href', /\/api\/calendar\/export\.ics\?tz=/)
+  await expect(
+    page.getByText(/downloaded calendar file is a one-time copy/i),
+  ).toBeVisible()
   const calendar = await page.request.get('/api/calendar/export.ics')
   expect(calendar.status()).toBe(200)
   const content = await calendar.text()
@@ -95,6 +101,9 @@ test('a study schedule becomes a reviewable path, downloadable calendar tasks an
   ).toBeVisible()
   await page.getByRole('button', { name: 'Undo this pathway' }).click()
   await expect(page.getByText('Saved study sessions')).toHaveCount(0)
+  await expect(
+    page.getByRole('link', { name: 'Download the latest calendar file (.ics)' }),
+  ).toBeVisible()
   const afterUndo = await (
     await page.request.get('/api/calendar/export.ics')
   ).text()
