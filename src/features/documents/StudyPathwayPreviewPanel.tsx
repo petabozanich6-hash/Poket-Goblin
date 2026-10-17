@@ -406,7 +406,7 @@ export function StudyPathwayPreviewPanel({
         {loading ? 'Planning…' : 'Preview my pathway'}
       </Button>
       {error ? <p role="alert">{error}</p> : null}
-      {preview && stored?.pathway?.status !== 'active' ? (
+      {preview ? (
         <div aria-live="polite">
           <p>
             {preview.preview.sessions.length} proposed sessions.{' '}
