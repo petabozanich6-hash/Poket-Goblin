@@ -102,11 +102,37 @@ describe('approved pathway transactions and Undo', () => {
         minutes: 60,
         sequence: 1,
       },
+      {
+        stepId: 'custom-notes',
+        goalId: 'goal',
+        title: 'My reading',
+        date: '2030-05-14',
+        minutes: 45,
+        sequence: 1,
+      },
+      {
+        stepId: 'custom-title',
+        goalId: 'goal',
+        title: 'Outline research',
+        date: '2030-05-15',
+        minutes: 45,
+        sequence: 1,
+      },
     ])
     await h.env.DB.prepare(
       "UPDATE tasks SET status = 'completed' WHERE user_id = ? AND title = ?",
     )
       .bind(alice.id, 'Completed reading')
+      .run()
+    await h.env.DB.prepare(
+      "UPDATE tasks SET notes = 'Important personal notes' WHERE user_id = ? AND title = 'My reading'",
+    )
+      .bind(alice.id)
+      .run()
+    await h.env.DB.prepare(
+      "UPDATE tasks SET title = 'My customised outline' WHERE user_id = ? AND title = 'Outline research'",
+    )
+      .bind(alice.id)
       .run()
     await h.env.DB.prepare(
       'INSERT INTO tasks (id, user_id, title, priority, capacity_cost) VALUES (?, ?, ?, ?, ?)',
@@ -119,12 +145,18 @@ describe('approved pathway transactions and Undo', () => {
       cookie: alice.cookie,
     })
     expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ undone: 1, retained: 3 })
     expect(
       h.query(
         'SELECT title FROM tasks WHERE user_id = ? ORDER BY title',
         alice.id,
       ),
-    ).toEqual([{ title: 'Completed reading' }, { title: 'Unrelated chore' }])
+    ).toEqual([
+      { title: 'Completed reading' },
+      { title: 'My customised outline' },
+      { title: 'My reading' },
+      { title: 'Unrelated chore' },
+    ])
   })
 
   it('creates a new active version after Undo without erasing cancelled history', async () => {
@@ -251,6 +283,17 @@ describe('approved pathway transactions and Undo', () => {
     expect((await send(draft.id, '2030-05-11')).status).toBe(409)
     expect((await send(draft.id, '2030-05-07', 120)).status).toBe(409)
     expect((await send(draft.id, '2030-05-07', 45)).status).toBe(200)
+    expect(
+      h.query(
+        'SELECT notes FROM tasks WHERE user_id = ? AND title = ?',
+        alice.id,
+        'Draft essay',
+      ),
+    ).toEqual([
+      {
+        notes: expect.stringContaining('45 min · pathway '),
+      },
+    ])
     // A later day is allowed before the actual assessment deadline, but only
     // if its confirmed capacity covers all tasks already planned that day.
     await h.env.DB.prepare(
@@ -277,6 +320,19 @@ describe('approved pathway transactions and Undo', () => {
       },
     )
     expect(noBudget.status).toBe(400)
+    await h.env.DB.prepare(
+      "UPDATE tasks SET notes = 'Personal notes stay mine' WHERE user_id = ? AND title = ?",
+    )
+      .bind(alice.id, 'Draft essay')
+      .run()
+    expect((await send(draft.id, '2030-05-10', 30, 120)).status).toBe(200)
+    expect(
+      h.query(
+        'SELECT notes FROM tasks WHERE user_id = ? AND title = ?',
+        alice.id,
+        'Draft essay',
+      ),
+    ).toEqual([{ notes: 'Personal notes stay mine' }])
   })
 
   it('removes approved pathways and sessions when a user deletes their account', async () => {
