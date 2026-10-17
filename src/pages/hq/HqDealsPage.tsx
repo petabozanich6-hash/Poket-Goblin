@@ -240,6 +240,55 @@ type Redemption = {
   revenuePaidCents: number
 }
 
+type StripeUsage = {
+  linked: boolean
+  source: 'stripe' | 'draft'
+  active?: boolean
+  redemptions: number
+  maxRedemptions?: number | null
+  remaining?: number | null
+  expiresAt?: string | null
+}
+
+function StripeUsageTracker({ campaignId }: { campaignId: string }) {
+  const usage = useQuery({
+    queryKey: ['hq', 'deals', campaignId, 'stripe-usage'],
+    queryFn: () =>
+      api.admin.get<StripeUsage>(
+        `/deals/${encodeURIComponent(campaignId)}/stripe-usage`,
+      ),
+    staleTime: 0,
+  })
+  if (usage.isLoading) return <p>Checking Stripe's ledger…</p>
+  if (usage.isError)
+    return <p role="alert">Could not check Stripe redemption totals.</p>
+  const stats = usage.data
+  if (!stats?.linked)
+    return <p>Draft only. This code has not been published to Stripe.</p>
+  return (
+    <p>
+      Stripe-confirmed redemptions: <strong>{stats.redemptions}</strong>
+      {stats.maxRedemptions !== null
+        ? ` / ${stats.maxRedemptions}`
+        : ''}{' '}
+      · Remaining: {stats.remaining ?? 'Unlimited'} · Status:{' '}
+      {stats.active ? 'Active' : 'Inactive'}
+      {stats.expiresAt
+        ? ` · Expires ${new Date(stats.expiresAt).toLocaleDateString()}`
+        : ''}
+      <br />
+      <small>
+        Checkout previews do not count as redemptions. Financial totals below
+        come from the internal ledger, not Stripe, until invoice reconciliation
+        is implemented.
+      </small>
+      <Button variant="secondary" onClick={() => void usage.refetch()}>
+        Refresh Stripe usage
+      </Button>
+    </p>
+  )
+}
+
 function RedemptionTracker({ campaignId }: { campaignId: string }) {
   const claims = useQuery({
     queryKey: ['hq', 'deals', campaignId, 'redemptions'],
@@ -551,6 +600,7 @@ export function HqDealsPage() {
                   · Revenue: {money(p.revenue_cents)} · Discounts given:{' '}
                   {money(p.realised_cents)}
                 </p>
+                <StripeUsageTracker campaignId={p.id} />
                 <p>
                   Committed: {money(p.committed_cents)} · Outstanding:{' '}
                   {money(Math.max(0, p.committed_cents - p.realised_cents))} ·
