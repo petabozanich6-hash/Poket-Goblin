@@ -1,7 +1,9 @@
 name: Study pathway browser acceptance
 
 on:
+  workflow_dispatch:
   pull_request:
+    types: [ready_for_review]
     branches: [main, development]
     paths:
       - 'e2e/study-pathway.spec.ts'
