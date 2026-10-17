@@ -1114,6 +1114,29 @@ adminRoutes.get(
   },
 )
 
+adminRoutes.get(
+  '/deals/giveaways/:id/grants',
+  requirePermission('subscriptions.read'),
+  async (c) => {
+    const id = c.req.param('id')
+    const campaign = await c.env.DB.prepare(
+      'SELECT id FROM premium_giveaway_campaigns WHERE id = ?',
+    ).bind(id).first()
+    if (!campaign) return c.json({ error: 'Giveaway not found' }, 404)
+    const rows = await c.env.DB.prepare(
+      `SELECT g.id, u.email, g.issued_at AS issuedAt,
+              e.current_period_end AS expiresAt, e.status,
+              e.ended_at AS endedAt
+       FROM premium_giveaway_grants g
+       JOIN users u ON u.id = g.user_id
+       JOIN user_entitlements e ON e.id = g.entitlement_id
+       WHERE g.campaign_id = ?
+       ORDER BY g.issued_at DESC LIMIT 250`,
+    ).bind(id).all()
+    return c.json({ grants: rows.results ?? [] })
+  },
+)
+
 adminRoutes.post(
   '/deals/giveaways',
   requirePermission('settings.write'),
