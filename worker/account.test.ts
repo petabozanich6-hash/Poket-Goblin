@@ -199,6 +199,43 @@ describe('opt-in verified email registration gate', () => {
     ).toHaveLength(0)
   })
 
+  it('keeps a gated account pending if delivery fails', async () => {
+    const send = vi.fn()
+    send.mockRejectedValueOnce(new Error('temporary outage'))
+    send.mockImplementation(async (message: Sent) => {
+      sent.push(message)
+      return { messageId: 'recovered' }
+    })
+    const test = createHarness({
+      EMAIL_VERIFICATION_REQUIRED: 'true',
+      EMAIL: { send } as unknown as SendEmail,
+    })
+    const register = await test.request('/api/auth/register', {
+      body: {
+        email: 'delivery-recovery@example.com',
+        password: 'correct horse battery',
+        displayName: 'Recovery',
+      },
+    })
+    expect(register.status).toBe(201)
+    expect(register.headers.get('set-cookie')).toBeNull()
+    expect(await json(register)).toMatchObject({
+      verificationRequired: true,
+      emailSent: false,
+    })
+    expect((await test.login('delivery-recovery@example.com')).status).toBe(403)
+    const resend = await test.request('/api/auth/verify-email/resend', {
+      body: { email: 'delivery-recovery@example.com' },
+    })
+    expect(resend.status).toBe(200)
+    expect(send).toHaveBeenCalledTimes(2)
+    const verify = await test.request('/api/auth/verify-email', {
+      body: { token: lastToken('verify-email') },
+    })
+    expect(verify.status).toBe(200)
+    expect((await test.login('delivery-recovery@example.com')).status).toBe(200)
+  })
+
   it('sends email but denies access until the proof link is used', async () => {
     h.env.EMAIL_VERIFICATION_REQUIRED = 'true'
     const res = await h.request('/api/auth/register', {
