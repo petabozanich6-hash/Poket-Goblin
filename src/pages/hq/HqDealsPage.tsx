@@ -174,12 +174,53 @@ function GiveawaysPanel() {
   )
 }
 
+type Redemption = {
+  id: string
+  email: string
+  status: 'reserved' | 'confirmed' | 'failed' | 'expired'
+  createdAt: string
+  confirmedAt: string | null
+  committedCents: number
+  discountsRealisedCents: number
+  revenuePaidCents: number
+}
+
+function RedemptionTracker({ campaignId }: { campaignId: string }) {
+  const claims = useQuery({
+    queryKey: ['hq', 'deals', campaignId, 'redemptions'],
+    queryFn: () =>
+      api.admin.get<{ redemptions: Redemption[] }>(
+        `/deals/${encodeURIComponent(campaignId)}/redemptions`,
+      ),
+  })
+  if (claims.isLoading) return <p>Checking the treasure ledger…</p>
+  if (claims.isError) return <p role="alert">Could not load the claims ledger.</p>
+  if (!claims.data?.redemptions.length)
+    return <p>No claims recorded for this campaign yet.</p>
+  return (
+    <div>
+      <h4>Claim history (latest 250)</h4>
+      <ul>
+        {claims.data.redemptions.map((claim) => (
+          <li key={claim.id}>
+            {claim.email} — {claim.status} ·{' '}
+            {new Date(claim.createdAt).toLocaleDateString()} · Discount used:{' '}
+            {money(claim.discountsRealisedCents)} · Revenue:{' '}
+            {money(claim.revenuePaidCents)}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 export function HqDealsPage() {
   const qc = useQueryClient()
   const deals = useQuery({ queryKey: ['hq', 'deals'], queryFn: fetchDeals })
   const [message, setMessage] = useState('')
   const [kind, setKind] = useState<'percent' | 'fixed'>('percent')
   const [preset, setPreset] = useState('custom')
+  const [expandedTracker, setExpandedTracker] = useState<string | null>(null)
   const refresh = () => qc.invalidateQueries({ queryKey: ['hq', 'deals'] })
   const create = useMutation({
     mutationFn: (data: Record<string, unknown>) =>
@@ -315,7 +356,7 @@ export function HqDealsPage() {
             />
           </label>
           <label>
-            Discounted billing cycles{' '}
+            Discounted invoices (not months){' '}
             <input
               name="cycles"
               type="number"
@@ -325,6 +366,13 @@ export function HqDealsPage() {
               required
             />
           </label>
+          <p role="note">
+            CAUTION: A billing cycle means one invoice, not one calendar month.
+            Six cycles means six months on a monthly plan but six years on an
+            annual plan. These draft codes cannot be activated or redeemed.
+            Calendar-duration and plan-specific discount rules are being designed
+            separately. Free Premium gifts are handled above.
+          </p>
           <label>
             Audience{' '}
             <select name="audience">
@@ -405,6 +453,17 @@ export function HqDealsPage() {
             </p>
             {p.activation_window_days ? (
               <p>Expires {p.activation_window_days} days after activation.</p>
+            ) : null}
+            <Button
+              variant="secondary"
+              onClick={() =>
+                setExpandedTracker(expandedTracker === p.id ? null : p.id)
+              }
+            >
+              {expandedTracker === p.id ? 'Hide claims' : 'View claim tracker'}
+            </Button>
+            {expandedTracker === p.id ? (
+              <RedemptionTracker campaignId={p.id} />
             ) : null}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <Button
