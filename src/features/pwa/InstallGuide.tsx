@@ -106,8 +106,17 @@ export function InstallGuide() {
           apps.
         </p>
       ) : null}
+      {platform === 'android' || platform === 'samsung' ? (
+        <p className={styles.sub}>
+          <strong>Android safety note:</strong> Install only from{' '}
+          <strong>pocketgoblin.org</strong> using your browser’s install option.
+          If Android or Google Play Protect shows a security warning, do not
+          bypass it or disable protection. You can keep using Pocket Goblin in
+          your browser and report the warning to support@pocketgoblin.org.
+        </p>
+      ) : null}
       <p className={styles.sub}>
-        No app store, no download beyond the website itself. Once installed,
+        Pocket Goblin is a web app, not a Play Store download. Once installed,
         long-press the icon (Android, desktop Chrome/Edge) for a{' '}
         <strong>Talk to Goblin</strong> shortcut.
       </p>
