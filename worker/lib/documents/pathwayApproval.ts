@@ -110,13 +110,15 @@ export async function persistApprovedPathway(
   // Only IDs the approval route used to build this exact schedule are marked.
   for (const reviewId of new Set(approvedReviewItemIds)) {
     statements.push(
-      db.prepare(
-        `UPDATE review_items
+      db
+        .prepare(
+          `UPDATE review_items
          SET status = 'accepted', reviewed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
              updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
          WHERE id = ? AND user_id = ? AND source_type = 'document'
            AND source_id = ? AND status IN ('pending', 'edited', 'snoozed')`,
-      ).bind(reviewId, userId, documentId),
+        )
+        .bind(reviewId, userId, documentId),
     )
   }
   // D1 batch runs in a single transaction; failure rolls back every write.
