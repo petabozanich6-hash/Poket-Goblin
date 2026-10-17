@@ -1,4 +1,5 @@
 import type { Env } from '../../env'
+import { makeInferenceSample, recordInferenceSample } from '../aiTelemetry'
 
 export class WorkersAiBlockedError extends Error {}
 
@@ -107,6 +108,9 @@ export async function callWorkersAi(
     throw new WorkersAiBlockedError('Workers AI budget unavailable')
   }
   let timer: ReturnType<typeof setTimeout> | undefined
+  let raw: unknown = null
+  let completed = false
+  const started = Date.now()
   try {
     const result = await Promise.race([
       // The "-fast" variant is newer than the bundled type list.
@@ -127,6 +131,7 @@ export async function callWorkersAi(
         )
       }),
     ])
+    raw = result
     // A timeout cannot cancel binding inference; retain the reservation.
     if (!result || typeof result !== 'object' || !('response' in result)) {
       throw new Error('Invalid Workers AI response')
@@ -134,17 +139,31 @@ export async function callWorkersAi(
     const content = result.response
     if (typeof content === 'string') {
       if (content.length > 32_000) throw new Error('AI output too large')
-      return JSON.parse(content) as unknown
+      const parsed = JSON.parse(content) as unknown
+      completed = true
+      return parsed
     }
     // JSON mode can return an already parsed object.
     if (content && typeof content === 'object' && !Array.isArray(content)) {
       if (JSON.stringify(content).length > 32_000)
         throw new Error('AI output too large')
+      completed = true
       return content
     }
     throw new Error('Empty Workers AI response')
   } finally {
     clearTimeout(timer)
+    await recordInferenceSample(
+      env,
+      makeInferenceSample({
+        model,
+        modality: 'text',
+        status: completed ? 'completed' : 'failed',
+        durationMs: Date.now() - started,
+        raw,
+        promptText: system + user,
+      }),
+    )
   }
 }
 
@@ -186,6 +205,9 @@ export async function transcribeImageWithWorkersAi(
     binary += String.fromCharCode(...image.subarray(i, i + 0x8000))
   }
   let timer: ReturnType<typeof setTimeout> | undefined
+  let raw: unknown = null
+  let completed = false
+  const started = Date.now()
   try {
     const result = await Promise.race([
       // Newer than the bundled type list, like the text model.
@@ -215,13 +237,25 @@ export async function transcribeImageWithWorkersAi(
         )
       }),
     ])
+    raw = result
     const response =
       result && typeof result === 'object' && 'response' in result
         ? (result as { response: unknown }).response
         : null
     if (typeof response !== 'string') throw new Error('Empty vision response')
+    completed = true
     return response.slice(0, 20_000)
   } finally {
     clearTimeout(timer)
+    await recordInferenceSample(
+      env,
+      makeInferenceSample({
+        model: WORKERS_AI_VISION_MODEL,
+        modality: 'vision',
+        status: completed ? 'completed' : 'failed',
+        durationMs: Date.now() - started,
+        raw,
+      }),
+    )
   }
 }
