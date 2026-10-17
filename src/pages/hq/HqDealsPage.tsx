@@ -23,6 +23,8 @@ type Campaign = {
   revenue_cents: number
   expires_at: string | null
   activation_window_days: number | null
+  stripe_promotion_code_id: string | null
+  start_at: string | null
 }
 const money = (cents: number) =>
   new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(
@@ -300,6 +302,21 @@ export function HqDealsPage() {
     },
     onError: (e: Error) => setMessage(e.message),
   })
+  const publish = useMutation({
+    mutationFn: (id: string) =>
+      api.admin.send(
+        'POST',
+        `/deals/${encodeURIComponent(id)}/publish-first-invoice`,
+        {},
+      ),
+    onSuccess: () => {
+      setMessage(
+        'First-invoice code published to Stripe. Test at Checkout without completing payment.',
+      )
+      void refresh()
+    },
+    onError: (e: Error) => setMessage(e.message),
+  })
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const f = new FormData(event.currentTarget)
@@ -546,6 +563,31 @@ export function HqDealsPage() {
                   <p>
                     Expires {p.activation_window_days} days after activation.
                   </p>
+                ) : null}
+                {!p.active &&
+                !p.stripe_promotion_code_id &&
+                p.kind === 'percent' &&
+                p.billing_cycles === 1 &&
+                p.audience === 'new' &&
+                p.verification === 'none' &&
+                p.max_redemptions === 1 &&
+                p.budget_cents === null &&
+                p.start_at === null &&
+                p.activation_window_days === null ? (
+                  <Button
+                    variant="secondary"
+                    disabled={publish.isPending}
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          'Publish this one-use, first-invoice code in live Stripe? It can be redeemed for a real discount. No payment is required to inspect Checkout.',
+                        )
+                      )
+                        publish.mutate(p.id)
+                    }}
+                  >
+                    Publish 1-use code to Stripe
+                  </Button>
                 ) : null}
                 <Button
                   variant="secondary"

@@ -67,6 +67,7 @@ import {
 import { checkRateLimit } from '../lib/rateLimit'
 import { usdAudQuote } from '../lib/finance'
 import { newId } from '../lib/ids'
+import { billingConfig, stripe, StripeError } from '../lib/billing/stripe'
 import { accountEmail, sendEmail } from '../lib/email'
 import {
   revokeAllSessions,
@@ -1005,6 +1006,127 @@ adminRoutes.post('/deals', requirePermission('settings.write'), async (c) => {
   return c.json({ id, code, active: false }, 201)
 })
 
+// Owner-controlled first-invoice codes only. Multicycle / founder offers remain
+// inactive until interval-safe redemption and accounting are implemented.
+adminRoutes.post(
+  '/deals/:id/publish-first-invoice',
+  requirePermission('settings.write'),
+  async (c) => {
+    const id = c.req.param('id')
+    const row = await c.env.DB.prepare(
+      'SELECT * FROM promotion_campaigns WHERE id = ?',
+    )
+      .bind(id)
+      .first<Record<string, unknown>>()
+    if (!row) return c.json({ error: 'Campaign not found' }, 404)
+    if (
+      row.kind !== 'percent' ||
+      Number(row.billing_cycles) !== 1 ||
+      row.audience !== 'new' ||
+      row.verification !== 'none' ||
+      Number(row.max_redemptions) !== 1 ||
+      row.budget_cents !== null ||
+      row.start_at !== null ||
+      row.activation_window_days !== null ||
+      row.stripe_promotion_code_id
+    )
+      return c.json(
+        {
+          error:
+            'Only an unpublished, one-redemption, new-customer percentage offer for the first invoice is supported. Other drafts remain locked.',
+        },
+        409,
+      )
+    if (row.expires_at && Date.parse(String(row.expires_at)) <= Date.now())
+      return c.json({ error: 'This draft is already expired.' }, 409)
+    const config = billingConfig(c.env)
+    if (!config.enabled)
+      return c.json({ error: 'Stripe is not configured.' }, 503)
+    // Never create a live Stripe code before the remote D1 migration exists.
+    try {
+      await c.env.DB.prepare(
+        'SELECT stripe_promotion_code_id FROM promotion_campaigns WHERE id = ?',
+      )
+        .bind(id)
+        .first()
+    } catch {
+      return c.json(
+        { error: 'Apply the Stripe promotion database migration first.' },
+        503,
+      )
+    }
+    if (!/^[A-Z0-9]+$/.test(String(row.code)))
+      return c.json(
+        {
+          error:
+            'Stripe promotion codes must contain only letters and numbers.',
+        },
+        409,
+      )
+    const couponId = 'pg_' + id
+    try {
+      await stripe(
+        config,
+        'POST',
+        '/coupons',
+        {
+          id: couponId,
+          name: String(row.name),
+          duration: 'once',
+          percent_off: Number(row.amount),
+          metadata: { campaign_id: id },
+        },
+        { idempotencyKey: 'pg-coupon-' + id },
+      )
+      const promo = await stripe<{ id: string }>(
+        config,
+        'POST',
+        '/promotion_codes',
+        {
+          coupon: couponId,
+          code: String(row.code),
+          max_redemptions: 1,
+          restrictions: { first_time_transaction: true },
+          ...(row.expires_at
+            ? {
+                expires_at: Math.floor(
+                  Date.parse(String(row.expires_at)) / 1000,
+                ),
+              }
+            : {}),
+          metadata: { campaign_id: id },
+        },
+        { idempotencyKey: 'pg-code-' + id },
+      )
+      await c.env.DB.prepare(
+        `UPDATE promotion_campaigns
+         SET stripe_coupon_id = ?, stripe_promotion_code_id = ?, active = 1,
+             updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+         WHERE id = ? AND stripe_promotion_code_id IS NULL`,
+      )
+        .bind(couponId, promo.id, id)
+        .run()
+      await writeAudit(c.env.DB, {
+        ...actor(c),
+        action: 'deals.publish_first_invoice',
+        targetType: 'promotion',
+        targetId: id,
+        detail: { stripeCodeId: promo.id },
+      })
+      return c.json({ ok: true, stripePromotionCodeId: promo.id })
+    } catch (error) {
+      console.error(
+        'Promotion publish failed',
+        error instanceof StripeError ? error.status : 'network',
+      )
+      return c.json(
+        { error: 'Stripe refused the code. Check Stripe Workbench logs.' },
+        502,
+      )
+    }
+  },
+)
+
 adminRoutes.patch(
   '/deals/:id',
   requirePermission('settings.write'),
@@ -1037,6 +1159,24 @@ adminRoutes.patch(
           },
           409,
         )
+      if (row.stripe_promotion_code_id) {
+        const config = billingConfig(c.env)
+        if (!config.enabled)
+          return c.json(
+            { error: 'Stripe unavailable; cannot safely pause code.' },
+            503,
+          )
+        try {
+          await stripe(
+            config,
+            'POST',
+            '/promotion_codes/' + String(row.stripe_promotion_code_id),
+            { active: false },
+          )
+        } catch {
+          return c.json({ error: 'Stripe could not deactivate code.' }, 502)
+        }
+      }
       fields.active = 0
     }
     if ('name' in body) {
@@ -1055,9 +1195,9 @@ adminRoutes.patch(
           Number(body.maxRedemptions) < 1)
       )
         return c.json({ error: 'Invalid redemption limit' }, 400)
-      if (locked)
+      if (locked || row.stripe_promotion_code_id)
         return c.json(
-          { error: 'Campaign with redemptions cannot change terms' },
+          { error: 'Published or redeemed campaigns cannot change terms' },
           409,
         )
       fields.max_redemptions = body.maxRedemptions
