@@ -98,13 +98,17 @@ function GiveawaysPanel() {
   })
   const grant = useMutation({
     mutationFn: ({ id, email }: { id: string; email: string }) =>
-      api.admin.send(
+      api.admin.send<{ emailSent: boolean }>(
         'POST',
         `/deals/giveaways/${encodeURIComponent(id)}/grant`,
         { email },
       ),
-    onSuccess: () => {
-      setNotice('Free Premium has been awarded — no recurring payment.')
+    onSuccess: (result) => {
+      setNotice(
+        result.emailSent
+          ? 'Free Premium awarded! The gift email was sent to the email service.'
+          : 'Free Premium awarded, but the notification email could not be sent. The recipient can already sign in and use Premium.',
+      )
       void qc.invalidateQueries({ queryKey: ['hq', 'giveaways'] })
     },
     onError: (error: Error) => setNotice(error.message),

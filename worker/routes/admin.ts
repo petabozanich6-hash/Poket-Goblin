@@ -67,6 +67,7 @@ import {
 import { checkRateLimit } from '../lib/rateLimit'
 import { usdAudQuote } from '../lib/finance'
 import { newId } from '../lib/ids'
+import { accountEmail, sendEmail } from '../lib/email'
 import {
   revokeAllSessions,
   type AuthUser,
@@ -1195,10 +1196,10 @@ adminRoutes.post(
       return c.json({ error: 'Enter an existing customer email.' }, 400)
     const owner = c.get('user')
     const recipient = await c.env.DB.prepare(
-      "SELECT id FROM users WHERE email = ? AND status = 'active'",
+      "SELECT id, display_name AS displayName FROM users WHERE email = ? AND status = 'active'",
     )
       .bind(email)
-      .first<{ id: string }>()
+      .first<{ id: string; displayName: string }>()
     if (!recipient) return c.json({ error: 'Active account not found' }, 404)
     if (recipient.id === owner.id)
       return c.json({ error: 'Owner giveaways must go to customers.' }, 409)
@@ -1276,6 +1277,31 @@ adminRoutes.post(
       targetId: recipient.id,
       detail: { campaignId: giveawayId, durationDays: campaign.days },
     })
-    return c.json({ ok: true, expiresAt: ends }, 201)
+    // The entitlement is committed before email delivery; failed email must
+    // never revoke the grant or cause a second redemption.
+    const mail = await sendEmail(
+      c.env,
+      accountEmail({
+        to: email,
+        subject: '🎁 The goblins have a gift for you — free Premium!',
+        greeting: 'A little mischief for you, ' + recipient.displayName + '!',
+        lines: [
+          'The Pocket Goblin gremlins awarded you ' +
+            campaign.days +
+            ' days of Premium access, completely free.',
+          'Your access is ready now and lasts until ' +
+            ends.slice(0, 10) +
+            ' (UTC).',
+          'No payment details are needed. This gift will not start a subscription or renew automatically.',
+          'Sign in to Pocket Goblin to enjoy your gift!',
+        ],
+        action: {
+          label: 'Open Pocket Goblin',
+          url: 'https://pocketgoblin.org/',
+        },
+        footer: 'Questions? Contact our support team.',
+      }),
+    )
+    return c.json({ ok: true, expiresAt: ends, emailSent: mail.sent }, 201)
   },
 )
