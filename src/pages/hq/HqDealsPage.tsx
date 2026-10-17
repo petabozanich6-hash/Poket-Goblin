@@ -80,9 +80,6 @@ export function HqDealsPage() {
       verification: String(f.get('verification')),
       maxRedemptions: max ? Number(max) : null,
       budgetCents: budget ? Math.round(Number(budget) * 100) : null,
-      activationWindowDays: f.get('window') ? Number(f.get('window')) : null,
-      startAt: f.get('start') ? new Date(String(f.get('start'))).toISOString() : null,
-      expiresAt: f.get('expires') ? new Date(String(f.get('expires'))).toISOString() : null,
       activationWindowDays: f.get('activationWindowDays')
         ? Number(f.get('activationWindowDays'))
         : null,
