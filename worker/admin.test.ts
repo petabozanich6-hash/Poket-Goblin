@@ -734,9 +734,7 @@ describe('promotion owner-only isolation', () => {
     ]
     for (const path of paths) {
       expect((await h.request(path)).status).toBe(401)
-      expect(
-        (await h.request(path, { cookie: alice.cookie })).status,
-      ).toBe(404)
+      expect((await h.request(path, { cookie: alice.cookie })).status).toBe(404)
     }
     const published = await h.request(
       `/api/admin/deals/${id}/publish-first-invoice`,
