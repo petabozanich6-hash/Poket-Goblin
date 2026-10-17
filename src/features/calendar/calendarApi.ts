@@ -37,3 +37,20 @@ export function subscribeLinks(url: string, webcalUrl: string) {
     outlook: `https://outlook.live.com/calendar/0/addfromweb?url=${encodeURIComponent(url)}&name=${encodeURIComponent('Pocket Goblin')}`,
   }
 }
+
+export type StudyCalendarSession = {
+  id: string
+  title: string
+  minutes: number
+  date: string
+  pathwayId: string
+  documentId: string
+}
+
+/** Approved, still-open study sessions for Pocket Goblin's own calendar. */
+export function fetchStudyCalendarSessions(from: string, to: string) {
+  const params = new URLSearchParams({ from, to })
+  return api.get<{ sessions: StudyCalendarSession[] }>(
+    `/documents/study-sessions?${params.toString()}`,
+  )
+}
