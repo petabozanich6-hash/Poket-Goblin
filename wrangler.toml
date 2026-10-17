@@ -51,7 +51,9 @@ AI_DAILY_GLOBAL_LIMIT = "300"
 EMAIL_VERIFICATION_REQUIRED = "true"
 # Stripe Premium price ids (not secret). Empty = Premium shows "Coming soon".
 # The keys are Worker secrets: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET.
-# Live keys stay refused until STRIPE_LIVE_ENABLED = "true" (owner approval).
+# Live billing explicitly enabled by the owner in production on 2026-10-17.
+# Keep this in source control: Wrangler deployments replace dashboard-only vars.
+STRIPE_LIVE_ENABLED = "true"
 STRIPE_PRICE_MONTHLY = "price_1UQcuoRA6WYgjfaI4nZemncM"
 STRIPE_PRICE_YEARLY = "price_1UQcehRA6WYgjfaIchHkzT9R"
 
