@@ -1060,7 +1060,6 @@ adminRoutes.patch(
   },
 )
 
-
 // ---------------------------------------------------- owner-issued giveaways
 // These grants never talk to Stripe and never begin an automatic renewal.
 // Only a passkey-elevated owner can create or issue them.
@@ -1126,7 +1125,10 @@ adminRoutes.post(
     const body = await readJson(c)
     const email =
       typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254)
+    if (
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+      email.length > 254
+    )
       return c.json({ error: 'Enter an existing customer email.' }, 400)
     const owner = c.get('user')
     const recipient = await c.env.DB.prepare(
@@ -1187,7 +1189,14 @@ adminRoutes.post(
          (id,campaign_id,user_id,entitlement_id,issued_by)
          SELECT ?,?,?,?,?
          WHERE EXISTS (SELECT 1 FROM user_entitlements WHERE id = ?)`,
-      ).bind(grantId, giveawayId, recipient.id, entitlementId, owner.id, entitlementId),
+      ).bind(
+        grantId,
+        giveawayId,
+        recipient.id,
+        entitlementId,
+        owner.id,
+        entitlementId,
+      ),
     ])
     if (!results[1]?.meta.changes)
       return c.json(
