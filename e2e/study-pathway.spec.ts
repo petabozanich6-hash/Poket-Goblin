@@ -73,12 +73,23 @@ test('a study schedule becomes a reviewable path, downloadable calendar tasks an
   await expect(page.getByText('Saved study sessions')).toBeVisible()
   await expect(
     page.getByRole('link', {
-      name: 'Download the latest calendar file (.ics)',
+      name: 'Download your calendar (.ics)',
     }),
   ).toHaveAttribute('href', /\/api\/calendar\/export\.ics\?tz=/)
   await expect(
     page.getByText(/downloaded calendar file is a one-time copy/i),
   ).toBeVisible()
+  // The built-in calendar must show the saved sessions, not only exported
+  // all-day task due dates. Use another tab to preserve the upload review.
+  const calendarPage = await page.context().newPage()
+  await calendarPage.goto('/life/calendar')
+  await expect(
+    calendarPage.getByRole('heading', { name: 'Calendar' }),
+  ).toBeVisible()
+  await expect(calendarPage.getByText(/Understanding evidence/).first()).toBeVisible()
+  await expect(calendarPage.getByText(/min study · planned day/).first()).toBeVisible()
+  await calendarPage.close()
+
   const calendar = await page.request.get('/api/calendar/export.ics')
   expect(calendar.status()).toBe(200)
   const content = await calendar.text()
@@ -105,7 +116,7 @@ test('a study schedule becomes a reviewable path, downloadable calendar tasks an
   await expect(page.getByText('Saved study sessions')).toHaveCount(0)
   await expect(
     page.getByRole('link', {
-      name: 'Download the latest calendar file (.ics)',
+      name: 'Download your calendar (.ics)',
     }),
   ).toBeVisible()
   const afterUndo = await (
