@@ -10,6 +10,7 @@ import { billingConfig } from './billing/stripe'
 import type { Env } from '../env'
 import { PLAN_SQL, type Plan } from './access'
 import { resolveProvider } from './intelligence/provider'
+import { inferenceSummary } from './aiTelemetry'
 import {
   aiDailyLimitFor,
   storageQuotaBytesFor,
@@ -189,10 +190,8 @@ export async function aiMetrics(
     ),
     eventsTrackedSince: trackedSince?.since ?? null,
     approachingLimit: approaching,
-    // Token prices differ by provider and model; not configured, not guessed.
-    costs: notConfigured(
-      'AI cost reporting is not configured. Check your AI provider’s billing dashboard.',
-    ),
+    // Measured calls and latency; unpriced models are explicitly excluded from dollar totals.
+    costs: await inferenceSummary(db, now),
   }
 }
 

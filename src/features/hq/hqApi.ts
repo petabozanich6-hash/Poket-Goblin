@@ -62,7 +62,28 @@ export type Overview = {
       used: number
       limit: number
     }[]
-    costs: Unavailable
+    costs:
+      | Unavailable
+      | {
+          available: true
+          trackedSince: string | null
+          trackedCalls30d: number
+          estimatedGrossUsd30d: number
+          unpricedCalls30d: number
+          note: string
+          models: {
+            model: string
+            modality: 'text' | 'vision'
+            calls: number
+            failures: number
+            avgMs: number
+            reportedTokens: number
+            approximateTokens: number
+            unknownTokens: number
+            estimatedGrossUsd: number
+            unpricedCalls: number
+          }[]
+        }
   }
   storage: {
     trackedBytes: number
