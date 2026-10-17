@@ -11,6 +11,7 @@
  * - Temporary ("Just sort it") documents never have their text stored, and a
  *   failure deletes their original immediately.
  */
+import { readEverydayDocument } from '../../../shared/documents/everyday'
 import { isStudyPathwayGroup } from '../../../shared/documents/studyPathwayGroups'
 import {
   extractText,
@@ -155,28 +156,38 @@ export async function processDocumentForUser(
       }
     }
 
-    const ruleUnderstanding = extracted.text
-      ? withDeadlinePlan(
-          understandDocument(extracted.text, doc.displayName, {
-            reference: local,
-            monthFirst: options.monthFirst,
-          }),
-          extracted.text,
-          {
-            reference: local,
-            monthFirst: options.monthFirst,
-            filename: doc.displayName,
-          },
-        )
+    const everyday = extracted.text
+      ? readEverydayDocument(extracted.text, {
+          reference: local,
+          monthFirst: options.monthFirst,
+        })
       : null
+    const ruleUnderstanding =
+      everyday ??
+      (extracted.text
+        ? withDeadlinePlan(
+            understandDocument(extracted.text, doc.displayName, {
+              reference: local,
+              monthFirst: options.monthFirst,
+            }),
+            extracted.text,
+            {
+              reference: local,
+              monthFirst: options.monthFirst,
+              filename: doc.displayName,
+            },
+          )
+        : null)
     // A grounded pathway still needs the learner's approval and completion
     // target. Missing planning preferences are not a reason to call a model.
     const rulesSufficient =
       ruleUnderstanding !== null &&
-      ((ruleUnderstanding.documentType === 'education' &&
-        ruleUnderstanding.suggestions.some(
-          (s) => s.type === 'task' && !!s.group && isStudyPathwayGroup(s.group),
-        )) ||
+      (everyday !== null ||
+        (ruleUnderstanding.documentType === 'education' &&
+          ruleUnderstanding.suggestions.some(
+            (s) =>
+              s.type === 'task' && !!s.group && isStudyPathwayGroup(s.group),
+          )) ||
         (ruleUnderstanding.documentType !== 'general' &&
           ruleUnderstanding.suggestions.some((s) => s.confidence === 'high') &&
           ruleUnderstanding.suggestions.every(

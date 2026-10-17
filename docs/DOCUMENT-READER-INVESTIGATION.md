@@ -4,7 +4,9 @@ Investigated main commit 12434c8 (17 October 2026). The user confirmed that the 
 
 ## Routing change
 
-Run text understanding and deadline/module planning before deciding to call AI. Skip text AI when the rules produce a recognised study pathway, or a recognised document with at least one high-confidence action and no low-confidence, uncertain or incomplete actions. These are routing heuristics, not proof that every detail was extracted. Unknown or ambiguous text retains the existing bounded AI attempt and rules fallback. Photos/scans retain the existing vision path. No expected savings percentage is claimed without representative upload measurements.
+Run text understanding and deadline/module planning before deciding to call AI. Skip text AI when the rules produce a recognised study pathway, or a recognised document with at least one high-confidence action and no low-confidence, uncertain or incomplete actions. These are routing heuristics, not proof that every detail was extracted. An additional review-only reader handles explicit reply/RSVP deadlines, paperwork, insurance and official renewals, timesheets, interviews, delivery notices, collection requests and service visits. It supports email text in accepted document formats; it does not connect an inbox or add `.eml` support. It keeps missing or ambiguous dates for user confirmation rather than asking AI to guess. It rejects quoted threads, conditional/cancelled instructions, multiple dates on an action, dates preceding an action, and detected unsupported requests. These heuristics are intentionally conservative and are not a guarantee of exhaustive comprehension. New everyday suggestions always require approval, even when the existing autonomy setting permits automatic actions.
+
+Unknown or ambiguous text retains the existing bounded AI attempt and rules fallback. Photos/scans retain the existing vision path. No expected savings percentage is claimed without representative upload measurements.
 
 Study tasks still require pathway approval; ordinary rule actions still obey existing autonomy settings and Undo. AI suggestions still require review. Temporary text retention, tenant isolation, production external-provider blocking, cost gates and model defaults are unchanged. No existing uploads are reprocessed.
 
@@ -35,3 +37,7 @@ New regressions check zero provider calls and zero AI usage/reservations for a c
 - Aggregate `ai_events` outcome and applicable budget state at that time, if available. These events store only coarse outcomes; they cannot distinguish a timeout from invalid JSON or a block.
 
 The current catch discards the underlying exception, so existing Worker logs may not contain the needed detail. If historical metadata is unavailable, reproduce with a synthetic, non-sensitive document and capture only allowlisted error categories and timing. Do not enable prompt logging or upload the user's original PDF just for diagnosis.
+
+## Expanded everyday validation
+
+The expanded regression corpus covers nine everyday request types, email headers and multiple independent actions, missing/ambiguous dates, missing appointment times, duplicate instructions, and rejection of quoted, conditional, cancelled, mixed or competing requests. Upload integration tests exercise all nine types with a configured AI binding and verify zero calls, zero AI usage, no auto-created tasks/events, explicit review flags and empty temporary extracted text.

@@ -558,6 +558,65 @@ describe('untrusted content and AI', () => {
     expect(h.query('SELECT * FROM ai_usage_daily')).toEqual([])
   })
 
+  it.each([
+    ['Please reply by 28 October 2030.', 'Reply to the message'],
+    [
+      'Please return the form by 28 October 2030.',
+      'Complete and return the requested paperwork',
+    ],
+    [
+      'Your insurance renewal is due on 28 October 2030.',
+      'Review insurance renewal',
+    ],
+    [
+      'Your registration expires on 28 October 2030.',
+      'Review official renewal',
+    ],
+    ['Please submit your timesheet by 28 October 2030.', 'Submit timesheet'],
+    ['Your job interview on 28 October 2030 at 14:30.', 'Job interview'],
+    ['Your parcel is expected on 28 October 2030.', 'Check expected delivery'],
+    [
+      'Please collect your prescription by 28 October 2030.',
+      'Collect the requested item',
+    ],
+    [
+      'Your inspection is scheduled for 28 October 2030 at 09:30.',
+      'Inspection or service visit',
+    ],
+    ['Please return the form.', 'Complete and return the requested paperwork'],
+  ])(
+    'keeps everyday requests reviewable without spending AI: %s',
+    async (text, title) => {
+      const run = vi.fn(async () => {
+        throw new Error('must not call AI')
+      })
+      const env = {
+        ...h.env,
+        AI_PROVIDER: 'workers_ai',
+        AI: { run } as unknown as Ai,
+      }
+      const { status, body } = await upload(alice, text, {
+        env,
+        name: 'message.txt',
+      })
+      expect(status).toBe(201)
+      expect(body.processing.mode).toBe('rules')
+      expect(body.suggestions).toHaveLength(1)
+      expect(body.suggestions[0]).toMatchObject({ title, status: 'pending' })
+      expect(h.query('SELECT * FROM tasks')).toEqual([])
+      expect(h.query('SELECT * FROM events')).toEqual([])
+      expect(h.query('SELECT extracted_text FROM documents')).toEqual([
+        { extracted_text: '' },
+      ])
+      expect(run).not.toHaveBeenCalled()
+      expect(h.query('SELECT * FROM ai_usage_daily')).toEqual([])
+      const rows = h.query('SELECT payload_json FROM review_items') as {
+        payload_json: string
+      }[]
+      expect(JSON.parse(rows[0]!.payload_json).requiresReview).toBe(true)
+    },
+  )
+
   it('falls back to the built-in reader when the AI fails', async () => {
     const env = {
       ...h.env,

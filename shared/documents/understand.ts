@@ -66,6 +66,8 @@ export type DocumentSuggestion = {
   step?: string
   /** 'ai' when a model suggested it: never added without the person's OK. */
   origin?: 'ai' | 'rules'
+  /** Explicit rule templates can require approval even with a clear date. */
+  requiresReview?: boolean
 }
 
 export type ExtractedFact = {
