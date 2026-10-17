@@ -1,0 +1,51 @@
+name: Manually compare Pocket Goblin Workers AI models
+on:
+  workflow_dispatch:
+    inputs:
+      models:
+        description: "Select model trial"
+        required: true
+        type: choice
+        default: qwen
+        options:
+          - qwen
+          - gemma
+          - glm
+          - baseline
+          - all-four
+      confirm_charge:
+        description: "Type RUN to authorise a small real inference test (possibly billable)"
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  compare:
+    if: ${{ inputs.confirm_charge == 'RUN' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Select allowlisted models
+        id: select
+        env:
+          CHOICE: ${{ inputs.models }}
+        run: |
+          case "$CHOICE" in
+            qwen|gemma|glm|baseline) echo "models=$CHOICE" >> "$GITHUB_OUTPUT" ;;
+            all-four) echo "models=baseline,qwen,gemma,glm" >> "$GITHUB_OUTPUT" ;;
+            *) exit 1 ;;
+          esac
+      - name: Verify zero-call dry run
+        env:
+          BENCHMARK_MODELS: ${{ steps.select.outputs.models }}
+        run: node scripts/compare-pocket-ai.mjs --dry-run
+      - name: Compare synthetic study document
+        env:
+          BENCHMARK_MODELS: ${{ steps.select.outputs.models }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/compare-pocket-ai.mjs
