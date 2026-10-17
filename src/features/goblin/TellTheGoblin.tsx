@@ -239,7 +239,7 @@ export function TellTheGoblin({ prominent = false }: { prominent?: boolean }) {
               onClick={() => fileInput.current?.click()}
             >
               <Paperclip size={18} aria-hidden />
-              <span>Add documents or photos</span>
+              <span>Upload up to 10 documents</span>
             </button>
             <input
               ref={fileInput}
@@ -247,7 +247,7 @@ export function TellTheGoblin({ prominent = false }: { prominent?: boolean }) {
               hidden
               multiple
               accept=".pdf,.docx,.txt,.md,image/jpeg,image/png,image/webp,image/gif"
-              aria-label="Choose a document"
+              aria-label="Upload up to 10 documents"
               onChange={(e) => {
                 chooseFiles(Array.from(e.target.files ?? []))
                 e.target.value = ''
