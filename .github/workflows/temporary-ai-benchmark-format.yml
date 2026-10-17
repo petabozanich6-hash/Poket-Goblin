@@ -15,7 +15,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx prettier --write scripts/compare-pocket-ai.mjs scripts/compare-pocket-ai.test.mjs docs/MANUAL-AI-MODEL-COMPARISON.md
+      - run: npx prettier --write scripts/compare-pocket-ai.mjs scripts/compare-pocket-ai.test.mjs docs/MANUAL-AI-MODEL-COMPARISON.md .github/workflows/manual-compare-pocket-ai.yml
+      - name: Print formatted manual workflow for safe owner update
+        run: cat .github/workflows/manual-compare-pocket-ai.yml
       - name: Commit formatted benchmark files
         run: |
           git config user.name "github-actions[bot]"
