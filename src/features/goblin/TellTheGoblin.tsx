@@ -191,9 +191,14 @@ export function TellTheGoblin({ prominent = false }: { prominent?: boolean }) {
         {files.length ? (
           <div className={styles.attachment}>
             <Paperclip size={14} aria-hidden />
-            <span className={styles.fileName}>
-              {files.map((item) => item.name).join(', ')}
-            </span>
+            <div className={styles.fileName} aria-label="Documents ready to upload">
+              <strong>{files.length} document(s) selected</strong>
+              <ul>
+                {files.map((item, index) => (
+                  <li key={`${index}-${item.name}`}>{item.name}</li>
+                ))}
+              </ul>
+            </div>
             <label className={styles.keep}>
               <input
                 type="checkbox"
