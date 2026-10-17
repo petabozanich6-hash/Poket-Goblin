@@ -3,14 +3,15 @@
  *
  * - Text comes from text files, Word (.docx) and PDFs. Photos and scans need
  *   a vision-capable AI provider; without one the goblin says so plainly.
- * - AI is used when configured, enabled and under the user's daily limit;
- *   otherwise (or if it fails or returns junk) the deterministic reader runs.
+ * - The deterministic reader runs first. AI is reserved for text without a
+ *   usable rules result, or images, when configured and within existing limits.
  * - Nothing is written to tasks/reminders/calendar here: suggestions go to
  *   review_items. Afterwards the upload route adds the confident, rule-based
  *   ones straight away (lib/documents/autoAdd.ts, with Undo); the rest wait.
  * - Temporary ("Just sort it") documents never have their text stored, and a
  *   failure deletes their original immediately.
  */
+import { readEverydayDocument } from '../../../shared/documents/everyday'
 import { isStudyPathwayGroup } from '../../../shared/documents/studyPathwayGroups'
 import {
   extractText,
@@ -155,7 +156,50 @@ export async function processDocumentForUser(
       }
     }
 
+    const everyday = extracted.text
+      ? readEverydayDocument(extracted.text, {
+          reference: local,
+          monthFirst: options.monthFirst,
+        })
+      : null
+    const ruleUnderstanding =
+      everyday ??
+      (extracted.text
+        ? withDeadlinePlan(
+            understandDocument(extracted.text, doc.displayName, {
+              reference: local,
+              monthFirst: options.monthFirst,
+            }),
+            extracted.text,
+            {
+              reference: local,
+              monthFirst: options.monthFirst,
+              filename: doc.displayName,
+            },
+          )
+        : null)
+    // A grounded pathway still needs the learner's approval and completion
+    // target. Missing planning preferences are not a reason to call a model.
+    const rulesSufficient =
+      ruleUnderstanding !== null &&
+      (everyday !== null ||
+        (ruleUnderstanding.documentType === 'education' &&
+          ruleUnderstanding.suggestions.some(
+            (s) =>
+              s.type === 'task' && !!s.group && isStudyPathwayGroup(s.group),
+          )) ||
+        (ruleUnderstanding.documentType !== 'general' &&
+          ruleUnderstanding.suggestions.some((s) => s.confidence === 'high') &&
+          ruleUnderstanding.suggestions.every(
+            (s) =>
+              !s.uncertain &&
+              s.confidence !== 'low' &&
+              s.missingInformation.length === 0,
+          )))
+    if (rulesSufficient) understanding = ruleUnderstanding
+
     const canUseAi =
+      !rulesSufficient &&
       aiReady &&
       // One AI call per document: a photo has already had its turn.
       !readFromImage &&
@@ -196,16 +240,15 @@ export async function processDocumentForUser(
       if (aiCalled) await recordUsage(env.DB, userId, provider.kind)
     }
 
-    if (!understanding && extracted.text) {
-      understanding = understandDocument(extracted.text, doc.displayName, {
-        reference: local,
-        monthFirst: options.monthFirst,
-      })
+    if (!understanding && ruleUnderstanding) {
+      understanding = ruleUnderstanding
       if (outcome === 'ai_unavailable') {
         understanding.warnings.push(
           'The AI reader had a problem, so the built-in goblin read it instead.',
         )
       }
+    }
+    if (understanding) {
       if (readFromImage) {
         outcome = 'ai'
         understanding.warnings.push(
@@ -213,7 +256,7 @@ export async function processDocumentForUser(
         )
       }
     }
-    if (understanding && extracted.text) {
+    if (understanding && extracted.text && mode === 'ai') {
       understanding = withDeadlinePlan(understanding, extracted.text, {
         reference: local,
         monthFirst: options.monthFirst,
