@@ -68,7 +68,9 @@ function GiveawaysPanel() {
         { email },
       ),
     onSuccess: () => {
-      setNotice('Free Premium has been awarded — no recurring payment.')
+      setNotice(
+        'Free Premium was awarded. The email service was asked to notify the recipient; check delivery status in the grant response.',
+      )
       void qc.invalidateQueries({ queryKey: ['hq', 'giveaways'] })
     },
     onError: (error: Error) => setNotice(error.message),
