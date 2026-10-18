@@ -170,3 +170,18 @@ meRoutes.patch('/settings', async (c) => {
   const settings = await loadSettings(c.env.DB, user.id)
   return c.json({ settings })
 })
+
+/** Mark the walkthrough seen for this authenticated account only.
+ * Replays don't clear this flag, and a different user's state cannot be changed.
+ */
+meRoutes.patch('/tour', async (c) => {
+  const body = (await c.req.json().catch(() => null)) as { seen?: unknown } | null
+  if (body?.seen !== true) return c.json({ error: 'Expected seen: true' }, 400)
+  const user = c.get('user')
+  await c.env.DB.prepare(
+    `UPDATE user_settings SET tour_seen = 1,
+       updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+       WHERE user_id = ?`,
+  ).bind(user.id).run()
+  return c.json({ tourSeen: true })
+})
