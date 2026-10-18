@@ -23,6 +23,7 @@ import {
 import { useAuth } from '@/features/auth/useAuth'
 import { fetchAchievements } from '@/features/magical/magicalApi'
 import { InstallGuide } from '@/features/pwa/InstallGuide'
+import { PushControls } from '@/features/pwa/PushControls'
 import { GoblinSettings } from '@/features/voice/GoblinSettings'
 import { applyTheme } from '@/lib/theme'
 
@@ -151,6 +152,11 @@ export function SettingsPage() {
       </Card>
 
       <Card>
+        <h2>Push notifications (optional)</h2>
+        <PushControls />
+      </Card>
+
+      <Card>
         <h2>How the Goblin helps</h2>
         <label className={styles.checkField}>
           <input
@@ -246,8 +252,8 @@ export function SettingsPage() {
       <Card>
         <h2>Gentle nudges</h2>
         <p className={styles.sub}>
-          In-app only. No push or email unless those channels are configured
-          later and you opt in.
+          These nudges stay inside the app. Due reminders and HQ replies can
+          also reach your device if you opt into push notifications above.
         </p>
         <div className={styles.tabs}>
           {(['off', 'quiet', 'normal', 'chatty'] as NudgeFrequency[]).map(
