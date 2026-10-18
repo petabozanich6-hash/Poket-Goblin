@@ -22,6 +22,7 @@ export type SettingsRow = {
   goblinFrequency: GoblinFrequency
   completedQuestCount: number
   goblinAutonomy: 'auto' | 'ask' | null
+  tourSeen: number
 }
 
 export const SETTINGS_SELECT = `capacity_mode as capacityMode, theme,
@@ -36,7 +37,8 @@ export const SETTINGS_SELECT = `capacity_mode as capacityMode, theme,
   planning_approach as planningApproach,
   goblin_frequency as goblinFrequency,
   completed_quest_count as completedQuestCount,
-  goblin_autonomy as goblinAutonomy`
+  goblin_autonomy as goblinAutonomy,
+  tour_seen as tourSeen`
 
 export function mapSettings(row: SettingsRow | null): UserSettings {
   return {
@@ -54,6 +56,7 @@ export function mapSettings(row: SettingsRow | null): UserSettings {
     goblinFrequency: row?.goblinFrequency ?? 'normal',
     completedQuestCount: row?.completedQuestCount ?? 0,
     goblinAutonomy: row?.goblinAutonomy === 'ask' ? 'ask' : 'auto',
+    tourSeen: Boolean(row?.tourSeen ?? 0),
   }
 }
 

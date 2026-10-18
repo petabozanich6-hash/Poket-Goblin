@@ -41,6 +41,8 @@ async function register(page: Page, email: string, name: string) {
   await page.getByLabel('Password').fill(password)
   await page.getByRole('button', { name: /create account/i }).click()
   await expect(page).toHaveURL(/\/den/, { timeout: 20_000 })
+  await page.getByRole('button', { name: 'I’ll figure it out' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
   const me = await page.request.get('/api/me')
   return ((await me.json()) as { user: { id: string } }).user.id
 }

@@ -202,6 +202,8 @@ export type UserSettings = {
   completedQuestCount: number
   /** 'auto': safe, reversible actions happen straight away (with Undo). */
   goblinAutonomy: 'auto' | 'ask'
+  /** Whether this account has dismissed or completed the guided tour. */
+  tourSeen: boolean
 }
 
 export type Achievement = {

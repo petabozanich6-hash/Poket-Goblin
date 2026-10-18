@@ -107,7 +107,7 @@ export function HomePage() {
 
   return (
     <div className={styles.page}>
-      <header className={styles.greeting}>
+      <header className={styles.greeting} data-tour="den">
         <GoblinMascot
           size={72}
           alt=""
@@ -151,7 +151,9 @@ export function HomePage() {
         </section>
       ) : null}
 
-      <TellTheGoblin prominent />
+      <div data-tour="capture">
+        <TellTheGoblin prominent />
+      </div>
 
       {hasToday ? (
         <section className={styles.panel} aria-labelledby="today-heading">
