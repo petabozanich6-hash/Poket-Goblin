@@ -67,6 +67,7 @@ import {
 import { checkRateLimit } from '../lib/rateLimit'
 import { usdAudQuote } from '../lib/finance'
 import { newId } from '../lib/ids'
+import { pushForUser } from '../lib/push'
 import { billingConfig, stripe, StripeError } from '../lib/billing/stripe'
 import { accountEmail, sendEmail } from '../lib/email'
 import {
@@ -533,10 +534,10 @@ adminRoutes.post(
       return c.json({ error: 'Invalid reply or status' }, 400)
     }
     const report = await c.env.DB.prepare(
-      'SELECT id FROM support_threads WHERE id = ?',
+      'SELECT id, user_id as userId FROM support_threads WHERE id = ?',
     )
       .bind(c.req.param('id'))
-      .first()
+      .first<{ id: string; userId: string }>()
     if (!report) return c.json({ error: 'Not found' }, 404)
     await c.env.DB.batch([
       c.env.DB.prepare(
@@ -555,6 +556,7 @@ adminRoutes.post(
       targetId: c.req.param('id'),
       detail: { statusChanged: status !== null },
     })
+    await pushForUser(c.env, report.userId, 'messages').catch(() => undefined)
     return c.json({ ok: true })
   },
 )
