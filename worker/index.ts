@@ -236,10 +236,12 @@ async function scheduled(
   ctx: ExecutionContext,
 ) {
   if (_controller.cron === '*/5 * * * *') {
-    ctx.waitUntil(deliverDueReminders(env).catch(() => {
-      // Never log push endpoint URLs or reminder contents.
-      console.error('push scheduler: delivery failed')
-    }))
+    ctx.waitUntil(
+      deliverDueReminders(env).catch(() => {
+        // Never log push endpoint URLs or reminder contents.
+        console.error('push scheduler: delivery failed')
+      }),
+    )
     return
   }
   ctx.waitUntil(

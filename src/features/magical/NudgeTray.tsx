@@ -99,9 +99,9 @@ export function NudgeTray() {
             </ul>
           )}
           <p className={styles.modeNote}>
-            These gentle nudges appear only while Pocket Goblin is open.
-            For due reminders and HQ replies while it’s closed, opt into
-            push notifications in Settings, or subscribe to your Goblin calendar.
+            These gentle nudges appear only while Pocket Goblin is open. For due
+            reminders and HQ replies while it’s closed, opt into push
+            notifications in Settings, or subscribe to your Goblin calendar.
           </p>
         </div>
       ) : null}

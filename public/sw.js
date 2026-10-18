@@ -88,7 +88,6 @@ self.addEventListener('fetch', (event) => {
   }
 })
 
-
 // The push service sends NO customer data. Every push shows a visible,
 // generic alert: nothing sensitive is ever displayed on a lock screen.
 self.addEventListener('push', (event) => {
@@ -108,8 +107,13 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     (async () => {
       const url = new URL('/den', self.location.origin)
-      const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-      const current = windows.find((client) => new URL(client.url).origin === url.origin)
+      const windows = await self.clients.matchAll({
+        type: 'window',
+        includeUncontrolled: true,
+      })
+      const current = windows.find(
+        (client) => new URL(client.url).origin === url.origin,
+      )
       if (current) {
         await current.navigate(url.href)
         await current.focus()
