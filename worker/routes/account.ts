@@ -84,6 +84,8 @@ export const NOT_EXPORTED = new Set([
   'webauthn_challenges',
   'account_tokens',
   'calendar_feeds',
+  // Device push endpoints are bearer-like credentials, never include in export.
+  'push_subscriptions',
   'user_roles',
   'processing_jobs',
   // Short-lived machinery: record ids for follow-ups, replay protection.
