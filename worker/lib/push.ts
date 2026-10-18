@@ -94,10 +94,10 @@ export function inQuietHours(now: Date, zone: string, settings: ClockSettings): 
     const h = Number(parts.find((p) => p.type === 'hour')?.value)
     const m = Number(parts.find((p) => p.type === 'minute')?.value)
     const current = h * 60 + m
-    const [sh, sm] = settings.quietHoursStart.split(':').map(Number)
-    const [eh, em] = settings.quietHoursEnd.split(':').map(Number)
-    const start = sh * 60 + sm
-    const end = eh * 60 + em
+    const startParts = settings.quietHoursStart.split(':')
+    const endParts = settings.quietHoursEnd.split(':')
+    const start = Number(startParts[0]) * 60 + Number(startParts[1])
+    const end = Number(endParts[0]) * 60 + Number(endParts[1])
     if (start === end) return false
     return start < end ? current >= start && current < end : current >= start || current < end
   } catch { return true } // Unknown timezone: fail quietly instead of waking anyone.
