@@ -83,7 +83,10 @@ export function SettingsPage() {
 
       <Card>
         <h2>First time here? Or need a refresher?</h2>
-        <p className={styles.sub}>Let the Goblin show you around the workshop. Seven quick stops, and you can skip whenever you like.</p>
+        <p className={styles.sub}>
+          Let the Goblin show you around the workshop. Seven quick stops, and
+          you can skip whenever you like.
+        </p>
         <Link to="/den?tour=1">👹 Take the Grand Tour</Link>
       </Card>
 

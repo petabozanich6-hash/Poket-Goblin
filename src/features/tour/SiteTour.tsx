@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+} from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useLocation, useNavigate } from 'react-router'
 
@@ -73,7 +79,10 @@ export function SiteTour() {
   useEffect(() => {
     if (!user || !settings) return
     // This link is deliberately replayable even once the account has seen the tour.
-    if (location.pathname === '/den' && new URLSearchParams(location.search).get('tour') === '1') {
+    if (
+      location.pathname === '/den' &&
+      new URLSearchParams(location.search).get('tour') === '1'
+    ) {
       offeredTo.current = user.id
       setError(null)
       setStep(0)
@@ -81,7 +90,11 @@ export function SiteTour() {
       navigate('/den', { replace: true })
       return
     }
-    if (location.pathname === '/den' && !settings.tourSeen && offeredTo.current !== user.id) {
+    if (
+      location.pathname === '/den' &&
+      !settings.tourSeen &&
+      offeredTo.current !== user.id
+    ) {
       offeredTo.current = user.id
       setStage('welcome')
     }
@@ -90,14 +103,17 @@ export function SiteTour() {
   useEffect(() => {
     if (stage !== 'tour') return
     const wanted = steps[step]?.path
-    if (wanted && wanted !== location.pathname) navigate(wanted, { replace: true })
+    if (wanted && wanted !== location.pathname)
+      navigate(wanted, { replace: true })
   }, [stage, step, location.pathname, navigate])
 
   useEffect(() => {
     if (!stage) return
     const previous = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = previous }
+    return () => {
+      document.body.style.overflow = previous
+    }
   }, [stage])
 
   useEffect(() => {
@@ -113,7 +129,10 @@ export function SiteTour() {
 
     const measure = () => {
       const target = document.querySelector<HTMLElement>(current.selector)
-      if (!target) { setSpotlight(null); return }
+      if (!target) {
+        setSpotlight(null)
+        return
+      }
       const rect = target.getBoundingClientRect()
       setSpotlight({
         left: Math.max(8, rect.left - 8),
@@ -124,7 +143,8 @@ export function SiteTour() {
     }
     const prepare = window.setTimeout(() => {
       document.querySelector<HTMLElement>(current.selector)?.scrollIntoView({
-        behavior: 'auto', block: 'center',
+        behavior: 'auto',
+        block: 'center',
       })
       measure()
     }, 60)
@@ -166,7 +186,11 @@ export function SiteTour() {
       void closeTour('/den')
     }
     if (event.key !== 'Tab') return
-    const controls = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href]') ?? [])
+    const controls = Array.from(
+      dialogRef.current?.querySelectorAll<HTMLElement>(
+        'button:not(:disabled), a[href]',
+      ) ?? [],
+    )
     if (!controls.length) return
     const first = controls[0]
     const last = controls[controls.length - 1]
@@ -183,15 +207,21 @@ export function SiteTour() {
 
   const current = steps[step]!
   const smallScreen = window.innerWidth < 600
-  const panelStyle: CSSProperties | undefined = stage === 'tour' && spotlight ? {
-    left: smallScreen ? 12 : Math.max(12, Math.min(spotlight.left, window.innerWidth - 386)),
-    top: spotlight.top + spotlight.height + 300 < window.innerHeight
-      ? spotlight.top + spotlight.height + 16
-      : spotlight.top > 320
-        ? spotlight.top - 300
-        : Math.max(12, window.innerHeight - 315),
-    transform: 'none',
-  } : undefined
+  const panelStyle: CSSProperties | undefined =
+    stage === 'tour' && spotlight
+      ? {
+          left: smallScreen
+            ? 12
+            : Math.max(12, Math.min(spotlight.left, window.innerWidth - 386)),
+          top:
+            spotlight.top + spotlight.height + 300 < window.innerHeight
+              ? spotlight.top + spotlight.height + 16
+              : spotlight.top > 320
+                ? spotlight.top - 300
+                : Math.max(12, window.innerHeight - 315),
+          transform: 'none',
+        }
+      : undefined
 
   return (
     <div className={styles.layer}>
@@ -207,7 +237,9 @@ export function SiteTour() {
             height: spotlight.height,
           }}
         />
-      ) : <div className={styles.veil} aria-hidden="true" />}
+      ) : (
+        <div className={styles.veil} aria-hidden="true" />
+      )}
       <div
         ref={dialogRef}
         role="dialog"
@@ -225,11 +257,24 @@ export function SiteTour() {
             <h2 id="site-tour-title">Welcome to the Den</h2>
             <p id="site-tour-description">
               I’m your Pocket Goblin. Before you throw your entire life at me,
-              fancy a quick look around the workshop? Seven tiny stops. No homework.
+              fancy a quick look around the workshop? Seven tiny stops. No
+              homework.
             </p>
             <div className={styles.actions}>
-              <Button onClick={() => { setError(null); setStage('tour'); setStep(0) }}>Show me around</Button>
-              <Button variant="secondary" disabled={saving} onClick={() => void closeTour('/den')}>
+              <Button
+                onClick={() => {
+                  setError(null)
+                  setStage('tour')
+                  setStep(0)
+                }}
+              >
+                Show me around
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={saving}
+                onClick={() => void closeTour('/den')}
+              >
                 I’ll figure it out
               </Button>
             </div>
@@ -239,34 +284,72 @@ export function SiteTour() {
             <p className={styles.eyebrow}>👹 TOUR COMPLETE</p>
             <h2 id="site-tour-title">The workshop is yours!</h2>
             <p id="site-tour-description">
-              Now go make some manageable mischief. You can take this tour again from Settings whenever you want.
+              Now go make some manageable mischief. You can take this tour again
+              from Settings whenever you want.
             </p>
             <div className={styles.actions}>
-              <Button disabled={saving} onClick={() => void closeTour('/tell')}>Capture my first thought</Button>
-              <Button variant="secondary" disabled={saving} onClick={() => void closeTour('/den')}>Explore my Den</Button>
+              <Button disabled={saving} onClick={() => void closeTour('/tell')}>
+                Capture my first thought
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={saving}
+                onClick={() => void closeTour('/den')}
+              >
+                Explore my Den
+              </Button>
             </div>
           </>
         ) : (
           <>
-            <p className={styles.eyebrow}>👹 GRAND TOUR · {step + 1} OF {steps.length}</p>
+            <p className={styles.eyebrow}>
+              👹 GRAND TOUR · {step + 1} OF {steps.length}
+            </p>
             <h2 id="site-tour-title">{current.title}</h2>
             <p id="site-tour-description">{current.copy}</p>
             {step === 3 && access?.plan === 'free' ? (
-              <p className={styles.note}>Some document tools have Free plan limits; Premium features are labelled in the app.</p>
+              <p className={styles.note}>
+                Some document tools have Free plan limits; Premium features are
+                labelled in the app.
+              </p>
             ) : null}
             <div className={styles.actions}>
-              <Button variant="secondary" disabled={step === 0 || saving} onClick={() => setStep(i => i - 1)}>Back</Button>
-              <Button disabled={saving} onClick={() => {
-                if (step === steps.length - 1) { setStage('finished'); setSpotlight(null) }
-                else { setSpotlight(null); setStep(i => i + 1) }
-              }}>
+              <Button
+                variant="secondary"
+                disabled={step === 0 || saving}
+                onClick={() => setStep((i) => i - 1)}
+              >
+                Back
+              </Button>
+              <Button
+                disabled={saving}
+                onClick={() => {
+                  if (step === steps.length - 1) {
+                    setStage('finished')
+                    setSpotlight(null)
+                  } else {
+                    setSpotlight(null)
+                    setStep((i) => i + 1)
+                  }
+                }}
+              >
                 {step === steps.length - 1 ? 'Finish tour' : 'Next'}
               </Button>
-              <Button variant="ghost" disabled={saving} onClick={() => void closeTour('/den')}>Skip tour</Button>
+              <Button
+                variant="ghost"
+                disabled={saving}
+                onClick={() => void closeTour('/den')}
+              >
+                Skip tour
+              </Button>
             </div>
           </>
         )}
-        {error ? <p role="alert" className={styles.error}>{error}</p> : null}
+        {error ? (
+          <p role="alert" className={styles.error}>
+            {error}
+          </p>
+        ) : null}
       </div>
     </div>
   )

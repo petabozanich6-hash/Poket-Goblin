@@ -151,7 +151,9 @@ export function HomePage() {
         </section>
       ) : null}
 
-      <div data-tour="capture"><TellTheGoblin prominent /></div>
+      <div data-tour="capture">
+        <TellTheGoblin prominent />
+      </div>
 
       {hasToday ? (
         <section className={styles.panel} aria-labelledby="today-heading">
