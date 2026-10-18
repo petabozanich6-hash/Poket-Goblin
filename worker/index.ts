@@ -10,6 +10,7 @@ import {
 } from './lib/documents/lifecycle'
 import { reconcileSubscriptions } from './lib/billing/reconcile'
 import { newId } from './lib/ids'
+import { deliverDueReminders } from './lib/push'
 import {
   authSecretProblem,
   resolveSession,
@@ -32,6 +33,7 @@ import { historyRoutes } from './routes/history'
 import { intelligenceRoutes } from './routes/intelligence'
 import { magicalRoutes } from './routes/magical'
 import { meRoutes } from './routes/me'
+import { pushRoutes } from './routes/push'
 import { noteRoutes } from './routes/notes'
 import { platformRoutes } from './routes/platform'
 import { planRoutes } from './routes/plan'
@@ -147,6 +149,7 @@ app.use('*', async (c, next) => {
 })
 
 app.route('/me', meRoutes)
+app.route('/push', pushRoutes)
 app.route('/account', accountRoutes)
 app.route('/goblin', goblinRoutes)
 app.route('/categories', categoryRoutes)
@@ -232,6 +235,15 @@ async function scheduled(
   env: Env,
   ctx: ExecutionContext,
 ) {
+  if (_controller.cron === '*/5 * * * *') {
+    ctx.waitUntil(
+      deliverDueReminders(env).catch(() => {
+        // Never log push endpoint URLs or reminder contents.
+        console.error('push scheduler: delivery failed')
+      }),
+    )
+    return
+  }
   ctx.waitUntil(
     (async () => {
       const documents = await sweepExpiredDocuments(env)

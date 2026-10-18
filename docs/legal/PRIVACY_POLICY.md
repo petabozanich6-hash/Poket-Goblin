@@ -1,6 +1,6 @@
 # Pocket Goblin Privacy Policy
 
-**Effective date:** 17 October 2026
+**Effective date:** 19 October 2026
 
 **Pocket Goblin** is operated by Peta Bozanich, trading as Pocket Goblin (ABN 54 938 519 819), in New South Wales, Australia. Website: [pocketgoblin.org](https://pocketgoblin.org). Privacy enquiries: support@pocketgoblin.org.
 
@@ -54,6 +54,12 @@ Thoughts entered while offline may be stored **on your device** until they are s
 We use essential session cookies to keep you signed in and protect your account. Browser storage also supports the app's preferences, offline use and operation. We do not use advertising-tracking cookies.
 
 If you subscribe to your Pocket Goblin calendar from another app, its feed link includes a private token. Anyone who obtains that link can view the calendar entries it exposes. Keep it private and reset it in Calendar if you believe it has been shared.
+
+## Optional device push notifications
+
+If you explicitly enable push notifications in Settings, your browser supplies a unique push-service endpoint for that device. We store it with your signed-in session, time zone and notification preferences so we can send optional reminders and replies from Goblin HQ. Browser providers such as Apple, Google and Mozilla deliver these alerts according to their policies; they receive a generic push request, **not your reminder titles, notes, task details or support messages**. The notification visible on your lock screen is generic.
+
+Push notifications are off by default and never used for marketing. You can disable them on each device in Settings or block them through your device's notification controls. Signing out ends the associated server subscription; deleting your account also deletes associated subscriptions. We record reminder identifiers and due times to avoid duplicate alerts, not the content of the reminder.
 
 ## Who handles your information
 

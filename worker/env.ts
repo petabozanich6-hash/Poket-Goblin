@@ -2,6 +2,11 @@ export type Env = {
   DB: D1Database
   ENVIRONMENT: string
   AUTH_SECRET?: string
+  /** RFC 8292 VAPID public key, stored as a Worker secret. */
+  VAPID_PUBLIC_KEY?: string
+  /** RFC 8292 VAPID private scalar; NEVER expose to client. */
+  VAPID_PRIVATE_KEY?: string
+  VAPID_SUBJECT?: string
   /** Local Miniflare R2 or remote bucket (remote requires approval) */
   UPLOADS?: R2Bucket
   /** none | openai_compatible | workers_ai */

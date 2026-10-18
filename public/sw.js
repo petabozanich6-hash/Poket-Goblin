@@ -87,3 +87,39 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(cacheFirstAsset(request))
   }
 })
+
+// The push service sends NO customer data. Every push shows a visible,
+// generic alert: nothing sensitive is ever displayed on a lock screen.
+self.addEventListener('push', (event) => {
+  event.waitUntil(
+    self.registration.showNotification('Pocket Goblin 👹', {
+      body: 'Your Goblin has something for you. Open your Den to check.',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      tag: 'pocket-goblin-update',
+      data: { url: '/den' },
+    }),
+  )
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  event.waitUntil(
+    (async () => {
+      const url = new URL('/den', self.location.origin)
+      const windows = await self.clients.matchAll({
+        type: 'window',
+        includeUncontrolled: true,
+      })
+      const current = windows.find(
+        (client) => new URL(client.url).origin === url.origin,
+      )
+      if (current) {
+        await current.navigate(url.href)
+        await current.focus()
+      } else {
+        await self.clients.openWindow(url.href)
+      }
+    })(),
+  )
+})
