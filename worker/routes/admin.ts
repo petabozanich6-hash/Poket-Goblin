@@ -556,7 +556,16 @@ adminRoutes.post(
       targetId: c.req.param('id'),
       detail: { statusChanged: status !== null },
     })
-    await pushForUser(c.env, report.userId, 'messages').catch(() => undefined)
+    const notification = pushForUser(c.env, report.userId, 'messages').catch(
+      () => undefined,
+    )
+    // Never make an HQ reply wait on an external push provider in production.
+    // In local route tests without an ExecutionContext, await safely instead.
+    try {
+      c.executionCtx.waitUntil(notification)
+    } catch {
+      await notification
+    }
     return c.json({ ok: true })
   },
 )
