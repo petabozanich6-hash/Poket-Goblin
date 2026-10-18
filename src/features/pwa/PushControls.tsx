@@ -45,7 +45,13 @@ export function PushControls() {
     setBusy(true)
     setMessage(null)
     try {
-      // Only called from the button, never from mount or navigation.
+      // Request permission directly from this click to preserve user activation,
+      // especially for installed iOS web apps.
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') {
+        setMessage('Notifications were not allowed. You can change this in your browser or device settings.')
+        return
+      }
       const registration = await navigator.serviceWorker.ready
       const existing = await registration.pushManager.getSubscription()
       const subscription = existing ?? await registration.pushManager.subscribe({
