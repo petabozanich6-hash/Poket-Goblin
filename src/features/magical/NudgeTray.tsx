@@ -99,8 +99,9 @@ export function NudgeTray() {
             </ul>
           )}
           <p className={styles.modeNote}>
-            In-app only, while Pocket Goblin is open. For alerts when it’s
-            closed, add your Goblin calendar to your phone (Calendar page).
+            These gentle nudges appear only while Pocket Goblin is open.
+            For due reminders and HQ replies while it’s closed, opt into
+            push notifications in Settings, or subscribe to your Goblin calendar.
           </p>
         </div>
       ) : null}
