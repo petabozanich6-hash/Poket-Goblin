@@ -14,7 +14,9 @@ test('the Grand Tour is optional, replayable, responsive and remembered across s
   await page.getByRole('button', { name: /create account/i }).click()
   await expect(page).toHaveURL(/\/den/, { timeout: 20_000 })
 
-  await expect(page.getByRole('dialog', { name: 'Welcome to the Den' })).toBeVisible()
+  await expect(
+    page.getByRole('dialog', { name: 'Welcome to the Den' }),
+  ).toBeVisible()
   await page.getByRole('button', { name: 'Show me around' }).click()
 
   const titles = [
@@ -40,7 +42,9 @@ test('the Grand Tour is optional, replayable, responsive and remembered across s
     await expect(page.getByRole('dialog', { name: titles[i] })).toBeVisible()
     await expect(page.locator('[class*="spotlight"]')).toHaveCount(1)
     if (i === 3) {
-      await expect(page.getByText(/Some document tools have Free plan limits/)).toBeVisible()
+      await expect(
+        page.getByText(/Some document tools have Free plan limits/),
+      ).toBeVisible()
     }
     if (i < titles.length - 1) {
       await page.getByRole('button', { name: 'Next' }).click()
@@ -48,7 +52,9 @@ test('the Grand Tour is optional, replayable, responsive and remembered across s
   }
 
   await page.getByRole('button', { name: 'Finish tour' }).click()
-  await expect(page.getByRole('dialog', { name: 'The workshop is yours!' })).toBeVisible()
+  await expect(
+    page.getByRole('dialog', { name: 'The workshop is yours!' }),
+  ).toBeVisible()
   await page.getByRole('button', { name: 'Explore my Den' }).click()
   await expect(page).toHaveURL(/\/den$/)
   await expect(page.getByRole('dialog')).toHaveCount(0)
