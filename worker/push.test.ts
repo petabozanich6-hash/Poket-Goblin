@@ -12,13 +12,13 @@ const b64 = (buffer: ArrayBuffer) =>
     .replace(/=+$/g, '')
 
 async function credentials() {
-  const pair = await crypto.subtle.generateKey(
+  const pair = (await crypto.subtle.generateKey(
     { name: 'ECDSA', namedCurve: 'P-256' },
     true,
     ['sign', 'verify'],
-  )
-  const privateJwk = await crypto.subtle.exportKey('jwk', pair.privateKey)
-  const publicRaw = await crypto.subtle.exportKey('raw', pair.publicKey)
+  )) as CryptoKeyPair
+  const privateJwk = (await crypto.subtle.exportKey('jwk', pair.privateKey)) as JsonWebKey
+  const publicRaw = (await crypto.subtle.exportKey('raw', pair.publicKey)) as ArrayBuffer
   return {
     VAPID_PUBLIC_KEY: b64(publicRaw),
     VAPID_PRIVATE_KEY: privateJwk.d,
