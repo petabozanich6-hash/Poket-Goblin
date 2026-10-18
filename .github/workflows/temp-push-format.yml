@@ -27,14 +27,12 @@ jobs:
         run: |
           npx prettier --write \
             docs/WEB_PUSH.md \
-            migrations/0024_web_push.sql \
             worker/lib/push.ts \
             worker/routes/push.ts \
             worker/push.test.ts \
             worker/env.ts \
             worker/index.ts \
             worker/routes/admin.ts \
-            wrangler.toml \
             public/sw.js \
             src/pages/SettingsPage.tsx \
             src/features/pwa/PushControls.tsx \
