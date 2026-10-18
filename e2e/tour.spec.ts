@@ -70,9 +70,10 @@ test('the Grand Tour is optional, replayable, responsive and remembered across s
   try {
     const second = await otherDevice.newPage()
     await second.goto('/')
+    await second.getByRole('tab', { name: 'Sign in' }).click()
     await second.getByLabel('Email').fill(email)
     await second.getByLabel('Password').fill(password)
-    await second.getByRole('button', { name: /log in/i }).click()
+    await second.getByRole('button', { name: 'Enter the den' }).click()
     await expect(second).toHaveURL(/\/den/, { timeout: 20_000 })
     await expect(second.getByRole('dialog')).toHaveCount(0)
   } finally {
