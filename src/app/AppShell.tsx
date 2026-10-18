@@ -21,6 +21,7 @@ import { VoiceFab } from '@/features/voice/VoiceFab'
 import { VoiceProvider } from '@/features/voice/VoiceContext'
 import { readQueue } from '@/features/voice/offlineQueue'
 import { SupportNotice } from '@/features/support/SupportNotice'
+import { SiteTour } from '@/features/tour/SiteTour'
 
 import styles from './AppShell.module.css'
 
@@ -177,6 +178,7 @@ export function AppShell() {
           <OverwhelmMode />
           <VoiceFab />
           <UpdatePrompt />
+          <SiteTour />
         </div>
       </VoiceProvider>
     </OverwhelmProvider>
