@@ -25,6 +25,8 @@ test('a study schedule becomes a reviewable path, downloadable calendar tasks an
   await page.getByLabel('Password').fill('PathwayE2ePass!9')
   await page.getByRole('button', { name: /create account/i }).click()
   await expect(page).toHaveURL(/\/den/, { timeout: 20_000 })
+  await page.getByRole('button', { name: 'I’ll figure it out' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
 
   await page.goto('/life/documents')
   await page.getByLabel(/Upload up to 10 documents/).setInputFiles({
