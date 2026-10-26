@@ -53,4 +53,5 @@ export const GOBLIN_QUERY_KEYS = [
   'history',
   'briefing',
   'search',
+  'health',
 ]
