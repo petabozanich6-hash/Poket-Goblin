@@ -10,6 +10,7 @@ Your thoughts, plans and paperwork belong to you. This policy explains what info
 
 - **Account information:** email address, display name, email-verification status, password hash and account preferences.
 - **Information you enter:** tasks, reminders, calendar items, notes, shopping lists, brain dumps, conversations with the Goblin, documents and information extracted from them, and personalisation you choose to save.
+- **Health information (only if you turn Health on):** weigh-ins and waist measurements, food and drink with any calorie and nutrient numbers, saved recipes, activity and steps, daily habits such as water and sleep, supplements and when you took them, and the goals you set. See **Health tracking** below.
 - **Support information:** messages, replies and the status of requests sent through Messages to Goblin HQ or email.
 - **Usage and security information:** sign-in sessions, security events, feature usage counts, rate limits and technical diagnostics needed to operate, protect and troubleshoot the service.
 - **Billing and promotion information:** your subscription plan, payment status, renewal dates, Stripe customer and subscription identifiers, applied coupon or promotional-code details, and records of time-limited Premium giveaways. Goblin HQ may show an authorised administrator which account received a giveaway; Stripe holds the actual promotional-code redemption count for published discount codes. Stripe handles payment-card information directly; Pocket Goblin does not receive your full card number or card security code.
@@ -40,6 +41,16 @@ When you upload a document, you choose how it is handled:
 - **Keep this document:** the original remains in your private document vault, together with extracted information used for searching and organising it, until you delete it or your account. Storage limits depend on your plan.
 
 Document processing may include built-in text extraction and Cloudflare Workers AI. You control what you upload. Do not rely on extraction or AI interpretation as a substitute for reading an important original.
+
+## Health tracking
+
+Health is **off** until you turn it on and agree to it in **My Life → Health**. Health information is sensitive, so it is handled more carefully than your other entries:
+
+- **Private to you.** Your health entries are visible only in your account. They are not used for advertising and are not shared with anyone else.
+- **Not sent to AI.** Logging a meal, weight, activity, habit or supplement, whether on the Health page or by telling the Goblin, is handled by built-in rules on our servers. Once Health is on, messages that look like health logs are not passed to AI as a brain dump. The one exception is a **nutrition-panel screenshot** you choose to upload: after you confirm, that image is sent to Cloudflare Workers AI only to read the printed numbers, which you can check and edit before anything is saved. The image is not kept.
+- **Recipe links.** If you paste a recipe link, Pocket Goblin fetches that public web page once to read its published nutrition details. Only the link you provide is visited; the site may see a request from our servers.
+- **Not medical advice.** Health shows general information to help you keep track. It does not diagnose or treat anything; talk to your doctor about your situation.
+- **Export and delete.** Your health information is included in the account-data export in **Settings → Your data**. You can delete all of it at any time in **My Life → Health → Goals & settings → Delete my health data**, which also turns Health off. Deleting your account deletes it too.
 
 ## Voice, offline use and your device
 

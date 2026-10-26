@@ -60,6 +60,28 @@ tasks. It also checks the one-active-pathway constraint and account deletion.
 This is a release runbook, **not** authorisation to apply a production
 migration, merge PR #38 or deploy production code.
 
+## Health tracking (migration 0025)
+
+`0025_health_tracking.sql` adds eight new tables (`health_profiles`,
+`health_weigh_ins`, `health_recipes`, `health_meals`, `health_activities`,
+`health_habit_days`, `health_supplements`, `health_supplement_doses`). It is
+additive: it creates tables and indexes only and changes no existing rows. Every
+table cascades on account deletion and is included in the account export.
+
+The code tolerates the migration not being applied yet. The Health page says
+it is "being set up", Health API writes return 503, the Goblin answers health
+phrases by saying Health is off, and the account export skips the missing tables. Even so, apply
+it **before** merging the Health PR, in the same order as above:
+
+1. Run the read-only preflight from `main` and confirm `0025` is the only
+   pending migration.
+2. With the owner's separate approval, run `apply`.
+3. Run preflight again and confirm zero pending migrations.
+4. Merge, then smoke-test: turn Health on, log a supplement, weigh-in and
+   meal, export, and delete health data.
+
+This is a release runbook, **not** authorisation to apply the migration or merge.
+
 ## Safety model
 
 | Guard                    | What it does                                                                                                                                                             |
