@@ -73,7 +73,22 @@ export const EXPORTED_TABLES: Record<string, { omit?: string[] }> = {
   promotion_redemptions: {
     omit: ['stripe_subscription_id', 'stripe_checkout_session_id'],
   },
+  // Opt-in health tracking (migration 0025).
+  health_profiles: {},
+  health_weigh_ins: {},
+  health_meals: {},
+  health_activities: {},
+  health_habit_days: {},
+  health_supplements: {},
+  health_supplement_doses: {},
 }
+
+/** Tables whose migration may land after the Worker that reads them (merges to main deploy at once). */
+const LATE_TABLES = [
+  'study_pathways',
+  'study_pathway_sessions',
+  ...Object.keys(EXPORTED_TABLES).filter((t) => t.startsWith('health_')),
+]
 
 /** Secrets and machinery that are deliberately not exported. */
 export const NOT_EXPORTED = new Set([
@@ -223,16 +238,15 @@ accountRoutes.get('/export', async (c) => {
   // automatically deploys. Export must work safely in that short interval
   // even if new tables are not migrated yet. Once present, include all rows.
   const schemaRows = await c.env.DB.prepare(
-    "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('study_pathways', 'study_pathway_sessions')",
-  ).all<{ name: string }>()
-  const availablePathwayTables = new Set(
+    `SELECT name FROM sqlite_master WHERE type = 'table' AND name IN (${LATE_TABLES.map(() => '?').join(', ')})`,
+  )
+    .bind(...LATE_TABLES)
+    .all<{ name: string }>()
+  const availableLateTables = new Set(
     (schemaRows.results ?? []).map((row) => row.name),
   )
   for (const [table, rule] of Object.entries(EXPORTED_TABLES)) {
-    if (
-      (table === 'study_pathways' || table === 'study_pathway_sessions') &&
-      !availablePathwayTables.has(table)
-    ) {
+    if (LATE_TABLES.includes(table) && !availableLateTables.has(table)) {
       data[table] = []
       continue
     }

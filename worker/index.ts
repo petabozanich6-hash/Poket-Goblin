@@ -38,6 +38,7 @@ import { planRoutes } from './routes/plan'
 import { reminderRoutes } from './routes/reminders'
 import { reviewRoutes } from './routes/review'
 import { searchRoutes } from './routes/search'
+import { healthRoutes } from './routes/health'
 import { shoppingRoutes } from './routes/shopping'
 import { supportRoutes } from './routes/support'
 import { taskRoutes } from './routes/tasks'
@@ -158,6 +159,7 @@ app.route('/calendar', calendarRoutes)
 app.route('/reminders', reminderRoutes)
 app.route('/notes', noteRoutes)
 app.route('/shopping', shoppingRoutes)
+app.route('/my-health', healthRoutes)
 app.route('/search', searchRoutes)
 app.route('/history', historyRoutes)
 app.route('/dashboard', dashboardRoutes)
