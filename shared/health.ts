@@ -9,6 +9,8 @@
  * - General information, not medical advice; the person's own doctor comes first.
  */
 
+import { NUTRIENTS, emptyNutrition, type Nutrition } from './recipes'
+
 export type Units = 'metric' | 'imperial'
 export type Meal = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'drink'
 export type Intensity = 'light' | 'moderate' | 'vigorous'
@@ -42,6 +44,8 @@ export const CAFFEINE_GUIDE_MG = 400
 export const DISCLAIMER =
   'General information to help you keep track, not medical advice. Your doctor knows your situation best.'
 
+export type MacroGoals = { calories: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null }
+
 export type HealthProfile = {
   enabled: true
   consentedAt: string
@@ -49,12 +53,22 @@ export type HealthProfile = {
   goalWeightKg: number | null
   weeklyActivityMinutes: number
   dailyCalorieGoal: number | null
+  macros: MacroGoals
   targets: Record<Habit, number>
   hideNumbers: boolean
 }
 
 export type WeighIn = { id: string; day: string; weightKg: number | null; waistCm: number | null }
-export type MealEntry = { id: string; day: string; meal: Meal; description: string; calories: number | null; caffeineMg: number | null }
+export type MealEntry = Nutrition & {
+  id: string
+  day: string
+  meal: Meal
+  description: string
+  recipeId: string | null
+  servings: number
+  caffeineMg: number | null
+}
+export type Recipe = Nutrition & { id: string; name: string; sourceUrl: string | null; servings: number | null }
 export type ActivityEntry = { id: string; day: string; kind: string; minutes: number | null; steps: number | null; intensity: Intensity }
 export type Supplement = { id: string; name: string; dose: string | null; dosesPerDay: number; caffeineMg: number | null }
 export type SupplementToday = Supplement & { taken: number }
@@ -72,6 +86,8 @@ export type HealthSummary = {
   supplementsDue: number
   caffeineMg: number
   calories: number | null
+  /** Today's totals from what was logged with numbers; `counted` meals had any numbers at all. */
+  nutrition: Nutrition & { counted: number; uncounted: number }
   week: { start: string; activityMinutes: number; goalMinutes: number; steps: number }
   weight: {
     weighIns: WeighIn[]
@@ -197,4 +213,70 @@ export function healthNotes(input: {
     })
   }
   return notes
+}
+
+// ---------------------------------------------------------------- macros
+
+/** About 2,000 mg of sodium (5 g of salt) a day is Australia's suggested dietary target for adults. */
+export const SODIUM_GUIDE_MG = 2000
+/** Calorie goals below this need a plan with a doctor or dietitian; the app won't set one. */
+export const MIN_CALORIE_GOAL = 1200
+
+export type MacroPreset = { id: string; label: string; plain: string; carbs: number; protein: number; fat: number }
+
+/**
+ * Plain-English starting points (percent of calories). "Balanced" sits inside the ranges in Australia's
+ * Nutrient Reference Values (carbs 45–65%, protein 15–25%, fat 20–35%).
+ */
+export const MACRO_PRESETS: MacroPreset[] = [
+  { id: 'balanced', label: 'Balanced', plain: 'A bit of everything, close to the Australian guidelines.', carbs: 50, protein: 20, fat: 30 },
+  { id: 'higher_protein', label: 'Higher protein', plain: 'More protein helps you feel full while eating less.', carbs: 40, protein: 30, fat: 30 },
+  { id: 'lower_carb', label: 'Lower carb', plain: 'Fewer carbs, more protein and fat.', carbs: 25, protein: 35, fat: 40 },
+]
+
+/** Grams for a calorie goal and a split (protein and carbs have about 4 kcal per gram, fat about 9). */
+export function macrosFor(calories: number, split: { carbs: number; protein: number; fat: number }): MacroGoals {
+  return {
+    calories: Math.round(calories),
+    proteinG: Math.round((calories * split.protein) / 100 / 4),
+    carbsG: Math.round((calories * split.carbs) / 100 / 4),
+    fatG: Math.round((calories * split.fat) / 100 / 9),
+  }
+}
+
+export type CalorieInput = {
+  weightKg: number
+  heightCm: number
+  age: number
+  sex: 'male' | 'female' | 'unspecified'
+  activity: 'little' | 'light' | 'moderate' | 'very'
+}
+const ACTIVITY_FACTOR = { little: 1.2, light: 1.375, moderate: 1.55, very: 1.725 }
+
+/**
+ * A starting estimate only (Mifflin–St Jeor resting energy x activity), then about 500 kcal less a day,
+ * which is roughly 0.5 kg a week. Never below 1,200. Runs on the device; nothing here is stored.
+ */
+export function suggestCalories(i: CalorieInput): { maintain: number; lose: number; floored: boolean } | null {
+  if (!(i.weightKg >= 30 && i.weightKg <= 300 && i.heightCm >= 120 && i.heightCm <= 230 && i.age >= 18 && i.age <= 100)) return null
+  const sexTerm = i.sex === 'male' ? 5 : i.sex === 'female' ? -161 : -78
+  const bmr = 10 * i.weightKg + 6.25 * i.heightCm - 5 * i.age + sexTerm
+  const maintain = Math.round((bmr * ACTIVITY_FACTOR[i.activity]) / 10) * 10
+  const target = maintain - 500
+  return { maintain, lose: Math.max(MIN_CALORIE_GOAL, target), floored: target < MIN_CALORIE_GOAL }
+}
+
+/** Today's nutrition from logged meals (only meals with numbers count towards the totals). */
+export function totalNutrition(meals: MealEntry[]): Nutrition & { counted: number; uncounted: number } {
+  const out = { ...emptyNutrition(), counted: 0, uncounted: 0 }
+  for (const m of meals) {
+    const any = NUTRIENTS.some((k) => m[k] != null)
+    if (any) out.counted++
+    else if (m.meal !== 'drink') out.uncounted++
+    for (const k of NUTRIENTS) {
+      const v = m[k]
+      if (v != null) out[k] = Math.round(((out[k] ?? 0) + v) * 10) / 10
+    }
+  }
+  return out
 }

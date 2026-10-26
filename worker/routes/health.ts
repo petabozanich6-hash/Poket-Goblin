@@ -10,9 +10,21 @@ import {
   type Intensity,
   type Meal,
 } from '../../shared/health'
+import {
+  NUTRIENTS,
+  NUTRIENT_LABELS,
+  emptyNutrition,
+  hasNutrition,
+  nutritionFromText,
+  panelIsPer100g,
+  recipeFromHtml,
+  scaleNutrition,
+  type Nutrition,
+} from '../../shared/recipes'
 import type { Env } from '../env'
 import { todayLocalFromOffset } from '../lib/datetime'
 import {
+  MAX_RECIPES,
   MAX_SUPPLEMENTS,
   addActivity,
   addDose,
@@ -20,12 +32,15 @@ import {
   deleteEntry,
   deleteHealthData,
   enableHealth,
+  getRecipe,
   habitAmount,
   healthSummary,
   healthTablesReady,
+  listRecipes,
   listSupplements,
   loadProfile,
   restoreWeighIn,
+  saveRecipe,
   saveWeighIn,
   setHabit,
   updateProfile,
@@ -34,6 +49,8 @@ import {
   type ProfilePatch,
 } from '../lib/health'
 import { newId } from '../lib/ids'
+import { assertUnderLimit, loadAiPolicy, recordAiEvent, recordUsage } from '../lib/intelligence/usage'
+import { WorkersAiBlockedError, transcribeImageWithWorkersAi } from '../lib/intelligence/workersAi'
 import { checkRateLimit } from '../lib/rateLimit'
 import type { AuthUser } from '../lib/session'
 import { asString } from '../lib/validate'
@@ -124,6 +141,9 @@ healthRoutes.patch('/profile', async (c) => {
     ['goalWeightKg', 'goal weight', 30, 300, true],
     ['weeklyActivityMinutes', 'weekly activity goal', 0, 2000, false],
     ['dailyCalorieGoal', 'calorie goal', 1200, 6000, true],
+    ['proteinGoalG', 'protein goal', 0, 600, true],
+    ['carbsGoalG', 'carbs goal', 0, 1000, true],
+    ['fatGoalG', 'fat goal', 0, 500, true],
     ['water', 'water goal', 0, 30, false],
     ['veg', 'vegetable goal', 0, 20, false],
     ['fruit', 'fruit goal', 0, 20, false],
@@ -185,20 +205,46 @@ healthRoutes.delete('/weigh-ins/:day', async (c) => {
 
 healthRoutes.post('/meals', async (c) => {
   if (!(await requireOn(c))) return c.json(OFF, 409)
+  const user = c.get('user')
   const body = await json(c)
   const day = dayOf(c, body)
   if (!day) return c.json({ error: 'Choose today or a recent day.' }, 400)
   const meal = body?.meal as Meal
   if (!MEALS.includes(meal)) return c.json({ error: 'Choose breakfast, lunch, dinner, a snack or a drink.' }, 400)
+  const servings = num(body?.servings ?? 1, 0.1, 20)
+  if (typeof servings !== 'number') return c.json({ error: 'Servings should be between 0.1 and 20.' }, 400)
+  const caffeineMg = int(body?.caffeineMg, 0, 2000)
+  if (caffeineMg === undefined && body?.caffeineMg !== undefined) return c.json({ error: "That caffeine amount doesn't look right." }, 400)
+
+  // From a saved recipe: its per-serving numbers times the servings eaten (copied, so history never changes).
+  if (body?.recipeId !== undefined && body.recipeId !== null) {
+    const recipe = await getRecipe(c.env.DB, user.id, String(body.recipeId))
+    if (!recipe) return c.json({ error: 'Recipe not found' }, 404)
+    const totals = scaleNutrition(recipe, servings)
+    const id = await addMeal(c.env.DB, user.id, { day, meal, description: recipe.name, recipeId: recipe.id, servings, caffeineMg, ...totals })
+    return c.json({ id }, 201)
+  }
+
   const description = asString(body?.description, 200)
   if (!description) return c.json({ error: 'Say what you had.' }, 400)
-  const calories = int(body?.calories, 0, 10000)
-  const caffeineMg = int(body?.caffeineMg, 0, 2000)
-  if (calories === undefined && body?.calories !== undefined) return c.json({ error: "Those calories don't look right." }, 400)
-  if (caffeineMg === undefined && body?.caffeineMg !== undefined) return c.json({ error: "That caffeine amount doesn't look right." }, 400)
-  const id = await addMeal(c.env.DB, c.get('user').id, { day, meal, description, calories, caffeineMg })
+  const nutrition = readNutrition(body)
+  if ('error' in nutrition) return c.json({ error: nutrition.error }, 400)
+  const id = await addMeal(c.env.DB, user.id, { day, meal, description, servings, caffeineMg, ...nutrition.values })
   return c.json({ id }, 201)
 })
+
+/** Optional nutrition numbers (any may be left out). */
+function readNutrition(body: Record<string, unknown> | null): { values: Nutrition } | { error: string } {
+  const values = emptyNutrition()
+  for (const k of NUTRIENTS) {
+    if (body?.[k] === undefined) continue
+    const { label, max } = NUTRIENT_LABELS[k]
+    const v = num(body[k], 0, max)
+    if (v === undefined) return { error: `${label} doesn't look right.` }
+    values[k] = v === null ? null : k === 'calories' || k === 'sodiumMg' ? Math.round(v) : Math.round(v * 10) / 10
+  }
+  return { values }
+}
 
 healthRoutes.post('/activities', async (c) => {
   if (!(await requireOn(c))) return c.json(OFF, 409)
@@ -346,4 +392,196 @@ healthRoutes.post('/supplements/:id/doses', async (c) => {
   if (!own) return c.json({ error: 'Supplement not found' }, 404)
   const id = await addDose(c.env.DB, user.id, c.req.param('id'), day)
   return c.json({ id }, 201)
+})
+
+// ---------------------------------------------------------------- recipes and meal analysis
+
+healthRoutes.get('/recipes', async (c) => {
+  if (!(await requireOn(c))) return c.json(OFF, 409)
+  return c.json({ recipes: await listRecipes(c.env.DB, c.get('user').id) })
+})
+
+function recipeFields(body: Record<string, unknown> | null) {
+  const name = asString(body?.name, 120)
+  if (!name) return { error: 'Give the recipe a name.' }
+  let sourceUrl: string | null = null
+  if (body?.sourceUrl) {
+    const u = safeUrl(String(body.sourceUrl))
+    if (!u) return { error: "That link doesn't look right." }
+    sourceUrl = u.toString()
+  }
+  const servings = body?.servings == null || body.servings === '' ? null : int(body.servings, 1, 100)
+  if (servings === undefined) return { error: 'Servings should be between 1 and 100.' }
+  const nutrition = readNutrition(body)
+  if ('error' in nutrition) return { error: nutrition.error }
+  return { fields: { name, sourceUrl, servings, ...nutrition.values } }
+}
+
+healthRoutes.post('/recipes', async (c) => {
+  if (!(await requireOn(c))) return c.json(OFF, 409)
+  const user = c.get('user')
+  const parsed = recipeFields(await json(c))
+  if ('error' in parsed) return c.json({ error: parsed.error }, 400)
+  if ((await listRecipes(c.env.DB, user.id)).length >= MAX_RECIPES) {
+    return c.json({ error: `You can keep up to ${MAX_RECIPES} recipes. Remove one first.` }, 409)
+  }
+  const id = await saveRecipe(c.env.DB, user.id, parsed.fields)
+  return c.json({ id, recipe: await getRecipe(c.env.DB, user.id, id) }, 201)
+})
+
+healthRoutes.put('/recipes/:id', async (c) => {
+  const user = c.get('user')
+  if (!(await getRecipe(c.env.DB, user.id, c.req.param('id')))) return c.json({ error: 'Recipe not found' }, 404)
+  const parsed = recipeFields(await json(c))
+  if ('error' in parsed) return c.json({ error: parsed.error }, 400)
+  await saveRecipe(c.env.DB, user.id, { ...parsed.fields, id: c.req.param('id') })
+  return c.json({ recipe: await getRecipe(c.env.DB, user.id, c.req.param('id')) })
+})
+
+/** Removes a recipe from the list. Meals already logged keep their numbers. */
+healthRoutes.delete('/recipes/:id', async (c) => {
+  const r = await c.env.DB.prepare(
+    "UPDATE health_recipes SET archived_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ? AND user_id = ? AND archived_at IS NULL",
+  )
+    .bind(c.req.param('id'), c.get('user').id)
+    .run()
+  return (r.meta?.changes ?? 0) ? c.json({ ok: true }) : c.json({ error: 'Recipe not found' }, 404)
+})
+
+/** Public https web pages only: never an address, a local name or a non-standard port. */
+export function safeUrl(raw: string): URL | null {
+  let u: URL
+  try {
+    u = new URL(raw.trim())
+  } catch {
+    return null
+  }
+  const host = u.hostname.toLowerCase()
+  if (u.protocol !== 'https:' || u.username || u.password || (u.port && u.port !== '443')) return null
+  if (!host.includes('.') || /^[\d.]+$/.test(host) || host.includes(':') || host.startsWith('[')) return null
+  if (/(^|\.)(localhost|local|internal|lan|home|arpa)$/.test(host)) return null
+  return u
+}
+
+type FetchLike = (input: string, init?: RequestInit) => Promise<Response>
+const MAX_PAGE_BYTES = 2 * 1024 * 1024
+
+/** Fetches a recipe page (following up to 3 redirects, each re-checked), reading at most 2 MB. */
+export async function fetchRecipePage(raw: string, fetchImpl: FetchLike = fetch): Promise<{ html: string; url: string } | null> {
+  let url = safeUrl(raw)
+  for (let hop = 0; url && hop < 4; hop++) {
+    const res = await fetchImpl(url.toString(), {
+      redirect: 'manual',
+      headers: { accept: 'text/html,application/xhtml+xml', 'user-agent': 'PocketGoblin/1.0 (recipe nutrition reader)' },
+      signal: AbortSignal.timeout(8000),
+    })
+    if (res.status >= 300 && res.status < 400) {
+      const next = res.headers.get('location')
+      url = next ? safeUrl(new URL(next, url).toString()) : null
+      continue
+    }
+    if (!res.ok || !/text\/html|xhtml/i.test(res.headers.get('content-type') ?? '') || !res.body) return null
+    const reader = res.body.getReader()
+    const chunks: Uint8Array[] = []
+    let size = 0
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      size += value.byteLength
+      if (size > MAX_PAGE_BYTES) {
+        await reader.cancel()
+        break
+      }
+      chunks.push(value)
+    }
+    const bytes = new Uint8Array(chunks.reduce((s, ch) => s + ch.byteLength, 0))
+    let at = 0
+    for (const ch of chunks) {
+      bytes.set(ch, at)
+      at += ch.byteLength
+    }
+    return { html: new TextDecoder().decode(bytes), url: url.toString() }
+  }
+  return null
+}
+
+/**
+ * Reads a recipe link's published nutrition (schema.org data that recipe sites provide for search engines).
+ * No AI. Returns a preview to check and save; nothing is stored here.
+ */
+healthRoutes.post('/recipes/from-link', async (c) => {
+  if (!(await requireOn(c))) return c.json(OFF, 409)
+  const limit = checkRateLimit(`health-link:${c.get('user').id}`, 10, 60 * 60_000)
+  if (!limit.ok) return c.json({ error: 'Please wait a little before reading more links.' }, 429)
+  const body = await json(c)
+  if (!safeUrl(String(body?.url ?? ''))) return c.json({ error: 'Paste a full https:// recipe link.' }, 400)
+  let page: Awaited<ReturnType<typeof fetchRecipePage>> = null
+  try {
+    page = await fetchRecipePage(String(body!.url))
+  } catch {
+    page = null
+  }
+  const recipe = page ? recipeFromHtml(page.html) : null
+  if (!recipe || !hasNutrition(recipe.nutrition)) {
+    return c.json(
+      {
+        error: "I couldn't find nutrition details published on that page. Try a screenshot of the nutrition panel, or type the numbers in.",
+        code: 'no_nutrition',
+      },
+      422,
+    )
+  }
+  return c.json({ preview: { name: recipe.name, servings: recipe.servings, sourceUrl: page!.url, ...recipe.nutrition } })
+})
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+/**
+ * Reads a screenshot or photo of a nutrition panel. The image is sent to Cloudflare Workers AI only to
+ * write out its text (the person is told this first); the numbers are then read by rules here, so they can
+ * be checked. Counts as one AI request. Nothing is stored until the person saves the preview.
+ */
+healthRoutes.post('/recipes/from-image', async (c) => {
+  if (!(await requireOn(c))) return c.json(OFF, 409)
+  const user = c.get('user')
+  let file: File | null = null
+  try {
+    const form = await c.req.formData()
+    const f = form.get('image')
+    file = f instanceof File ? f : null
+  } catch {
+    file = null
+  }
+  if (!file) return c.json({ error: 'Choose a screenshot or photo of the nutrition panel.' }, 400)
+  if (file.size > MAX_IMAGE_BYTES || !/^image\/(jpeg|png|webp)$/.test(file.type)) {
+    return c.json({ error: 'Use a JPEG, PNG or WebP image under 5 MB.' }, 400)
+  }
+  const policy = await loadAiPolicy(c.env.DB, c.env, user.id)
+  const typeIt = 'Type the numbers in instead, they only take a moment.'
+  if (!policy.providerEnabled || policy.env.AI_PROVIDER?.toLowerCase() !== 'workers_ai' || !policy.env.AI) {
+    await recordAiEvent(c.env.DB, user.id, 'nutrition', 'workers_ai', 'disabled')
+    return c.json({ error: `Reading pictures isn't available right now. ${typeIt}`, code: 'ai_unavailable' }, 503)
+  }
+  const gate = await assertUnderLimit(c.env.DB, policy, user.id)
+  if (!gate.ok) {
+    await recordAiEvent(c.env.DB, user.id, 'nutrition', 'workers_ai', 'limit_reached')
+    return c.json({ error: `You've used today's AI requests. ${typeIt}`, code: 'ai_limit' }, 429)
+  }
+  let text = ''
+  try {
+    text = await transcribeImageWithWorkersAi(policy.env, new Uint8Array(await file.arrayBuffer()), file.type)
+  } catch (e) {
+    await recordAiEvent(c.env.DB, user.id, 'nutrition', 'workers_ai', e instanceof WorkersAiBlockedError ? 'limit_reached' : 'ai_unavailable')
+    return c.json({ error: `I couldn't read that picture just now. ${typeIt}`, code: 'ai_unavailable' }, 503)
+  }
+  await recordUsage(c.env.DB, user.id, 'workers_ai')
+  await recordAiEvent(c.env.DB, user.id, 'nutrition', 'workers_ai', 'ai')
+  const nutrition = nutritionFromText(text)
+  if (!hasNutrition(nutrition)) {
+    return c.json({ error: `I couldn't find nutrition numbers in that picture. ${typeIt}`, code: 'no_nutrition' }, 422)
+  }
+  const warnings = panelIsPer100g(text)
+    ? ['This panel looks like it is per 100 g, not per serving. Check the numbers before saving.']
+    : []
+  return c.json({ preview: { name: null, servings: null, sourceUrl: null, ...nutrition }, warnings })
 })

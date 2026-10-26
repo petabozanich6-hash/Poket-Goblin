@@ -10,6 +10,7 @@ import {
   healthNotes,
   weekStart,
   weeklyAverages,
+  totalNutrition,
   weightTrend,
   type ActivityEntry,
   type Habit,
@@ -18,10 +19,12 @@ import {
   type Intensity,
   type Meal,
   type MealEntry,
+  type Recipe,
   type Supplement,
   type SupplementToday,
   type WeighIn,
 } from '../../shared/health'
+import { NUTRIENTS, type Nutrition } from '../../shared/recipes'
 import { newId } from './ids'
 
 const ready = new WeakSet<D1Database>()
@@ -47,6 +50,9 @@ type ProfileRow = {
   goalWeightKg: number | null
   weeklyActivityMinutes: number
   dailyCalorieGoal: number | null
+  proteinGoalG: number | null
+  carbsGoalG: number | null
+  fatGoalG: number | null
   water: number
   veg: number
   fruit: number
@@ -59,6 +65,7 @@ export async function loadProfile(db: D1Database, userId: string): Promise<Healt
     .prepare(
       `SELECT consented_at AS consentedAt, units, goal_weight_kg AS goalWeightKg,
               weekly_activity_minutes AS weeklyActivityMinutes, daily_calorie_goal AS dailyCalorieGoal,
+              protein_goal_g AS proteinGoalG, carbs_goal_g AS carbsGoalG, fat_goal_g AS fatGoalG,
               water_glasses AS water, veg_serves AS veg, fruit_serves AS fruit, sleep_hours AS sleep,
               hide_numbers AS hideNumbers
        FROM health_profiles WHERE user_id = ?`,
@@ -73,6 +80,7 @@ export async function loadProfile(db: D1Database, userId: string): Promise<Healt
     goalWeightKg: row.goalWeightKg,
     weeklyActivityMinutes: row.weeklyActivityMinutes,
     dailyCalorieGoal: row.dailyCalorieGoal,
+    macros: { calories: row.dailyCalorieGoal, proteinG: row.proteinGoalG, carbsG: row.carbsGoalG, fatG: row.fatGoalG },
     targets: { water: row.water, veg: row.veg, fruit: row.fruit, sleep: row.sleep },
     hideNumbers: Boolean(row.hideNumbers),
   }
@@ -93,6 +101,9 @@ export type ProfilePatch = Partial<{
   goalWeightKg: number | null
   weeklyActivityMinutes: number
   dailyCalorieGoal: number | null
+  proteinGoalG: number | null
+  carbsGoalG: number | null
+  fatGoalG: number | null
   water: number
   veg: number
   fruit: number
@@ -105,6 +116,9 @@ const PROFILE_COLUMNS: Record<keyof ProfilePatch, string> = {
   goalWeightKg: 'goal_weight_kg',
   weeklyActivityMinutes: 'weekly_activity_minutes',
   dailyCalorieGoal: 'daily_calorie_goal',
+  proteinGoalG: 'protein_goal_g',
+  carbsGoalG: 'carbs_goal_g',
+  fatGoalG: 'fat_goal_g',
   water: 'water_glasses',
   veg: 'veg_serves',
   fruit: 'fruit_serves',
@@ -133,6 +147,7 @@ export async function deleteHealthData(db: D1Database, userId: string) {
     db.prepare('DELETE FROM health_habit_days WHERE user_id = ?').bind(userId),
     db.prepare('DELETE FROM health_activities WHERE user_id = ?').bind(userId),
     db.prepare('DELETE FROM health_meals WHERE user_id = ?').bind(userId),
+    db.prepare('DELETE FROM health_recipes WHERE user_id = ?').bind(userId),
     db.prepare('DELETE FROM health_weigh_ins WHERE user_id = ?').bind(userId),
     db.prepare('DELETE FROM health_profiles WHERE user_id = ?').bind(userId),
   ])
@@ -179,15 +194,72 @@ export async function restoreWeighIn(db: D1Database, userId: string, day: string
 
 // ---------------------------------------------------------------- meals, activity, habits
 
+export const NUTRITION_COLUMNS: Record<keyof Nutrition, string> = {
+  calories: 'calories',
+  proteinG: 'protein_g',
+  carbsG: 'carbs_g',
+  fatG: 'fat_g',
+  satFatG: 'sat_fat_g',
+  sugarsG: 'sugars_g',
+  fibreG: 'fibre_g',
+  sodiumMg: 'sodium_mg',
+}
+export const NUTRITION_SELECT = NUTRIENTS.map((k) => `${NUTRITION_COLUMNS[k]} AS ${k}`).join(', ')
+export const MEAL_SELECT = `id, day, meal, description, recipe_id AS recipeId, servings, ${NUTRITION_SELECT}, caffeine_mg AS caffeineMg`
+
 export async function addMeal(
   db: D1Database,
   userId: string,
-  entry: { day: string; meal: Meal; description: string; calories?: number | null; caffeineMg?: number | null },
+  entry: { day: string; meal: Meal; description: string; recipeId?: string | null; servings?: number; caffeineMg?: number | null } & Partial<Nutrition>,
 ): Promise<string> {
   const id = newId('hmeal')
   await db
-    .prepare('INSERT INTO health_meals (id, user_id, day, meal, description, calories, caffeine_mg) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .bind(id, userId, entry.day, entry.meal, entry.description, entry.calories ?? null, entry.caffeineMg ?? null)
+    .prepare(
+      `INSERT INTO health_meals (id, user_id, day, meal, description, recipe_id, servings, ${NUTRIENTS.map((k) => NUTRITION_COLUMNS[k]).join(', ')}, caffeine_mg)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ${NUTRIENTS.map(() => '?').join(', ')}, ?)`,
+    )
+    .bind(id, userId, entry.day, entry.meal, entry.description, entry.recipeId ?? null, entry.servings ?? 1, ...NUTRIENTS.map((k) => entry[k] ?? null), entry.caffeineMg ?? null)
+    .run()
+  return id
+}
+
+// ---------------------------------------------------------------- recipes
+
+export const MAX_RECIPES = 300
+export const RECIPE_SELECT = `id, name, source_url AS sourceUrl, servings, ${NUTRITION_SELECT}`
+
+export async function listRecipes(db: D1Database, userId: string): Promise<Recipe[]> {
+  const { results } = await db
+    .prepare(`SELECT ${RECIPE_SELECT} FROM health_recipes WHERE user_id = ? AND archived_at IS NULL ORDER BY lower(name), id`)
+    .bind(userId)
+    .all<Recipe>()
+  return results ?? []
+}
+
+export async function getRecipe(db: D1Database, userId: string, id: string): Promise<Recipe | null> {
+  return db.prepare(`SELECT ${RECIPE_SELECT} FROM health_recipes WHERE id = ? AND user_id = ? AND archived_at IS NULL`).bind(id, userId).first<Recipe>()
+}
+
+export async function saveRecipe(
+  db: D1Database,
+  userId: string,
+  r: { id?: string; name: string; sourceUrl?: string | null; servings?: number | null } & Nutrition,
+): Promise<string> {
+  const cols = NUTRIENTS.map((k) => NUTRITION_COLUMNS[k])
+  if (r.id) {
+    await db
+      .prepare(
+        `UPDATE health_recipes SET name = ?, source_url = ?, servings = ?, ${cols.map((c) => `${c} = ?`).join(', ')},
+           updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ? AND user_id = ? AND archived_at IS NULL`,
+      )
+      .bind(r.name, r.sourceUrl ?? null, r.servings ?? null, ...NUTRIENTS.map((k) => r[k]), r.id, userId)
+      .run()
+    return r.id
+  }
+  const id = newId('hrec')
+  await db
+    .prepare(`INSERT INTO health_recipes (id, user_id, name, source_url, servings, ${cols.join(', ')}) VALUES (?, ?, ?, ?, ?, ${cols.map(() => '?').join(', ')})`)
+    .bind(id, userId, r.name, r.sourceUrl ?? null, r.servings ?? null, ...NUTRIENTS.map((k) => r[k]))
     .run()
   return id
 }
@@ -284,8 +356,7 @@ export async function healthSummary(db: D1Database, userId: string, today: strin
   const [meals, activities, habitRows, weighIns, weekActivity, supplements] = await Promise.all([
     db
       .prepare(
-        `SELECT id, day, meal, description, calories, caffeine_mg AS caffeineMg FROM health_meals
-         WHERE user_id = ? AND day = ? ORDER BY created_at, id`,
+        `SELECT ${MEAL_SELECT} FROM health_meals WHERE user_id = ? AND day = ? ORDER BY created_at, id`,
       )
       .bind(userId, today)
       .all<MealEntry>(),
@@ -348,6 +419,7 @@ export async function healthSummary(db: D1Database, userId: string, today: strin
     supplementsDue: supplements.reduce((s, x) => s + Math.max(0, x.dosesPerDay - x.taken), 0),
     caffeineMg,
     calories: withCalories.length ? withCalories.reduce((s, m) => s + (m.calories ?? 0), 0) : null,
+    nutrition: totalNutrition(mealList),
     week: {
       start: week,
       activityMinutes: Number(weekActivity?.minutes ?? 0),

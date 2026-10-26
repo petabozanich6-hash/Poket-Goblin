@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createTestD1 } from '../test/sqliteD1.mjs'
+import { app } from './index'
 import { createHarness, type Harness, type TestUser } from './testing/harness'
 
 let h: Harness
@@ -64,7 +65,7 @@ describe('logging', () => {
     expect(s.weight.weekly.at(-1)).toEqual({ weekStart: '2026-10-12', averageKg: 93.2 })
     expect(s.weight.changeKg4Weeks).toBeLessThan(0)
     expect(s.weight.paceKgPerWeek).toBeGreaterThan(-1)
-    expect(s.notes).toEqual([], 'a steady pace needs no note')
+    expect(s.notes).toEqual([]) // a steady pace needs no note
   })
 
   it('rejects impossible or future entries', async () => {
@@ -136,5 +137,102 @@ describe('logging', () => {
     const s = await summary()
     expect(s.notes.map((n: any) => n.kind)).toEqual(['pace'])
     expect(s.notes[0].text).toMatch(/doctor/)
+  })
+})
+
+// ---------------------------------------------------------------- recipes, macros and meal analysis
+
+
+const MOB = { name: 'Pork Belly Benedict With Gochujang Hollandaise', calories: 1071, proteinG: 30, fatG: 83, satFatG: 36, carbsG: 51, sugarsG: 14, fibreG: 4, sodiumMg: 1870 }
+
+describe('recipes and macros', () => {
+  beforeEach(async () => {
+    await enable()
+  })
+
+  it('a saved recipe logs its per-serving numbers times the servings eaten, against macro goals', async () => {
+    expect((await api('/profile', { method: 'PATCH', body: { dailyCalorieGoal: 1900, proteinGoalG: 140, carbsGoalG: 190, fatGoalG: 63 } })).status).toBe(200)
+    const r = (await (await api('/recipes', { body: { ...MOB, servings: 4, sourceUrl: 'https://www.mob.co.uk/recipes/pork-belly-benedict' } })).json()) as any
+    expect(r.recipe).toMatchObject({ name: MOB.name, calories: 1071, sodiumMg: 1870, servings: 4 })
+    expect((await api('/meals', { body: { meal: 'dinner', recipeId: r.id, servings: 0.5 } })).status).toBe(201)
+    await api('/meals', { body: { meal: 'breakfast', description: 'Greek yoghurt', calories: 150, proteinG: 15 } })
+    await api('/meals', { body: { meal: 'lunch', description: 'Sandwich' } })
+    const s = await summary()
+    expect(s.profile.macros).toEqual({ calories: 1900, proteinG: 140, carbsG: 190, fatG: 63 })
+    expect(s.nutrition).toMatchObject({ calories: 686, proteinG: 30, fatG: 41.5, sodiumMg: 935, counted: 2, uncounted: 1 })
+    expect(s.meals.find((m: any) => m.meal === 'dinner')).toMatchObject({ description: MOB.name, servings: 0.5, recipeId: r.id })
+
+    // Changing or removing the recipe never changes what was already eaten.
+    await api(`/recipes/${r.id}`, { method: 'PUT', body: { ...MOB, calories: 500 } })
+    await api(`/recipes/${r.id}`, { method: 'DELETE' })
+    expect((await summary()).nutrition.calories).toBe(686)
+    expect(((await (await api('/recipes')).json()) as any).recipes).toEqual([])
+  })
+
+  it('refuses a calorie goal under 1,200 and silly macro numbers', async () => {
+    const low = await api('/profile', { method: 'PATCH', body: { dailyCalorieGoal: 1000 } })
+    expect(low.status).toBe(400)
+    expect(((await low.json()) as any).error).toMatch(/doctor/)
+    expect((await api('/profile', { method: 'PATCH', body: { proteinGoalG: 5000 } })).status).toBe(400)
+    expect((await api('/recipes', { body: { name: 'x', calories: -5 } })).status).toBe(400)
+  })
+
+  it('reads a recipe link from the page\'s published nutrition, and only fetches public https pages', async () => {
+    const ld = { '@context': 'https://schema.org', '@type': 'Recipe', name: MOB.name, recipeYield: '4', nutrition: { calories: '1071 kcal', proteinContent: '30 g', fatContent: '83 g', sodiumContent: '1870 mg' } }
+    const fetched: string[] = []
+    vi.stubGlobal('fetch', async (url: string) => {
+      fetched.push(url)
+      if (url.includes('redirect')) return new Response(null, { status: 302, headers: { location: 'https://localhost/admin' } })
+      if (url.includes('plain')) return new Response('<html>No recipe here</html>', { headers: { 'content-type': 'text/html' } })
+      return new Response(`<html><script type="application/ld+json">${JSON.stringify(ld)}</script></html>`, { headers: { 'content-type': 'text/html; charset=utf-8' } })
+    })
+    try {
+      const ok = await api('/recipes/from-link', { body: { url: 'https://www.mob.co.uk/recipes/pork-belly-benedict' } })
+      expect(ok.status).toBe(200)
+      expect(((await ok.json()) as any).preview).toMatchObject({ name: MOB.name, servings: 4, calories: 1071, proteinG: 30, fatG: 83, sodiumMg: 1870, carbsG: null })
+      expect((await api('/recipes/from-link', { body: { url: 'https://example.com/plain' } })).status).toBe(422)
+      for (const bad of ['http://example.com/r', 'https://127.0.0.1/r', 'https://localhost/r', 'https://[::1]/r', 'https://printer.local/r', 'https://example.com:8080/r', 'file:///etc/passwd']) {
+        expect((await api('/recipes/from-link', { body: { url: bad } })).status, bad).toBe(400)
+      }
+      expect((await api('/recipes/from-link', { body: { url: 'https://example.com/redirect' } })).status).toBe(422)
+      expect(fetched.some((u) => u.includes('localhost'))).toBe(false)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+})
+
+describe('reading a nutrition panel screenshot', () => {
+  const PANEL = 'Nutritional information per serving:\nCalories\n1071 kcal\nProtein\n30 g\nFat 83g\nSaturated Fat 36g\nCarbohydrates 51g\nSugars 14g\nDietary Fibre 4g\nSodium 1870mg'
+  const upload = (env: any, user: TestUser, type = 'image/png') => {
+    const form = new FormData()
+    form.append('image', new File([new Uint8Array([137, 80, 78, 71, 1, 2, 3])], 'mob.png', { type }))
+    return app.request('/api/my-health/recipes/from-image', { method: 'POST', headers: { Cookie: user.cookie }, body: form }, env)
+  }
+
+  it('transcribes with the vision model, reads the numbers by rules, counts one AI request, stores nothing', async () => {
+    const calls: string[] = []
+    const ai = { run: async (model: string) => (calls.push(model), { response: PANEL }) }
+    h = createHarness({ AI_PROVIDER: 'workers_ai', AI: ai as unknown as Ai })
+    me = await h.register('panel@example.com')
+    await enable()
+    const r = await upload(h.env, me)
+    expect(r.status).toBe(200)
+    const body = (await r.json()) as any
+    expect(body.preview).toMatchObject({ calories: 1071, proteinG: 30, fatG: 83, satFatG: 36, carbsG: 51, sugarsG: 14, fibreG: 4, sodiumMg: 1870 })
+    expect(body.warnings).toEqual([])
+    expect(calls).toEqual(['@cf/meta/llama-4-scout-17b-16e-instruct'])
+    expect(h.query('SELECT request_count FROM ai_usage_daily WHERE user_id = ?', me.id)).toEqual([{ request_count: 1 }])
+    expect(h.query('SELECT COUNT(*) AS n FROM health_recipes WHERE user_id = ?', me.id)).toEqual([{ n: 0 }])
+    expect((await upload(h.env, me, 'application/pdf')).status).toBe(400)
+  })
+
+  it("says so plainly when pictures can't be read, so the numbers can be typed", async () => {
+    const r = await upload(h.env, me)
+    expect(r.status).toBe(409) // Health not on yet in this account
+    await enable()
+    const off = await upload(h.env, me)
+    expect(off.status).toBe(503)
+    expect(((await off.json()) as any).error).toMatch(/Type the numbers/)
   })
 })
