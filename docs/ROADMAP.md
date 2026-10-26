@@ -27,7 +27,8 @@
 Known follow-ups:
 
 - [ ] Richer series edit UI (edit-all fields) beyond skip / pause / stop
-- [ ] Email/push notification delivery (architecture ready; not configured)
+- [x] Push notification delivery (opt-in, payload-less web push; owner sets VAPID secrets)
+- [ ] Email notification delivery
 - [ ] Drag-reorder shopping items in the UI (API supports sortOrder)
 - [ ] Recurring calendar events UI (schema supports series; task recurrence is primary)
 

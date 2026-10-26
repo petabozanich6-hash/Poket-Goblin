@@ -87,3 +87,134 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(cacheFirstAsset(request))
   }
 })
+
+/*
+ * Notifications. A push carries no text (so nothing personal passes through
+ * the browser's push service): it only wakes us, and we ask Pocket Goblin,
+ * signed in, what to show. Every push must show something, or browsers
+ * (Safari especially) stop delivering.
+ */
+async function showNotices() {
+  const sub = await self.registration.pushManager.getSubscription()
+  const query = sub ? `?endpoint=${encodeURIComponent(sub.endpoint)}` : ''
+  let notices = []
+  try {
+    const res = await fetch(`/api/push/notices${query}`, {
+      credentials: 'same-origin',
+      cache: 'no-store',
+    })
+    if (res.status === 401) {
+      return self.registration.showNotification('Pocket Goblin', {
+        body: 'You’ve been signed out. Sign back in to keep your reminders coming.',
+        tag: 'pg-signed-out',
+        icon: '/icons/icon-192.png',
+        badge: '/icons/icon-192.png',
+        data: { url: '/' },
+      })
+    }
+    if (res.ok) notices = (await res.json()).notices || []
+  } catch {
+    // Offline or the server is busy: fall through to the general nudge.
+  }
+  if (!notices.length) {
+    // Nothing new for this device (another wake already showed it).
+    const open = await self.registration.getNotifications()
+    if (open.length) return
+    return self.registration.showNotification('Pocket Goblin', {
+      body: 'Something’s waiting for you in the Den.',
+      tag: 'pg-general',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      data: { url: '/den' },
+    })
+  }
+  await Promise.all(
+    notices.map((n) =>
+      self.registration.showNotification(n.title, {
+        body: n.body,
+        tag: n.tag,
+        icon: '/icons/icon-192.png',
+        badge: '/icons/icon-192.png',
+        data: { url: n.url, reminderId: n.reminderId },
+        // Android and desktop only; iPhone shows the notification alone.
+        actions: n.reminderId
+          ? [
+              { action: 'done', title: 'Done' },
+              { action: 'snooze', title: 'In 10 min' },
+            ]
+          : [],
+      }),
+    ),
+  )
+}
+
+self.addEventListener('push', (event) => {
+  event.waitUntil(showNotices())
+})
+
+async function openApp(url) {
+  const windows = await self.clients.matchAll({
+    type: 'window',
+    includeUncontrolled: true,
+  })
+  for (const client of windows) {
+    if (new URL(client.url).origin === self.location.origin) {
+      await client.focus()
+      if ('navigate' in client) await client.navigate(url).catch(() => {})
+      return
+    }
+  }
+  await self.clients.openWindow(url)
+}
+
+self.addEventListener('notificationclick', (event) => {
+  const notification = event.notification
+  const { url = '/den', reminderId } = notification.data || {}
+  notification.close()
+  if (reminderId && (event.action === 'done' || event.action === 'snooze')) {
+    const path =
+      event.action === 'done'
+        ? `/api/reminders/${encodeURIComponent(reminderId)}/complete`
+        : `/api/reminders/${encodeURIComponent(reminderId)}/snooze`
+    event.waitUntil(
+      fetch(path, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(event.action === 'snooze' ? { minutes: 10 } : {}),
+      }).then(
+        (res) => (res.ok ? undefined : openApp(url)),
+        () => openApp(url),
+      ),
+    )
+    return
+  }
+  event.waitUntil(openApp(url))
+})
+
+// The browser replaced this device's subscription: register the new one.
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil(
+    (async () => {
+      const res = await fetch('/api/push', { credentials: 'same-origin' })
+      if (!res.ok) return
+      const { publicKey } = await res.json()
+      if (!publicKey) return
+      const raw = atob(publicKey.replace(/-/g, '+').replace(/_/g, '/'))
+      const key = Uint8Array.from(raw, (c) => c.charCodeAt(0))
+      const sub = await self.registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: key,
+      })
+      await fetch('/api/push/subscriptions', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          endpoint: sub.endpoint,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }),
+      })
+    })(),
+  )
+})

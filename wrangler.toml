@@ -69,8 +69,10 @@ name = "EMAIL"
 
 # Hourly housekeeping: deletes abandoned "Just sort it" documents (originals
 # older than 24 h) and unfinished uploads. Cron Triggers are free.
+# Every minute: push notifications (reminders, check-ins). It does nothing
+# until the VAPID secrets are set and migration 0026 is applied.
 [triggers]
-crons = ["17 * * * *"]
+crons = ["17 * * * *", "* * * * *"]
 
 [dev]
 port = 8787

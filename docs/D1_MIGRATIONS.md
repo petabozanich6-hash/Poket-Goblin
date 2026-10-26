@@ -82,6 +82,20 @@ it **before** merging the Health PR, in the same order as above:
 
 This is a release runbook, **not** authorisation to apply the migration or merge.
 
+## Push notifications (migrations 0024 and 0026)
+
+`0024_web_push.sql` (already on `main`) and `0026_push_notifications.sql` are
+additive. 0026 adds one column to `push_subscriptions` and two new tables:
+`push_preferences`, which is exported, and `push_notices`, which is short-lived
+and not exported. Both cascade on account deletion. Until they are applied,
+the Settings card says notifications are "nearly ready", the API returns 503
+for changes, and the minute run does nothing. Apply them with the Health
+migration (0025), in the same preflight → approved apply → preflight order,
+before merging. Notifications also need the VAPID secrets; see
+`docs/PUSH_NOTIFICATIONS.md`.
+
+This is a release runbook, **not** authorisation to apply the migrations or merge.
+
 ## Safety model
 
 | Guard                    | What it does                                                                                                                                                             |

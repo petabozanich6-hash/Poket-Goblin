@@ -23,6 +23,7 @@ import {
 import { useAuth } from '@/features/auth/useAuth'
 import { fetchAchievements } from '@/features/magical/magicalApi'
 import { InstallGuide } from '@/features/pwa/InstallGuide'
+import { NotificationsCard } from '@/features/push/NotificationsCard'
 import { GoblinSettings } from '@/features/voice/GoblinSettings'
 import { applyTheme } from '@/lib/theme'
 
@@ -39,8 +40,13 @@ export function SettingsPage() {
   })
   const location = useLocation()
   useEffect(() => {
-    if (location.hash === '#goblin' && settings)
-      document.getElementById('goblin')?.scrollIntoView({ block: 'start' })
+    if (
+      (location.hash === '#goblin' || location.hash === '#notifications') &&
+      settings
+    )
+      document
+        .getElementById(location.hash.slice(1))
+        ?.scrollIntoView({ block: 'start' })
   }, [location.hash, settings])
 
   if (!settings) {
@@ -146,6 +152,11 @@ export function SettingsPage() {
       </section>
 
       <Card>
+        <h2 id="notifications">Notifications</h2>
+        <NotificationsCard />
+      </Card>
+
+      <Card>
         <h2>Put Pocket Goblin on your home screen</h2>
         <InstallGuide />
       </Card>
@@ -246,8 +257,8 @@ export function SettingsPage() {
       <Card>
         <h2>Gentle nudges</h2>
         <p className={styles.sub}>
-          In-app only. No push or email unless those channels are configured
-          later and you opt in.
+          These appear inside the app. Phone and desktop notifications are set
+          under Notifications above.
         </p>
         <div className={styles.tabs}>
           {(['off', 'quiet', 'normal', 'chatty'] as NudgeFrequency[]).map(

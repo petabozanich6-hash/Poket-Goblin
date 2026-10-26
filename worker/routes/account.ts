@@ -82,6 +82,7 @@ export const EXPORTED_TABLES: Record<string, { omit?: string[] }> = {
   health_habit_days: {},
   health_supplements: {},
   health_supplement_doses: {},
+  push_preferences: {},
 }
 
 /** Tables whose migration may land after the Worker that reads them (merges to main deploy at once). */
@@ -89,6 +90,7 @@ const LATE_TABLES = [
   'study_pathways',
   'study_pathway_sessions',
   ...Object.keys(EXPORTED_TABLES).filter((t) => t.startsWith('health_')),
+  'push_preferences',
 ]
 
 /** Secrets and machinery that are deliberately not exported. */
@@ -102,6 +104,8 @@ export const NOT_EXPORTED = new Set([
   'calendar_feeds',
   // Device push endpoints are bearer-like credentials, never include in export.
   'push_subscriptions',
+  // Which notifications were sent: kinds and record ids, gone within days.
+  'push_notices',
   'user_roles',
   'processing_jobs',
   // Short-lived machinery: record ids for follow-ups, replay protection.

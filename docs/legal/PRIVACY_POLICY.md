@@ -60,6 +60,15 @@ Recognised words are used to handle your instruction; saved tasks, notes, settin
 
 Thoughts entered while offline may be stored **on your device** until they are sent. Anyone with access to that device or browser profile may be able to access locally stored information. Clearing browser storage can remove unsent thoughts.
 
+## Notifications
+
+Notifications are **off** until you turn them on for a device and your browser asks for permission. You choose what comes through in **Settings → Notifications**: reminders when they're due, a morning check-in, an evening check-in and replies from Goblin HQ.
+
+- **No personal text through push services.** Your browser's push service (Google for Chrome and Android, Apple for Safari and iPhone, Mozilla for Firefox, Microsoft for Edge on Windows) only carries an empty wake-up signal to your device. Your device then fetches the words directly from Pocket Goblin while you are signed in.
+- **What a notification shows.** Check-ins show counts, such as "2 things due today", not the names of your tasks, health entries or supplements, because lock screens can be seen by others. A reminder shows the reminder text you wrote. A Goblin HQ reply notification says only that a reply is waiting.
+- **What we keep.** For each device: the push address your browser gives us, your time zone and which notifications that device has already shown. For each notification: its type, the record it refers to and when it was sent; these are deleted within a few days. Push addresses are not included in the account export because they work like a password for that device.
+- **Turning off.** Turn notifications off on a device in Settings, or block them in your browser. Signing out of a device stops its notifications. A sign-in lasts 30 days; when it runs out, the device gets one last notification asking you to sign back in, and notifications resume once you do.
+
 ## Essential cookies, local storage and calendar links
 
 We use essential session cookies to keep you signed in and protect your account. Browser storage also supports the app's preferences, offline use and operation. We do not use advertising-tracking cookies.
@@ -73,6 +82,7 @@ We use service providers to run Pocket Goblin:
 - **Cloudflare:** website and API hosting, account/database storage, private uploaded-file storage, Workers AI and configured account-email delivery.
 - **Stripe:** checkout, recurring subscriptions, payment management and billing records.
 - **Your chosen browser or operating-system speech provider:** voice recognition when you switch on microphone access.
+- **Your browser's push service (Google, Apple, Mozilla or Microsoft):** delivery of an empty wake-up signal to your device if you turn on notifications. See **Notifications** above.
 
 A small number of authorised people operating Pocket Goblin may access information where reasonably needed for support, security and service administration. Information may also be disclosed when required by law, to protect the service or users, or with your direction or permission.
 

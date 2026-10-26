@@ -1,0 +1,20 @@
+/* One choice per row: the box, its words (which wrap), then any time picker. */
+.option {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: var(--space-2);
+}
+
+.option > span {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.option input[type='checkbox'] {
+  flex-shrink: 0;
+}
+
+.option input[type='time'] {
+  font: inherit;
+}
