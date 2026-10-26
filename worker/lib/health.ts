@@ -36,7 +36,9 @@ const ready = new WeakSet<D1Database>()
 export async function healthTablesReady(db: D1Database): Promise<boolean> {
   if (ready.has(db)) return true
   const row = await db
-    .prepare("SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = 'health_supplement_doses'")
+    .prepare(
+      "SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = 'health_supplement_doses'",
+    )
     .first<{ ok: number }>()
   if (row) ready.add(db)
   return !!row
@@ -60,7 +62,10 @@ type ProfileRow = {
   hideNumbers: number
 }
 
-export async function loadProfile(db: D1Database, userId: string): Promise<HealthProfile | null> {
+export async function loadProfile(
+  db: D1Database,
+  userId: string,
+): Promise<HealthProfile | null> {
   const row = await db
     .prepare(
       `SELECT consented_at AS consentedAt, units, goal_weight_kg AS goalWeightKg,
@@ -80,13 +85,27 @@ export async function loadProfile(db: D1Database, userId: string): Promise<Healt
     goalWeightKg: row.goalWeightKg,
     weeklyActivityMinutes: row.weeklyActivityMinutes,
     dailyCalorieGoal: row.dailyCalorieGoal,
-    macros: { calories: row.dailyCalorieGoal, proteinG: row.proteinGoalG, carbsG: row.carbsGoalG, fatG: row.fatGoalG },
-    targets: { water: row.water, veg: row.veg, fruit: row.fruit, sleep: row.sleep },
+    macros: {
+      calories: row.dailyCalorieGoal,
+      proteinG: row.proteinGoalG,
+      carbsG: row.carbsGoalG,
+      fatG: row.fatGoalG,
+    },
+    targets: {
+      water: row.water,
+      veg: row.veg,
+      fruit: row.fruit,
+      sleep: row.sleep,
+    },
     hideNumbers: Boolean(row.hideNumbers),
   }
 }
 
-export async function enableHealth(db: D1Database, userId: string, now = new Date()) {
+export async function enableHealth(
+  db: D1Database,
+  userId: string,
+  now = new Date(),
+) {
   await db
     .prepare(
       `INSERT INTO health_profiles (user_id, consented_at, consent_version) VALUES (?, ?, ?)
@@ -126,10 +145,16 @@ const PROFILE_COLUMNS: Record<keyof ProfilePatch, string> = {
   hideNumbers: 'hide_numbers',
 }
 
-export async function updateProfile(db: D1Database, userId: string, patch: ProfilePatch) {
+export async function updateProfile(
+  db: D1Database,
+  userId: string,
+  patch: ProfilePatch,
+) {
   const keys = Object.keys(patch) as (keyof ProfilePatch)[]
   if (!keys.length) return
-  const values = keys.map((k) => (k === 'hideNumbers' ? (patch[k] ? 1 : 0) : patch[k] ?? null))
+  const values = keys.map((k) =>
+    k === 'hideNumbers' ? (patch[k] ? 1 : 0) : (patch[k] ?? null),
+  )
   await db
     .prepare(
       `UPDATE health_profiles SET ${keys.map((k) => `${PROFILE_COLUMNS[k]} = ?`).join(', ')},
@@ -142,7 +167,9 @@ export async function updateProfile(db: D1Database, userId: string, patch: Profi
 /** "Delete my health data": every health row and the consent itself. */
 export async function deleteHealthData(db: D1Database, userId: string) {
   await db.batch([
-    db.prepare('DELETE FROM health_supplement_doses WHERE user_id = ?').bind(userId),
+    db
+      .prepare('DELETE FROM health_supplement_doses WHERE user_id = ?')
+      .bind(userId),
     db.prepare('DELETE FROM health_supplements WHERE user_id = ?').bind(userId),
     db.prepare('DELETE FROM health_habit_days WHERE user_id = ?').bind(userId),
     db.prepare('DELETE FROM health_activities WHERE user_id = ?').bind(userId),
@@ -155,9 +182,15 @@ export async function deleteHealthData(db: D1Database, userId: string) {
 
 // ---------------------------------------------------------------- weigh-ins
 
-export async function weighInFor(db: D1Database, userId: string, day: string): Promise<WeighIn | null> {
+export async function weighInFor(
+  db: D1Database,
+  userId: string,
+  day: string,
+): Promise<WeighIn | null> {
   return db
-    .prepare(`SELECT id, day, weight_kg AS weightKg, waist_cm AS waistCm FROM health_weigh_ins WHERE user_id = ? AND day = ?`)
+    .prepare(
+      `SELECT id, day, weight_kg AS weightKg, waist_cm AS waistCm FROM health_weigh_ins WHERE user_id = ? AND day = ?`,
+    )
     .bind(userId, day)
     .first<WeighIn>()
 }
@@ -170,8 +203,12 @@ export async function saveWeighIn(
   values: { weightKg?: number | null; waistCm?: number | null },
 ): Promise<WeighIn> {
   const existing = await weighInFor(db, userId, day)
-  const weightKg = values.weightKg !== undefined ? values.weightKg : existing?.weightKg ?? null
-  const waistCm = values.waistCm !== undefined ? values.waistCm : existing?.waistCm ?? null
+  const weightKg =
+    values.weightKg !== undefined
+      ? values.weightKg
+      : (existing?.weightKg ?? null)
+  const waistCm =
+    values.waistCm !== undefined ? values.waistCm : (existing?.waistCm ?? null)
   const id = existing?.id ?? newId('hwt')
   await db
     .prepare(
@@ -184,12 +221,23 @@ export async function saveWeighIn(
   return { id, day, weightKg, waistCm }
 }
 
-export async function restoreWeighIn(db: D1Database, userId: string, day: string, before: WeighIn | null) {
+export async function restoreWeighIn(
+  db: D1Database,
+  userId: string,
+  day: string,
+  before: WeighIn | null,
+) {
   if (!before || (before.weightKg == null && before.waistCm == null)) {
-    await db.prepare('DELETE FROM health_weigh_ins WHERE user_id = ? AND day = ?').bind(userId, day).run()
+    await db
+      .prepare('DELETE FROM health_weigh_ins WHERE user_id = ? AND day = ?')
+      .bind(userId, day)
+      .run()
     return
   }
-  await saveWeighIn(db, userId, day, { weightKg: before.weightKg, waistCm: before.waistCm })
+  await saveWeighIn(db, userId, day, {
+    weightKg: before.weightKg,
+    waistCm: before.waistCm,
+  })
 }
 
 // ---------------------------------------------------------------- meals, activity, habits
@@ -204,13 +252,22 @@ export const NUTRITION_COLUMNS: Record<keyof Nutrition, string> = {
   fibreG: 'fibre_g',
   sodiumMg: 'sodium_mg',
 }
-export const NUTRITION_SELECT = NUTRIENTS.map((k) => `${NUTRITION_COLUMNS[k]} AS ${k}`).join(', ')
+export const NUTRITION_SELECT = NUTRIENTS.map(
+  (k) => `${NUTRITION_COLUMNS[k]} AS ${k}`,
+).join(', ')
 export const MEAL_SELECT = `id, day, meal, description, recipe_id AS recipeId, servings, ${NUTRITION_SELECT}, caffeine_mg AS caffeineMg`
 
 export async function addMeal(
   db: D1Database,
   userId: string,
-  entry: { day: string; meal: Meal; description: string; recipeId?: string | null; servings?: number; caffeineMg?: number | null } & Partial<Nutrition>,
+  entry: {
+    day: string
+    meal: Meal
+    description: string
+    recipeId?: string | null
+    servings?: number
+    caffeineMg?: number | null
+  } & Partial<Nutrition>,
 ): Promise<string> {
   const id = newId('hmeal')
   await db
@@ -218,7 +275,17 @@ export async function addMeal(
       `INSERT INTO health_meals (id, user_id, day, meal, description, recipe_id, servings, ${NUTRIENTS.map((k) => NUTRITION_COLUMNS[k]).join(', ')}, caffeine_mg)
        VALUES (?, ?, ?, ?, ?, ?, ?, ${NUTRIENTS.map(() => '?').join(', ')}, ?)`,
     )
-    .bind(id, userId, entry.day, entry.meal, entry.description, entry.recipeId ?? null, entry.servings ?? 1, ...NUTRIENTS.map((k) => entry[k] ?? null), entry.caffeineMg ?? null)
+    .bind(
+      id,
+      userId,
+      entry.day,
+      entry.meal,
+      entry.description,
+      entry.recipeId ?? null,
+      entry.servings ?? 1,
+      ...NUTRIENTS.map((k) => entry[k] ?? null),
+      entry.caffeineMg ?? null,
+    )
     .run()
   return id
 }
@@ -228,22 +295,41 @@ export async function addMeal(
 export const MAX_RECIPES = 300
 export const RECIPE_SELECT = `id, name, source_url AS sourceUrl, servings, ${NUTRITION_SELECT}`
 
-export async function listRecipes(db: D1Database, userId: string): Promise<Recipe[]> {
+export async function listRecipes(
+  db: D1Database,
+  userId: string,
+): Promise<Recipe[]> {
   const { results } = await db
-    .prepare(`SELECT ${RECIPE_SELECT} FROM health_recipes WHERE user_id = ? AND archived_at IS NULL ORDER BY lower(name), id`)
+    .prepare(
+      `SELECT ${RECIPE_SELECT} FROM health_recipes WHERE user_id = ? AND archived_at IS NULL ORDER BY lower(name), id`,
+    )
     .bind(userId)
     .all<Recipe>()
   return results ?? []
 }
 
-export async function getRecipe(db: D1Database, userId: string, id: string): Promise<Recipe | null> {
-  return db.prepare(`SELECT ${RECIPE_SELECT} FROM health_recipes WHERE id = ? AND user_id = ? AND archived_at IS NULL`).bind(id, userId).first<Recipe>()
+export async function getRecipe(
+  db: D1Database,
+  userId: string,
+  id: string,
+): Promise<Recipe | null> {
+  return db
+    .prepare(
+      `SELECT ${RECIPE_SELECT} FROM health_recipes WHERE id = ? AND user_id = ? AND archived_at IS NULL`,
+    )
+    .bind(id, userId)
+    .first<Recipe>()
 }
 
 export async function saveRecipe(
   db: D1Database,
   userId: string,
-  r: { id?: string; name: string; sourceUrl?: string | null; servings?: number | null } & Nutrition,
+  r: {
+    id?: string
+    name: string
+    sourceUrl?: string | null
+    servings?: number | null
+  } & Nutrition,
 ): Promise<string> {
   const cols = NUTRIENTS.map((k) => NUTRITION_COLUMNS[k])
   if (r.id) {
@@ -252,14 +338,30 @@ export async function saveRecipe(
         `UPDATE health_recipes SET name = ?, source_url = ?, servings = ?, ${cols.map((c) => `${c} = ?`).join(', ')},
            updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ? AND user_id = ? AND archived_at IS NULL`,
       )
-      .bind(r.name, r.sourceUrl ?? null, r.servings ?? null, ...NUTRIENTS.map((k) => r[k]), r.id, userId)
+      .bind(
+        r.name,
+        r.sourceUrl ?? null,
+        r.servings ?? null,
+        ...NUTRIENTS.map((k) => r[k]),
+        r.id,
+        userId,
+      )
       .run()
     return r.id
   }
   const id = newId('hrec')
   await db
-    .prepare(`INSERT INTO health_recipes (id, user_id, name, source_url, servings, ${cols.join(', ')}) VALUES (?, ?, ?, ?, ?, ${cols.map(() => '?').join(', ')})`)
-    .bind(id, userId, r.name, r.sourceUrl ?? null, r.servings ?? null, ...NUTRIENTS.map((k) => r[k]))
+    .prepare(
+      `INSERT INTO health_recipes (id, user_id, name, source_url, servings, ${cols.join(', ')}) VALUES (?, ?, ?, ?, ?, ${cols.map(() => '?').join(', ')})`,
+    )
+    .bind(
+      id,
+      userId,
+      r.name,
+      r.sourceUrl ?? null,
+      r.servings ?? null,
+      ...NUTRIENTS.map((k) => r[k]),
+    )
     .run()
   return id
 }
@@ -267,27 +369,61 @@ export async function saveRecipe(
 export async function addActivity(
   db: D1Database,
   userId: string,
-  entry: { day: string; kind: string; minutes?: number | null; steps?: number | null; intensity: Intensity },
+  entry: {
+    day: string
+    kind: string
+    minutes?: number | null
+    steps?: number | null
+    intensity: Intensity
+  },
 ): Promise<string> {
   const id = newId('hact')
   await db
-    .prepare('INSERT INTO health_activities (id, user_id, day, kind, minutes, steps, intensity) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .bind(id, userId, entry.day, entry.kind, entry.minutes ?? null, entry.steps ?? null, entry.intensity)
+    .prepare(
+      'INSERT INTO health_activities (id, user_id, day, kind, minutes, steps, intensity) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    )
+    .bind(
+      id,
+      userId,
+      entry.day,
+      entry.kind,
+      entry.minutes ?? null,
+      entry.steps ?? null,
+      entry.intensity,
+    )
     .run()
   return id
 }
 
-export async function habitAmount(db: D1Database, userId: string, day: string, habit: Habit): Promise<number | null> {
+export async function habitAmount(
+  db: D1Database,
+  userId: string,
+  day: string,
+  habit: Habit,
+): Promise<number | null> {
   const row = await db
-    .prepare('SELECT amount FROM health_habit_days WHERE user_id = ? AND day = ? AND habit = ?')
+    .prepare(
+      'SELECT amount FROM health_habit_days WHERE user_id = ? AND day = ? AND habit = ?',
+    )
     .bind(userId, day, habit)
     .first<{ amount: number }>()
   return row ? row.amount : null
 }
 
-export async function setHabit(db: D1Database, userId: string, day: string, habit: Habit, amount: number | null) {
+export async function setHabit(
+  db: D1Database,
+  userId: string,
+  day: string,
+  habit: Habit,
+  amount: number | null,
+) {
   if (amount == null) {
-    await db.prepare('DELETE FROM health_habit_days WHERE user_id = ? AND day = ? AND habit = ?').bind(userId, day, habit).run()
+    await db
+      .prepare(
+        'DELETE FROM health_habit_days WHERE user_id = ? AND day = ? AND habit = ?',
+      )
+      .bind(userId, day, habit)
+      .run()
     return
   }
   await db
@@ -306,8 +442,16 @@ export const ENTRY_TABLES = {
 } as const
 export type EntryTable = keyof typeof ENTRY_TABLES
 
-export async function deleteEntry(db: D1Database, userId: string, table: EntryTable, id: string): Promise<boolean> {
-  const r = await db.prepare(`DELETE FROM ${ENTRY_TABLES[table]} WHERE id = ? AND user_id = ?`).bind(id, userId).run()
+export async function deleteEntry(
+  db: D1Database,
+  userId: string,
+  table: EntryTable,
+  id: string,
+): Promise<boolean> {
+  const r = await db
+    .prepare(`DELETE FROM ${ENTRY_TABLES[table]} WHERE id = ? AND user_id = ?`)
+    .bind(id, userId)
+    .run()
   return (r.meta?.changes ?? 0) > 0
 }
 
@@ -315,7 +459,10 @@ export async function deleteEntry(db: D1Database, userId: string, table: EntryTa
 
 export const MAX_SUPPLEMENTS = 30
 
-export async function listSupplements(db: D1Database, userId: string): Promise<Supplement[]> {
+export async function listSupplements(
+  db: D1Database,
+  userId: string,
+): Promise<Supplement[]> {
   const { results } = await db
     .prepare(
       `SELECT id, name, dose, doses_per_day AS dosesPerDay, caffeine_mg AS caffeineMg
@@ -326,20 +473,33 @@ export async function listSupplements(db: D1Database, userId: string): Promise<S
   return results ?? []
 }
 
-export async function supplementsToday(db: D1Database, userId: string, day: string): Promise<SupplementToday[]> {
+export async function supplementsToday(
+  db: D1Database,
+  userId: string,
+  day: string,
+): Promise<SupplementToday[]> {
   const list = await listSupplements(db, userId)
   const { results } = await db
-    .prepare('SELECT supplement_id AS id, COUNT(*) AS n FROM health_supplement_doses WHERE user_id = ? AND day = ? GROUP BY supplement_id')
+    .prepare(
+      'SELECT supplement_id AS id, COUNT(*) AS n FROM health_supplement_doses WHERE user_id = ? AND day = ? GROUP BY supplement_id',
+    )
     .bind(userId, day)
     .all<{ id: string; n: number }>()
   const taken = new Map((results ?? []).map((r) => [r.id, Number(r.n)]))
   return list.map((s) => ({ ...s, taken: taken.get(s.id) ?? 0 }))
 }
 
-export async function addDose(db: D1Database, userId: string, supplementId: string, day: string): Promise<string> {
+export async function addDose(
+  db: D1Database,
+  userId: string,
+  supplementId: string,
+  day: string,
+): Promise<string> {
   const id = newId('hdose')
   await db
-    .prepare('INSERT INTO health_supplement_doses (id, user_id, supplement_id, day) VALUES (?, ?, ?, ?)')
+    .prepare(
+      'INSERT INTO health_supplement_doses (id, user_id, supplement_id, day) VALUES (?, ?, ?, ?)',
+    )
     .bind(id, userId, supplementId, day)
     .run()
   return id
@@ -347,55 +507,74 @@ export async function addDose(db: D1Database, userId: string, supplementId: stri
 
 // ---------------------------------------------------------------- summary
 
-export async function healthSummary(db: D1Database, userId: string, today: string): Promise<HealthSummary | null> {
+export async function healthSummary(
+  db: D1Database,
+  userId: string,
+  today: string,
+): Promise<HealthSummary | null> {
   const profile = await loadProfile(db, userId)
   if (!profile) return null
   const since = addDays(today, -120)
   const week = weekStart(today)
 
-  const [meals, activities, habitRows, weighIns, weekActivity, supplements] = await Promise.all([
-    db
-      .prepare(
-        `SELECT ${MEAL_SELECT} FROM health_meals WHERE user_id = ? AND day = ? ORDER BY created_at, id`,
-      )
-      .bind(userId, today)
-      .all<MealEntry>(),
-    db
-      .prepare(
-        `SELECT id, day, kind, minutes, steps, intensity FROM health_activities
+  const [meals, activities, habitRows, weighIns, weekActivity, supplements] =
+    await Promise.all([
+      db
+        .prepare(
+          `SELECT ${MEAL_SELECT} FROM health_meals WHERE user_id = ? AND day = ? ORDER BY created_at, id`,
+        )
+        .bind(userId, today)
+        .all<MealEntry>(),
+      db
+        .prepare(
+          `SELECT id, day, kind, minutes, steps, intensity FROM health_activities
          WHERE user_id = ? AND day = ? ORDER BY created_at, id`,
-      )
-      .bind(userId, today)
-      .all<ActivityEntry>(),
-    db
-      .prepare('SELECT day, habit, amount FROM health_habit_days WHERE user_id = ? AND day >= ? AND day <= ?')
-      .bind(userId, since, today)
-      .all<{ day: string; habit: Habit; amount: number }>(),
-    db
-      .prepare(
-        `SELECT id, day, weight_kg AS weightKg, waist_cm AS waistCm FROM health_weigh_ins
+        )
+        .bind(userId, today)
+        .all<ActivityEntry>(),
+      db
+        .prepare(
+          'SELECT day, habit, amount FROM health_habit_days WHERE user_id = ? AND day >= ? AND day <= ?',
+        )
+        .bind(userId, since, today)
+        .all<{ day: string; habit: Habit; amount: number }>(),
+      db
+        .prepare(
+          `SELECT id, day, weight_kg AS weightKg, waist_cm AS waistCm FROM health_weigh_ins
          WHERE user_id = ? AND day >= ? AND day <= ? ORDER BY day`,
-      )
-      .bind(userId, since, today)
-      .all<WeighIn>(),
-    db
-      .prepare(
-        `SELECT COALESCE(SUM(minutes), 0) AS minutes, COALESCE(SUM(steps), 0) AS steps FROM health_activities
+        )
+        .bind(userId, since, today)
+        .all<WeighIn>(),
+      db
+        .prepare(
+          `SELECT COALESCE(SUM(minutes), 0) AS minutes, COALESCE(SUM(steps), 0) AS steps FROM health_activities
          WHERE user_id = ? AND day >= ? AND day <= ?`,
-      )
-      .bind(userId, week, today)
-      .first<{ minutes: number; steps: number }>(),
-    supplementsToday(db, userId, today),
-  ])
+        )
+        .bind(userId, week, today)
+        .first<{ minutes: number; steps: number }>(),
+      supplementsToday(db, userId, today),
+    ])
 
-  const habits = Object.fromEntries(HABITS.map((h) => [h, 0])) as Record<Habit, number>
-  const byHabit = new Map<Habit, Map<string, number>>(HABITS.map((h) => [h, new Map()]))
+  const habits = Object.fromEntries(HABITS.map((h) => [h, 0])) as Record<
+    Habit,
+    number
+  >
+  const byHabit = new Map<Habit, Map<string, number>>(
+    HABITS.map((h) => [h, new Map()]),
+  )
   for (const r of habitRows.results ?? []) {
     byHabit.get(r.habit)?.set(r.day, r.amount)
     if (r.day === today) habits[r.habit] = r.amount
   }
   const streaks = Object.fromEntries(
-    HABITS.map((h) => [h, habitStreak(byHabit.get(h)!, profile.targets[h] ?? DEFAULT_TARGETS[h], today)]),
+    HABITS.map((h) => [
+      h,
+      habitStreak(
+        byHabit.get(h)!,
+        profile.targets[h] ?? DEFAULT_TARGETS[h],
+        today,
+      ),
+    ]),
   ) as Record<Habit, number>
 
   const mealList = meals.results ?? []
@@ -416,9 +595,14 @@ export async function healthSummary(db: D1Database, userId: string, today: strin
     activities: activities.results ?? [],
     habits,
     supplements,
-    supplementsDue: supplements.reduce((s, x) => s + Math.max(0, x.dosesPerDay - x.taken), 0),
+    supplementsDue: supplements.reduce(
+      (s, x) => s + Math.max(0, x.dosesPerDay - x.taken),
+      0,
+    ),
     caffeineMg,
-    calories: withCalories.length ? withCalories.reduce((s, m) => s + (m.calories ?? 0), 0) : null,
+    calories: withCalories.length
+      ? withCalories.reduce((s, m) => s + (m.calories ?? 0), 0)
+      : null,
     nutrition: totalNutrition(mealList),
     week: {
       start: week,
@@ -436,7 +620,8 @@ export async function healthSummary(db: D1Database, userId: string, today: strin
     streaks,
     notes: healthNotes({
       paceKgPerWeek: trend.paceKgPerWeek,
-      weeksOfData: weekly.filter((w) => w.weekStart >= addDays(week, -28)).length,
+      weeksOfData: weekly.filter((w) => w.weekStart >= addDays(week, -28))
+        .length,
       supplements,
       caffeineMg,
     }),

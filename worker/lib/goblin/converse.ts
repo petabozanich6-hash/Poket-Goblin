@@ -22,6 +22,7 @@ import {
   type DayRange,
 } from '../../../shared/goblin/conversation'
 import { normaliseAddress } from '../../../shared/goblin/address'
+import { parseHealth } from '../../../shared/goblin/health'
 import { parseOperation, splitClauses } from '../../../shared/goblin/language'
 import {
   styleReply,
@@ -813,6 +814,12 @@ export async function converse(
   const delegated: ActResponse[] = []
 
   for (const clause of splitClauses(heard)) {
+    // Health questions ("did I take my vitamins?", "how's my eating today?") go to the health
+    // handler, not the day overview.
+    if (parseHealth(clause)?.kind === 'query') {
+      leftovers.push(clause)
+      continue
+    }
     const conversational: Conversational | null = classifyConversation(
       clause,
       ctx.wallClock,

@@ -76,6 +76,7 @@ export const EXPORTED_TABLES: Record<string, { omit?: string[] }> = {
   // Opt-in health tracking (migration 0025).
   health_profiles: {},
   health_weigh_ins: {},
+  health_recipes: {},
   health_meals: {},
   health_activities: {},
   health_habit_days: {},

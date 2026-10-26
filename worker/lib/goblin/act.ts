@@ -12,6 +12,7 @@
  * Every change is recorded in goblin_actions with the state before and after,
  * which is what makes Undo real.
  */
+import { looksLikeHealth } from '../../../shared/goblin/health'
 import {
   parseUtterance,
   type Operation,
@@ -25,12 +26,20 @@ import {
 import { addHoursIso, localDateTimeToIso } from '../datetime'
 import { recordTaskHistory } from '../history'
 import { freePlanLimitFromError, freeQuota } from '../freeQuota'
+import { healthTablesReady, loadProfile } from '../health'
 import { newId } from '../ids'
 import { ensureDefaultShoppingList } from '../shopping'
+import {
+  applyHealthPlan,
+  healthAct,
+  revertHealthPlan,
+  type HealthPlan,
+} from './healthAct'
 
 // ------------------------------------------------------------------ types
 
 export type Plan =
+  | HealthPlan
   | { kind: 'shopping_insert'; listId: string; name: string; quantity: string }
   | {
       kind: 'shopping_update'
@@ -259,6 +268,9 @@ async function applyPlan(
   now: string,
 ): Promise<string> {
   switch (plan.kind) {
+    case 'health_insert':
+    case 'health_update':
+      return applyHealthPlan(db, userId, plan)
     case 'shopping_insert': {
       const id = newId('sitem')
       const max = await db
@@ -408,6 +420,10 @@ export async function revertPlan(
   now: string,
 ) {
   switch (plan.kind) {
+    case 'health_insert':
+    case 'health_update':
+      await revertHealthPlan(db, userId, plan)
+      return
     case 'shopping_insert':
       await db
         .prepare(
@@ -1251,11 +1267,29 @@ export async function actOnText(
       case 'overwhelm':
         response.overwhelm = true
         break
+      case 'health':
+        response.results.push(await healthAct(ctx, op.health))
+        break
       case 'capture':
+        // Health talk that wasn't understood stays out of the brain-dump review (which may use AI)
+        // once someone has turned Health on.
+        if (looksLikeHealth(op.clause) && (await healthOn(ctx))) {
+          response.results.push({
+            kind: 'info',
+            message:
+              'I didn’t quite catch that. Try “had toast for breakfast”, “walked 30 minutes” or “took my multivitamin”, or log it on the Health page.',
+          })
+          break
+        }
         response.capture.push(op.clause)
     }
   }
   return response
+}
+
+async function healthOn(ctx: Ctx): Promise<boolean> {
+  if (!(await healthTablesReady(ctx.db))) return false
+  return (await loadProfile(ctx.db, ctx.userId)) !== null
 }
 
 // ------------------------------------------------------------- undo/confirm

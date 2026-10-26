@@ -10,6 +10,7 @@
  * anything not recognised falls through to the existing brain-dump review.
  */
 import { parseRelativeDate, parseTime } from '../brainDump'
+import { parseHealth, type HealthOp } from './health'
 
 export type ShoppingEntry = { name: string; quantity: string }
 
@@ -61,6 +62,7 @@ export type Operation =
     }
   | { op: 'question'; clause: string }
   | { op: 'overwhelm'; clause: string }
+  | { op: 'health'; health: HealthOp; clause: string }
   | { op: 'capture'; clause: string }
 
 const OVERWHELM =
@@ -255,6 +257,10 @@ export function parseOperation(rawClause: string, now: Date): Operation {
 
   if (OVERWHELM.test(lower) && lower.length < 280)
     return { op: 'overwhelm', clause }
+
+  // Meals, weigh-ins, activity, habits and supplements (shared/goblin/health.ts).
+  const health = parseHealth(clause)
+  if (health) return { op: 'health', health, clause }
 
   // Negation: "I haven't bought milk yet", "I didn't pay the bill".
   const notYet = lower.match(
