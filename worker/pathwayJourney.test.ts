@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { app } from './index'
 import { createHarness, type Harness, type TestUser } from './testing/harness'
@@ -22,6 +22,10 @@ const STUDY_SCHEDULE = [
 ].join('\n')
 
 beforeEach(async () => {
+  // The schedule's Week 1 starts on 19 October 2026; past weeks are rightly
+  // left unscheduled, so plan from the start of term rather than today.
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-14T00:00:00Z'))
   h = createHarness()
   owner = await h.register('study-journey-owner@example.com')
   stranger = await h.register('study-journey-stranger@example.com')
@@ -29,6 +33,8 @@ beforeEach(async () => {
   // Free-plan task allowance. Verify the legitimate Premium workflow.
   h.makeOwner(owner.id)
 })
+
+afterEach(() => vi.useRealTimers())
 
 async function uploadSchedule() {
   const data = new FormData()
