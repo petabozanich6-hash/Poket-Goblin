@@ -1,6 +1,6 @@
 # Pocket Goblin Privacy Policy
 
-**Effective date:** 17 October 2026
+**Effective date:** 29 October 2026
 
 **Pocket Goblin** is operated by Peta Bozanich, trading as Pocket Goblin (ABN 54 938 519 819), in New South Wales, Australia. Website: [pocketgoblin.org](https://pocketgoblin.org). Privacy enquiries: support@pocketgoblin.org.
 
