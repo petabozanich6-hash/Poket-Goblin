@@ -865,6 +865,15 @@ describe('the Devourer acts first', () => {
 })
 
 describe('photos and scans (Workers AI)', () => {
+  // The letter (fixtures/letter-photo.txt) is dated 9 October 2026 and its
+  // deadlines are in late October; past deadlines are rightly skipped, so
+  // read it on a day shortly after it was sent rather than on today's date.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-12T00:00:00Z'))
+  })
+  afterEach(() => vi.useRealTimers())
+
   const fixture = (name: string) =>
     readFileSync(
       join(
