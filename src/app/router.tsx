@@ -16,6 +16,7 @@ import { HomePage } from '@/pages/HomePage'
 import { LegalPage } from '@/pages/LegalPage'
 import { InboxPage } from '@/pages/InboxPage'
 import { LifePage } from '@/pages/LifePage'
+import { HealthPage } from '@/features/health/HealthPage'
 import { MyLifeLayout, MyLifeOverview } from '@/pages/MyLifePage'
 import { PlanPage } from '@/pages/PlanPage'
 import { SearchPage } from '@/pages/SearchPage'
@@ -109,6 +110,7 @@ export function AppRouter() {
             <Route path="calendar" element={<CalendarPage />} />
             <Route path="lists" element={<LifePage />} />
             <Route path="documents" element={<DocumentsPage />} />
+            <Route path="health" element={<HealthPage />} />
             <Route path="plan" element={<PlanPage />} />
             <Route path="review" element={<InboxPage />} />
             <Route path="search" element={<SearchPage />} />

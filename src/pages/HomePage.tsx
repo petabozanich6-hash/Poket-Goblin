@@ -15,6 +15,8 @@ import { fetchPriorities } from '@/features/magical/magicalApi'
 import { useOverwhelm } from '@/features/magical/useOverwhelm'
 import { fetchTodayPlan } from '@/features/plan/planApi'
 import { TaskList } from '@/features/tasks/TaskList'
+import { HealthNudge } from '@/features/health/HealthNudge'
+import { PushNudge } from '@/features/push/PushNudge'
 
 import styles from './HomePage.module.css'
 
@@ -154,6 +156,9 @@ export function HomePage() {
       <div data-tour="capture">
         <TellTheGoblin prominent />
       </div>
+
+      <HealthNudge />
+      <PushNudge />
 
       {hasToday ? (
         <section className={styles.panel} aria-labelledby="today-heading">

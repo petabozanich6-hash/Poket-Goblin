@@ -38,6 +38,9 @@ import { planRoutes } from './routes/plan'
 import { reminderRoutes } from './routes/reminders'
 import { reviewRoutes } from './routes/review'
 import { searchRoutes } from './routes/search'
+import { healthRoutes } from './routes/health'
+import { pushRoutes } from './routes/push'
+import { PUSH_CRON, runPushTick, sweepPushNotices } from './lib/push/deliver'
 import { shoppingRoutes } from './routes/shopping'
 import { supportRoutes } from './routes/support'
 import { taskRoutes } from './routes/tasks'
@@ -158,6 +161,8 @@ app.route('/calendar', calendarRoutes)
 app.route('/reminders', reminderRoutes)
 app.route('/notes', noteRoutes)
 app.route('/shopping', shoppingRoutes)
+app.route('/my-health', healthRoutes)
+app.route('/push', pushRoutes)
 app.route('/search', searchRoutes)
 app.route('/history', historyRoutes)
 app.route('/dashboard', dashboardRoutes)
@@ -228,12 +233,27 @@ export { app }
  * challenges. Logs counts only.
  */
 async function scheduled(
-  _controller: ScheduledController,
+  controller: ScheduledController,
   env: Env,
   ctx: ExecutionContext,
 ) {
+  if (controller.cron === PUSH_CRON) {
+    ctx.waitUntil(
+      runPushTick(env).then(
+        (r) => {
+          if (r.queued || r.sent || r.gone || r.failed)
+            console.log(
+              `push: ${r.queued} queued, ${r.sent} sent, ${r.gone} gone, ${r.failed} failed`,
+            )
+        },
+        (e) => console.error('push: run failed', e),
+      ),
+    )
+    return
+  }
   ctx.waitUntil(
     (async () => {
+      await sweepPushNotices(env).catch(() => undefined)
       const documents = await sweepExpiredDocuments(env)
       await sweepExpiredChallenges(env)
       // Voice housekeeping: replay records and expired follow-up context.

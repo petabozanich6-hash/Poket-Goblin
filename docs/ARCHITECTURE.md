@@ -52,7 +52,7 @@ Pure helpers in `shared/magical/*` (briefing, prioritise, rescue, quiet hours, p
 Worker orchestration in `worker/lib/magical.ts` + `worker/routes/magical.ts`.  
 Preferences extend `user_settings` (migration `0005_sprint5_magical.sql`).
 
-Nudges are **in-app only**. No push/email delivery is claimed until configured and opted in.
+Nudges are in-app. Opt-in web push (reminders, morning/evening check-ins, Goblin HQ replies) is delivered by a once-a-minute Cron Trigger without payloads; see `docs/PUSH_NOTIFICATIONS.md`. No email nudges.
 
 ## Voice & installable app
 

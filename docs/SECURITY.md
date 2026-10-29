@@ -37,7 +37,8 @@ Pocket Goblin stores personal life data (tasks, notes, documents, reminders). Pr
 - The `AUTH_SECRET` fallback is used only outside production; production refuses to serve without a real secret.
 - HSTS is not set yet (domain-wide decision, pending owner approval).
 - OAuth token storage schema exists; live Google/Microsoft exchange not configured — do not claim OAuth secure-complete until tested.
-- No push channel. Account emails (verification, reset, password-changed) go through Cloudflare Email Service; bodies are never logged.
+- Web push is payload-less: browser push services receive an empty, VAPID-signed wake-up and the service worker fetches the words from `/api/push/notices` with the session cookie. Push endpoints are accepted only for known push-service hosts (no SSRF), are tied to the session that registered them (signing out removes them) and are never exported. See `docs/PUSH_NOTIFICATIONS.md`.
+- Account emails (verification, reset, password-changed) go through Cloudflare Email Service; bodies are never logged.
 - Document contents must never be logged; current code paths avoid logging raw uploads.
 
 ## Reporting

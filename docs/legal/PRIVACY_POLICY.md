@@ -1,6 +1,6 @@
 # Pocket Goblin Privacy Policy
 
-**Effective date:** 17 October 2026
+**Effective date:** 29 October 2026
 
 **Pocket Goblin** is operated by Peta Bozanich, trading as Pocket Goblin (ABN 54 938 519 819), in New South Wales, Australia. Website: [pocketgoblin.org](https://pocketgoblin.org). Privacy enquiries: support@pocketgoblin.org.
 
@@ -10,6 +10,7 @@ Your thoughts, plans and paperwork belong to you. This policy explains what info
 
 - **Account information:** email address, display name, email-verification status, password hash and account preferences.
 - **Information you enter:** tasks, reminders, calendar items, notes, shopping lists, brain dumps, conversations with the Goblin, documents and information extracted from them, and personalisation you choose to save.
+- **Health information (only if you turn Health on):** weigh-ins and waist measurements, food and drink with any calorie and nutrient numbers, saved recipes, activity and steps, daily habits such as water and sleep, supplements and when you took them, and the goals you set. See **Health tracking** below.
 - **Support information:** messages, replies and the status of requests sent through Messages to Goblin HQ or email.
 - **Usage and security information:** sign-in sessions, security events, feature usage counts, rate limits and technical diagnostics needed to operate, protect and troubleshoot the service.
 - **Billing and promotion information:** your subscription plan, payment status, renewal dates, Stripe customer and subscription identifiers, applied coupon or promotional-code details, and records of time-limited Premium giveaways. Goblin HQ may show an authorised administrator which account received a giveaway; Stripe holds the actual promotional-code redemption count for published discount codes. Stripe handles payment-card information directly; Pocket Goblin does not receive your full card number or card security code.
@@ -41,6 +42,16 @@ When you upload a document, you choose how it is handled:
 
 Document processing may include built-in text extraction and Cloudflare Workers AI. You control what you upload. Do not rely on extraction or AI interpretation as a substitute for reading an important original.
 
+## Health tracking
+
+Health is **off** until you turn it on and agree to it in **My Life → Health**. Health information is sensitive, so it is handled more carefully than your other entries:
+
+- **Private to you.** Your health entries are visible only in your account. They are not used for advertising and are not shared with anyone else.
+- **Not sent to AI.** Logging a meal, weight, activity, habit or supplement, whether on the Health page or by telling the Goblin, is handled by built-in rules on our servers. Once Health is on, messages that look like health logs are not passed to AI as a brain dump. The one exception is a **nutrition-panel screenshot** you choose to upload: after you confirm, that image is sent to Cloudflare Workers AI only to read the printed numbers, which you can check and edit before anything is saved. The image is not kept.
+- **Recipe links.** If you paste a recipe link, Pocket Goblin fetches that public web page once to read its published nutrition details. Only the link you provide is visited; the site may see a request from our servers.
+- **Not medical advice.** Health shows general information to help you keep track. It does not diagnose or treat anything; talk to your doctor about your situation.
+- **Export and delete.** Your health information is included in the account-data export in **Settings → Your data**. You can delete all of it at any time in **My Life → Health → Goals & settings → Delete my health data**, which also turns Health off. Deleting your account deletes it too.
+
 ## Voice, offline use and your device
 
 Pocket Goblin does not create or retain recordings of your microphone audio. If you choose voice input, your browser or device supplies speech recognition; depending on the browser, audio may be processed by Google, Apple, Microsoft or another browser provider under that provider's policies. Spoken replies use the device's available voices. You can type instead.
@@ -48,6 +59,15 @@ Pocket Goblin does not create or retain recordings of your microphone audio. If 
 Recognised words are used to handle your instruction; saved tasks, notes, settings, taught phrases and other items persist where you choose to save them. Short-lived technical records help prevent duplicate actions and resolve follow-up requests.
 
 Thoughts entered while offline may be stored **on your device** until they are sent. Anyone with access to that device or browser profile may be able to access locally stored information. Clearing browser storage can remove unsent thoughts.
+
+## Notifications
+
+Notifications are **off** until you turn them on for a device and your browser asks for permission. You choose what comes through in **Settings → Notifications**: reminders when they're due, a morning check-in, an evening check-in and replies from Goblin HQ.
+
+- **No personal text through push services.** Your browser's push service (Google for Chrome and Android, Apple for Safari and iPhone, Mozilla for Firefox, Microsoft for Edge on Windows) only carries an empty wake-up signal to your device. Your device then fetches the words directly from Pocket Goblin while you are signed in.
+- **What a notification shows.** Check-ins show counts, such as "2 things due today", not the names of your tasks, health entries or supplements, because lock screens can be seen by others. A reminder shows the reminder text you wrote. A Goblin HQ reply notification says only that a reply is waiting.
+- **What we keep.** For each device: the push address your browser gives us, your time zone and which notifications that device has already shown. For each notification: its type, the record it refers to and when it was sent; these are deleted within a few days. Push addresses are not included in the account export because they work like a password for that device.
+- **Turning off.** Turn notifications off on a device in Settings, or block them in your browser. Signing out of a device stops its notifications. A sign-in lasts 30 days; when it runs out, the device gets one last notification asking you to sign back in, and notifications resume once you do.
 
 ## Essential cookies, local storage and calendar links
 
@@ -62,6 +82,7 @@ We use service providers to run Pocket Goblin:
 - **Cloudflare:** website and API hosting, account/database storage, private uploaded-file storage, Workers AI and configured account-email delivery.
 - **Stripe:** checkout, recurring subscriptions, payment management and billing records.
 - **Your chosen browser or operating-system speech provider:** voice recognition when you switch on microphone access.
+- **Your browser's push service (Google, Apple, Mozilla or Microsoft):** delivery of an empty wake-up signal to your device if you turn on notifications. See **Notifications** above.
 
 A small number of authorised people operating Pocket Goblin may access information where reasonably needed for support, security and service administration. Information may also be disclosed when required by law, to protect the service or users, or with your direction or permission.
 

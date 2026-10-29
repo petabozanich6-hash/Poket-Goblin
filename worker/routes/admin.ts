@@ -69,6 +69,7 @@ import { usdAudQuote } from '../lib/finance'
 import { newId } from '../lib/ids'
 import { billingConfig, stripe, StripeError } from '../lib/billing/stripe'
 import { accountEmail, sendEmail } from '../lib/email'
+import { enqueueNotice } from '../lib/push/notices'
 import {
   revokeAllSessions,
   type AuthUser,
@@ -533,10 +534,10 @@ adminRoutes.post(
       return c.json({ error: 'Invalid reply or status' }, 400)
     }
     const report = await c.env.DB.prepare(
-      'SELECT id FROM support_threads WHERE id = ?',
+      'SELECT id, user_id AS userId FROM support_threads WHERE id = ?',
     )
       .bind(c.req.param('id'))
-      .first()
+      .first<{ id: string; userId: string }>()
     if (!report) return c.json({ error: 'Not found' }, 404)
     await c.env.DB.batch([
       c.env.DB.prepare(
@@ -555,6 +556,17 @@ adminRoutes.post(
       targetId: c.req.param('id'),
       detail: { statusChanged: status !== null },
     })
+    const replyCount = await c.env.DB.prepare(
+      "SELECT COUNT(*) AS n FROM support_replies WHERE thread_id = ? AND author = 'owner'",
+    )
+      .bind(report.id)
+      .first<{ n: number }>()
+    await enqueueNotice(
+      c.env.DB,
+      report.userId,
+      'message',
+      `${report.id}|${replyCount?.n ?? 0}`,
+    )
     return c.json({ ok: true })
   },
 )

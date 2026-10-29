@@ -15,6 +15,7 @@ const SECTIONS = [
   { to: '/life/calendar', label: 'Calendar' },
   { to: '/life/lists', label: 'Lists, notes & reminders' },
   { to: '/life/documents', label: 'Documents' },
+  { to: '/life/health', label: 'Health' },
   { to: '/life/plan', label: 'Plan my day' },
   { to: '/life/review', label: 'Suggestions' },
 ]

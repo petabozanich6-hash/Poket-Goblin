@@ -38,4 +38,10 @@ export type Env = {
   EMAIL_VERIFICATION_REQUIRED?: string
   /** Cloudflare Email Service binding for account emails (optional). */
   EMAIL?: SendEmail
+  /** Web push (VAPID) keys from `npm run push:keys`, both Worker secrets.
+   * Notifications stay off until both are set. */
+  VAPID_PUBLIC_KEY?: string
+  VAPID_PRIVATE_KEY?: string
+  /** Contact for push services, e.g. mailto:support@pocketgoblin.org */
+  VAPID_SUBJECT?: string
 }
